@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>US24 Employee Portal</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔐</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Lexend:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --page: #eceaed;
+    --surface: #fdfafa;
+    --surface-2: #f7f7f5;
+    --glass: rgba(250, 250, 252, .65);
+    --ink: #0b0d10;
+    --ink-soft: #555b63;
+    --rule: #c4c4db;
+    --rule-soft: #e4e4e9;
+    --mint: var(--navy);
+    --mint-deep: var(--navy-hover);
+    --mint-soft: #e3e9f6;
+    --navy: #0a2463;
+    --navy-hover: #0d2f80;
+    --orange: #f97316;
+    --orange-text: #ea580c;
+    --brand-ink: #0a2463;
+    --cobalt: #0648c0;
+    --cobalt-hover: #053da3;
+    --focus: rgba(6, 72, 192, .16);
+    --danger: #c9192e;
+    --danger-bg: #fdf0f1;
+    --warn: #b7791f;
+    --shadow: 0 1px 0 rgba(255,255,255,.7) inset, 0 28px 60px -28px rgba(11, 13, 16, .18);
+
+    --serif: "Marcellus", Georgia, serif;
+    --sans: "Lexend", system-ui, -apple-system, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    --r-sm: 4px;
+    --r-md: 6px;
+    --r-lg: 10px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --page: #0b0d10; --surface: #13161b; --surface-2: #181c22; --glass: rgba(11, 13, 16, .7);
+      --ink: #eceaed; --ink-soft: #9aa1ab; --rule: #2c313b; --rule-soft: #222730;
+      --mint-soft: rgba(59, 91, 180, .22); --cobalt: #8fb3ff; --cobalt-hover: #b3cbff;
+      --focus: rgba(143, 179, 255, .2); --danger: #ff7a88; --danger-bg: rgba(255, 122, 136, .08);
+      --warn: #ffd166; --shadow: 0 28px 60px -28px rgba(0, 0, 0, .7);
+      --navy: #1e3a8a; --navy-hover: #2446a3; --orange-text: #fb923c; --brand-ink: #c7d4f5;
+    }
+  }
+  :root[data-theme="dark"] {
+    --page: #0b0d10; --surface: #13161b; --surface-2: #181c22; --glass: rgba(11, 13, 16, .7);
+    --ink: #eceaed; --ink-soft: #9aa1ab; --rule: #2c313b; --rule-soft: #222730;
+    --mint-soft: rgba(59, 91, 180, .22); --cobalt: #8fb3ff; --cobalt-hover: #b3cbff;
+    --focus: rgba(143, 179, 255, .2); --danger: #ff7a88; --danger-bg: rgba(255, 122, 136, .08);
+    --warn: #ffd166; --shadow: 0 28px 60px -28px rgba(0, 0, 0, .7);
+    --navy: #1e3a8a; --navy-hover: #2446a3; --orange-text: #fb923c; --brand-ink: #c7d4f5;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { min-height: 100%; }
+  body {
+    font-family: var(--sans);
+    font-weight: 400;
+    background: var(--page);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    display: flex; flex-direction: column; min-height: 100vh;
+    overflow-x: hidden;
+  }
+  /* subtle paper grain + soft light */
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background:
+      radial-gradient(900px 500px at 12% -10%, rgba(10, 36, 99, .14), transparent 60%),
+      radial-gradient(800px 520px at 100% 110%, rgba(6, 72, 192, .08), transparent 60%);
+  }
+  body > * { position: relative; z-index: 1; }
+
+  /* ---------- Top nav (glass) ---------- */
+  .nav {
+    position: sticky; top: 0; z-index: 10;
+    background: var(--glass);
+    backdrop-filter: saturate(150%) blur(12px); -webkit-backdrop-filter: saturate(150%) blur(12px);
+    border-bottom: 1px solid var(--rule);
+  }
+  .nav-inner { max-width: 1200px; margin: 0 auto; padding: 14px 32px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .logo { display: flex; align-items: center; gap: 12px; font-family: var(--sans); font-weight: 500; font-size: 20px; letter-spacing: -.02em; color: var(--ink); text-decoration: none; }
+  .logo-mark {
+    width: 42px; height: 42px; border-radius: var(--r-md); display: grid; place-items: center;
+    background: var(--navy); color: #ffffff; border: 1px solid var(--navy); font-family: var(--mono); font-size: 14px; font-weight: 500; letter-spacing: -.02em;
+  }
+  .wordmark { display: flex; flex-direction: column; gap: 3px; }
+  .wordmark-name { line-height: 1.05; }
+  .tagline {
+    display: flex; align-items: center; gap: 5px;
+    font-family: var(--sans); font-size: 9.5px; font-style: italic; font-weight: 500; letter-spacing: 0;
+    color: var(--brand-ink); white-space: nowrap; line-height: 1;
+  }
+  .tagline::before, .tagline::after {
+    content: ""; flex: 1; min-width: 8px; height: 5px;
+    background: linear-gradient(to bottom, var(--orange) 0 2px, transparent 2px 3px, var(--brand-ink) 3px 5px);
+  }
+  .orange { color: var(--orange-text); }
+  .logo-mark .orange, .mark .orange { color: var(--orange); }
+  .nav-right { display: flex; align-items: center; gap: 8px; }
+  .nav-link { font-size: 14px; color: var(--ink); text-decoration: none; padding: 8px 12px; border-radius: var(--r-md); background: none; border: 0; font-family: inherit; cursor: pointer; }
+  .nav-link:hover { background: var(--rule-soft); }
+  .theme-toggle {
+    width: 38px; height: 38px; border-radius: var(--r-md); border: 1px solid var(--rule);
+    background: transparent; color: var(--ink); cursor: pointer; display: grid; place-items: center;
+    transition: background .12s ease;
+  }
+  .theme-toggle:hover { background: var(--rule-soft); }
+
+  /* ---------- Main layout ---------- */
+  .main { flex: 1; width: 100%; max-width: 1200px; margin: 0 auto; padding: clamp(40px, 7vw, 96px) 32px; display: grid; grid-template-columns: 1.15fr 1fr; gap: clamp(40px, 6vw, 88px); align-items: center; }
+
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 10px;
+    font-family: var(--mono); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-soft);
+    padding: 6px 12px 6px 6px; border: 1px solid var(--rule); border-radius: 999px; background: var(--glass);
+    margin-bottom: 28px;
+  }
+  .eyebrow .dot { width: 22px; height: 22px; border-radius: 50%; background: var(--mint); display: grid; place-items: center; }
+  .eyebrow .dot::after { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #ffffff; animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 50% { transform: scale(.6); opacity: .6; } }
+
+  .headline {
+    font-family: var(--serif); font-weight: 400; color: var(--ink);
+    font-size: clamp(42px, 5.6vw, 76px); line-height: 1.04; letter-spacing: -.035em; text-wrap: balance;
+    max-width: 13ch;
+  }
+  .mark { position: relative; display: inline-block; white-space: nowrap; z-index: 0; color: #ffffff; padding: 0 .12em; margin-top: .08em; }
+  .mark::before {
+    content: ""; position: absolute; inset: .06em 0 -.04em; z-index: -1;
+    background: var(--mint); border-radius: 4px; transform-origin: left center;
+    animation: mark 650ms cubic-bezier(.2, .8, .2, 1) 500ms both;
+  }
+  @keyframes mark { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+  .lede { margin-top: 26px; font-size: clamp(17px, 1.6vw, 21px); line-height: 1.45; letter-spacing: -.02em; color: var(--ink-soft); max-width: 34ch; font-weight: 300; }
+
+  .facts { margin-top: 44px; display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--rule); max-width: 520px; }
+  .fact { padding: 18px 16px 0 0; }
+  .fact + .fact { padding-left: 16px; border-left: 1px solid var(--rule); }
+  .fact .k { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-soft); margin-bottom: 6px; }
+  .fact .v { font-family: var(--serif); font-size: 22px; letter-spacing: -.02em; }
+
+  /* ---------- Card ---------- */
+  .card {
+    width: 100%; max-width: 440px; justify-self: end;
+    background: var(--surface); border: 1px solid var(--rule); border-radius: var(--r-lg);
+    box-shadow: var(--shadow); overflow: hidden;
+    animation: rise .5s cubic-bezier(.2, .8, .2, 1);
+  }
+  @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  .card-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 12px 20px; border-bottom: 1px solid var(--rule-soft); background: var(--surface-2);
+    font-family: var(--mono); font-size: 11.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-soft);
+  }
+  .ms-logo { display: inline-grid; grid-template-columns: 6px 6px; gap: 1px; margin-right: 8px; vertical-align: -1px; }
+  .ms-logo i { width: 6px; height: 6px; display: block; }
+  .secure { display: inline-flex; align-items: center; gap: 6px; }
+  .secure::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--mint-deep); }
+  .card-body { padding: 32px 32px 28px; }
+  .card h2 { font-family: var(--serif); font-weight: 400; font-size: 32px; letter-spacing: -.03em; line-height: 1.1; margin-bottom: 8px; }
+  .card .sub { color: var(--ink-soft); font-size: 14.5px; font-weight: 300; margin-bottom: 26px; }
+
+  .field { margin-bottom: 18px; }
+  .field label { display: block; font-family: var(--mono); font-size: 11.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-soft); margin-bottom: 8px; }
+  .input-wrap { position: relative; }
+  .input-wrap svg.lead { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--ink-soft); pointer-events: none; }
+  .input-wrap input {
+    width: 100%; height: 48px; border-radius: var(--r-md); border: 1px solid var(--rule);
+    background: var(--surface); color: var(--ink); font-family: var(--sans); font-size: 15px;
+    padding: 0 46px 0 42px; transition: border-color .12s ease, box-shadow .12s ease;
+  }
+  .input-wrap input::placeholder { color: var(--ink-soft); opacity: .6; font-weight: 300; }
+  .input-wrap input:hover { border-color: var(--ink-soft); }
+  .input-wrap input:focus { outline: none; border-color: var(--ink); box-shadow: 0 0 0 4px var(--focus); }
+  .input-wrap input.invalid { border-color: var(--danger); }
+  .eye {
+    position: absolute; right: 7px; top: 50%; transform: translateY(-50%); width: 34px; height: 34px;
+    border: none; background: transparent; color: var(--ink-soft); cursor: pointer; border-radius: var(--r-sm);
+    display: grid; place-items: center;
+  }
+  .eye:hover { color: var(--ink); background: var(--rule-soft); }
+  .caps { display: none; font-family: var(--mono); font-size: 11.5px; color: var(--warn); margin-top: 8px; }
+  .caps.show { display: block; }
+
+  .row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 4px 0 24px; font-size: 14px; flex-wrap: wrap; }
+  .check { display: flex; align-items: center; gap: 8px; color: var(--ink); cursor: pointer; user-select: none; font-weight: 300; }
+  .check input { width: 16px; height: 16px; accent-color: var(--ink); }
+  .link { color: var(--cobalt); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: color-mix(in srgb, var(--cobalt) 35%, transparent); background: none; border: none; font: inherit; cursor: pointer; }
+  .link:hover { color: var(--cobalt-hover); text-decoration-color: currentColor; }
+
+  .btn {
+    width: 100%; height: 52px; cursor: pointer; border-radius: var(--r-md);
+    font-family: var(--sans); font-weight: 500; font-size: 16px; letter-spacing: -.01em;
+    color: #ffffff; background: var(--navy);
+    border: 1px solid var(--navy);
+    border-top-color: color-mix(in srgb, var(--navy) 75%, white);
+    border-bottom-color: color-mix(in srgb, var(--navy) 80%, black);
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    transition: transform .12s ease, background .12s ease, border-color .12s ease;
+  }
+  .btn .arrow { transition: transform .15s ease; }
+  .btn:hover:not(:disabled) { background: var(--navy-hover); border-color: var(--navy-hover); }
+  .btn:hover:not(:disabled) .arrow { transform: translateX(3px); }
+  .btn:active:not(:disabled) { transform: translateY(1px); }
+  .btn:disabled { opacity: .65; cursor: not-allowed; }
+  .spinner { width: 17px; height: 17px; border-radius: 50%; border: 2px solid rgba(255,255,255,.3); border-top-color: #ffffff; animation: spin .7s linear infinite; display: none; }
+  .btn.loading .spinner { display: block; }
+  .btn.loading .arrow { display: none; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .alert {
+    display: none; align-items: flex-start; gap: 10px; background: var(--danger-bg); color: var(--danger);
+    border: 1px solid color-mix(in srgb, var(--danger) 28%, transparent); border-left-width: 3px;
+    padding: 11px 14px; border-radius: var(--r-md); font-size: 13.5px; margin-bottom: 20px; line-height: 1.45;
+  }
+  .alert.show { display: flex; animation: shake .35s; }
+  @keyframes shake { 20%, 60% { transform: translateX(-4px); } 40%, 80% { transform: translateX(4px); } }
+
+  .card-foot {
+    border-top: 1px solid var(--rule-soft); padding: 14px 32px; background: var(--surface-2);
+    display: flex; align-items: center; gap: 8px; color: var(--ink-soft); font-size: 12.5px; font-weight: 300;
+  }
+
+  /* ---------- Welcome view ---------- */
+  .welcome { display: none; }
+  .welcome.show { display: block; animation: rise .5s cubic-bezier(.2, .8, .2, 1); }
+  .who { display: flex; align-items: center; gap: 16px; margin-bottom: 22px; }
+  .avatar {
+    width: 64px; height: 64px; border-radius: var(--r-lg); flex-shrink: 0; display: grid; place-items: center;
+    font-family: var(--serif); font-size: 26px; color: #ffffff; background: var(--mint);
+  }
+  .welcome h2 { margin-bottom: 6px; }
+  .role {
+    display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 11px; font-weight: 500;
+    letter-spacing: .08em; text-transform: uppercase; padding: 4px 10px; border-radius: 999px; border: 1px solid;
+  }
+  .role.admin { background: var(--navy); color: #ffffff; border-color: var(--navy); }
+  .role.user  { background: var(--mint-soft); color: var(--ink); border-color: color-mix(in srgb, var(--mint-deep) 45%, transparent); }
+  .meta { border: 1px solid var(--rule); border-radius: var(--r-md); margin-bottom: 22px; }
+  .meta div { display: flex; justify-content: space-between; gap: 12px; padding: 12px 14px; font-size: 14px; }
+  .meta div + div { border-top: 1px solid var(--rule-soft); }
+  .meta span:first-child { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-soft); padding-top: 2px; }
+  .meta span:last-child { overflow-wrap: anywhere; text-align: right; }
+  .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--ink); }
+  .btn.ghost:hover { background: var(--ink); color: var(--page); }
+
+  /* ---------- Footer ---------- */
+  .footer { border-top: 1px solid var(--rule); }
+  .footer-inner { max-width: 1200px; margin: 0 auto; padding: 18px 32px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-family: var(--mono); font-size: 11.5px; letter-spacing: .04em; color: var(--ink-soft); }
+
+  /* ---------- Responsive ---------- */
+  @media (max-width: 900px) {
+    .nav-inner, .footer-inner { padding-left: 16px; padding-right: 16px; }
+    .main { grid-template-columns: minmax(0, 1fr); padding: 40px 16px 56px; gap: 36px; }
+    .main > * { min-width: 0; }
+    .eyebrow { font-size: 11px; }
+    .intro { text-align: left; }
+    .headline { font-size: clamp(38px, 10vw, 54px); }
+    .facts { display: none; }
+    .card { justify-self: stretch; max-width: none; }
+    .card-body { padding: 26px 20px 22px; }
+    .card-foot { padding: 12px 20px; }
+    .nav-link.hide-sm { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="logo" href="#"><span class="logo-mark"><span>U<span class="orange">S</span>24</span></span><span class="wordmark"><span class="wordmark-name">U<span class="orange">S</span>24 SOLUTIONS</span><span class="tagline">Innovative Technology Driven</span></span></a>
+    <div class="nav-right">
+      <span class="nav-link hide-sm" style="cursor:default">Employee Portal</span>
+      <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode" title="Toggle theme">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      </button>
+    </div>
+  </div>
+</nav>
+
+<main class="main">
+  <section class="intro">
+    <span class="eyebrow"><span class="dot"></span>Internal access · Employees only</span>
+    <h1 class="headline">Your workspace, <span class="mark">signed <span class="orange">in.</span></span></h1>
+    <p class="lede">Sign in with your company Outlook account to reach internal tools, resources and your team dashboard.</p>
+    <div class="facts">
+      <div class="fact"><div class="k">Access</div><div class="v">Role-based</div></div>
+      <div class="fact"><div class="k">Account</div><div class="v">Outlook ID</div></div>
+      <div class="fact"><div class="k">Session</div><div class="v">Per tab</div></div>
+    </div>
+  </section>
+
+  <div class="card">
+    <div class="card-head">
+      <span><span class="ms-logo"><i style="background:#f25022"></i><i style="background:#7fba00"></i><i style="background:#00a4ef"></i><i style="background:#ffb900"></i></span>Outlook account</span>
+      <span class="secure">Secure</span>
+    </div>
+
+    <div class="card-body">
+      <!-- Login view -->
+      <section id="loginView">
+        <h2>Sign in</h2>
+        <p class="sub">Enter your company email and password.</p>
+
+        <div class="alert" id="alert" role="alert">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span id="alertText"></span>
+        </div>
+
+        <form id="loginForm" novalidate>
+          <div class="field">
+            <label for="email">Outlook ID</label>
+            <div class="input-wrap">
+              <svg class="lead" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>
+              <input id="email" type="email" autocomplete="username" placeholder="name@us24solutions.com" required>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="password">Password</label>
+            <div class="input-wrap">
+              <svg class="lead" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <input id="password" type="password" autocomplete="current-password" placeholder="Enter your password" required>
+              <button type="button" class="eye" id="togglePw" aria-label="Show password">
+                <svg id="eyeIcon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+            <div class="caps" id="caps">⚠ Caps Lock is on</div>
+          </div>
+
+          <div class="row">
+            <label class="check"><input type="checkbox" id="remember"> Remember me</label>
+            <button type="button" class="link" id="forgot">Forgot password?</button>
+          </div>
+
+          <button type="submit" class="btn" id="submitBtn">
+            <span class="spinner"></span><span id="btnText">Sign in</span>
+            <svg class="arrow" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </button>
+        </form>
+      </section>
+
+      <!-- Welcome view -->
+      <section class="welcome" id="welcomeView">
+        <div class="who">
+          <div class="avatar" id="avatar"></div>
+          <div>
+            <h2 id="welcomeName"></h2>
+            <span class="role" id="roleBadge"></span>
+          </div>
+        </div>
+        <div class="meta">
+          <div><span>Account</span><span id="metaEmail"></span></div>
+          <div><span>Access level</span><span id="metaRole"></span></div>
+          <div><span>Signed in</span><span id="metaTime"></span></div>
+        </div>
+        <button class="btn ghost" id="logoutBtn">Sign out</button>
+      </section>
+    </div>
+
+    <div class="card-foot">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      Authorized US24 employees only. Activity may be monitored.
+    </div>
+  </div>
+</main>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <span>© <span id="year"></span> US24 Solutions</span>
+    <span>Need access? Contact your administrator</span>
+  </div>
+</footer>
+
+<script>
+(() => {
+  // Passwords are stored only as salted SHA-256 hashes: sha256("us24|" + email + "|" + password)
+  const USERS = {
+    "saurabh@us24solutions.com": {
+      name: "Saurabh", role: "admin",
+      hashes: ["60dfb9357aa3eebb1a08ea9a3703a900e8bfa9207f6acd7acb8737b16dbf7e50"]
+    },
+    "rohit.k@us24solutions.com": {
+      name: "Rohit K", role: "user",
+      hashes: [
+        "a7480793d7b52627f1044870c72aa2fa9fb71cb945e3b07e3d5ded0a2a6c0056",
+        "0e5a23a4b9729906d9f2432af02ff07f9e2cce6a028d6b0f895eab0317426dc6"
+      ]
+    },
+    "manish.v@us24solutions.com": {
+      name: "Manish V", role: "user",
+      hashes: ["60fc5f604bc27d0bf7be5708037e04248280d4ee6d650ce1cc5c16a7bf72b7ce"]
+    },
+    "jitender.s@us24solutions.com": {
+      name: "Jitender S", role: "user",
+      hashes: ["5c82404e0f5202fa22a902b8298228d9b2be2623699771a1e1beb40ad6d3210f"]
+    }
+  };
+
+  const MAX_ATTEMPTS = 5;
+  const LOCK_MS = 60 * 1000;
+
+  const $ = id => document.getElementById(id);
+  const store = {
+    get(s, k) { try { return s.getItem(k); } catch { return null; } },
+    set(s, k, v) { try { s.setItem(k, v); } catch {} },
+    del(s, k) { try { s.removeItem(k); } catch {} }
+  };
+  const LS = (() => { try { return window.localStorage; } catch { return null; } })();
+  const SS = (() => { try { return window.sessionStorage; } catch { return null; } })();
+
+  $("year").textContent = new Date().getFullYear();
+
+  // Theme
+  const savedTheme = LS && store.get(LS, "us24-theme");
+  if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+  $("themeToggle").addEventListener("click", () => {
+    const cur = document.documentElement.dataset.theme ||
+      (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    const next = cur === "dark" ? "light" : "dark";
+    document.documentElement.dataset.theme = next;
+    if (LS) store.set(LS, "us24-theme", next);
+  });
+
+  // Remembered email
+  const remembered = LS && store.get(LS, "us24-email");
+  if (remembered) { $("email").value = remembered; $("remember").checked = true; }
+
+  // Show / hide password
+  $("togglePw").addEventListener("click", () => {
+    const pw = $("password");
+    const show = pw.type === "password";
+    pw.type = show ? "text" : "password";
+    $("togglePw").setAttribute("aria-label", show ? "Hide password" : "Show password");
+    $("eyeIcon").innerHTML = show
+      ? '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19M1 1l22 22"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/>'
+      : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+  });
+
+  // Caps Lock warning
+  ["keydown", "keyup"].forEach(ev => $("password").addEventListener(ev, e => {
+    if (e.getModifierState) $("caps").classList.toggle("show", e.getModifierState("CapsLock"));
+  }));
+
+  $("forgot").addEventListener("click", () =>
+    showError("Please contact your administrator (saurabh@us24solutions.com) to reset your password."));
+
+  function showError(msg) {
+    const a = $("alert");
+    a.classList.remove("show"); void a.offsetWidth;
+    $("alertText").textContent = msg;
+    a.classList.add("show");
+  }
+  function clearError() {
+    $("alert").classList.remove("show");
+    $("email").classList.remove("invalid");
+    $("password").classList.remove("invalid");
+  }
+
+  async function sha256(text) {
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+    return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
+  }
+
+  function lockState() {
+    const raw = SS && store.get(SS, "us24-lock");
+    return raw ? JSON.parse(raw) : { attempts: 0, until: 0 };
+  }
+  function saveLock(s) { if (SS) store.set(SS, "us24-lock", JSON.stringify(s)); }
+
+  function setLoading(on) {
+    $("submitBtn").disabled = on;
+    $("submitBtn").classList.toggle("loading", on);
+    $("btnText").textContent = on ? "Signing in…" : "Sign in";
+  }
+
+  $("loginForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    clearError();
+
+    const email = $("email").value.trim().toLowerCase();
+    const password = $("password").value;
+
+    const lock = lockState();
+    if (lock.until > Date.now()) {
+      const secs = Math.ceil((lock.until - Date.now()) / 1000);
+      return showError(`Too many failed attempts. Try again in ${secs} seconds.`);
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      $("email").classList.add("invalid"); $("email").focus();
+      return showError("Please enter a valid Outlook email address.");
+    }
+    if (!password) {
+      $("password").classList.add("invalid"); $("password").focus();
+      return showError("Please enter your password.");
+    }
+
+    setLoading(true);
+    const [hash] = await Promise.all([
+      sha256(`us24|${email}|${password}`),
+      new Promise(r => setTimeout(r, 700))
+    ]);
+    setLoading(false);
+
+    const user = USERS[email];
+    if (!user || !user.hashes.includes(hash)) {
+      lock.attempts += 1;
+      if (lock.attempts >= MAX_ATTEMPTS) {
+        lock.until = Date.now() + LOCK_MS; lock.attempts = 0;
+        saveLock(lock);
+        return showError("Too many failed attempts. Sign-in is locked for 60 seconds.");
+      }
+      saveLock(lock);
+      $("password").value = "";
+      $("password").classList.add("invalid"); $("password").focus();
+      const left = MAX_ATTEMPTS - lock.attempts;
+      return showError(`Incorrect email or password. ${left} attempt${left === 1 ? "" : "s"} remaining.`);
+    }
+
+    saveLock({ attempts: 0, until: 0 });
+    if (LS) {
+      if ($("remember").checked) store.set(LS, "us24-email", email);
+      else store.del(LS, "us24-email");
+    }
+    const session = { email, name: user.name, role: user.role, at: Date.now() };
+    if (SS) store.set(SS, "us24-session", JSON.stringify(session));
+    showWelcome(session);
+  });
+
+  function showWelcome(s) {
+    $("loginView").style.display = "none";
+    $("avatar").textContent = s.name.split(" ").map(p => p[0]).join("").slice(0, 2).toUpperCase();
+    $("welcomeName").textContent = `Hello, ${s.name}`;
+    const badge = $("roleBadge");
+    badge.className = "role " + s.role;
+    badge.textContent = s.role === "admin" ? "★ Administrator" : "● Employee";
+    $("metaEmail").textContent = s.email;
+    $("metaRole").textContent = s.role === "admin" ? "Admin (full access)" : "User (standard access)";
+    $("metaTime").textContent = new Date(s.at).toLocaleString();
+    $("welcomeView").classList.add("show");
+  }
+
+  $("logoutBtn").addEventListener("click", () => {
+    if (SS) store.del(SS, "us24-session");
+    $("welcomeView").classList.remove("show");
+    $("loginView").style.display = "";
+    $("password").value = "";
+    $("password").type = "password";
+    $("password").focus();
+  });
+
+  // Restore session within the same tab
+  const existing = SS && store.get(SS, "us24-session");
+  if (existing) { try { showWelcome(JSON.parse(existing)); } catch {} }
+})();
+</script>
+</body>
+</html>
