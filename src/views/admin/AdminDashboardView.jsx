@@ -1,0 +1,213 @@
+import React, { useState, useEffect } from 'react';
+import { useWorkspace } from '../../context/WorkspaceContext';
+import { dashboardApi } from '../../api/dashboard';
+import { vobsApi } from '../../api/vobs';
+import { StatusBadge } from '../../components/vob/StatusBadge';
+import { ClientBadge } from '../../components/vob/ClientBadge';
+import { RecordDetailModal } from '../../components/vob/RecordDetailModal';
+import { CLIENTS } from '../../data/clients';
+
+export function AdminDashboardView() {
+  const { selectedClient, setSelectedClient, setActiveTab, openVerification } = useWorkspace();
+  const [summary, setSummary] = useState({ total: 0, pending: 0, authQueue: 0, error: 0, approved: 0 });
+  const [recentVobs, setRecentVobs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [inspectVobId, setInspectVobId] = useState(null);
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([
+      dashboardApi.getSummary({ clientId: selectedClient }),
+      vobsApi.getVobs({ clientId: selectedClient })
+    ]).then(([sumData, vobsList]) => {
+      setSummary(sumData);
+      setRecentVobs(vobsList);
+      setLoading(false);
+    }).catch(console.error);
+  }, [selectedClient]);
+
+  const handleCardClick = (targetStatus) => {
+    setActiveTab('records');
+  };
+
+  return (
+    <div className="admin-dashboard-view">
+      {/* KPI Overview Metrics */}
+      <section className="dashboard-section">
+        <div className="section-title-row">
+          <div>
+            <h2 className="dashboard-heading">Operational Metrics</h2>
+            <p className="dashboard-sub">Live volume and queue statuses across healthcare client organizations</p>
+          </div>
+          <div className="quick-actions-row">
+            <button type="button" className="btn btn-sm" onClick={() => setActiveTab('upload_assign')}>
+              + Upload & Assign Intake
+            </button>
+            <button type="button" className="btn btn-sm ghost" onClick={() => setActiveTab('master_data')}>
+              Master Reference Data
+            </button>
+          </div>
+        </div>
+
+        <div className="kpi-cards-grid">
+          <div className="kpi-card" onClick={() => handleCardClick('all')} title="Click to view all records">
+            <div className="kpi-label">Total Volume</div>
+            <div className="kpi-number">{loading ? '…' : summary.total}</div>
+            <div className="kpi-meta">All client requests</div>
+          </div>
+
+          <div className="kpi-card kpi-pending" onClick={() => handleCardClick('pending')} title="Click to view pending records">
+            <div className="kpi-label">Pending Verification</div>
+            <div className="kpi-number">{loading ? '…' : summary.pending}</div>
+            <div className="kpi-meta">Assigned & In Progress</div>
+          </div>
+
+          <div className="kpi-card kpi-auth" onClick={() => handleCardClick('auth_queue')} title="Click to view auth queue">
+            <div className="kpi-label">Auth Queue</div>
+            <div className="kpi-number">{loading ? '…' : summary.authQueue}</div>
+            <div className="kpi-meta">Awaiting prior auth determination</div>
+          </div>
+
+          <div className="kpi-card kpi-approved" onClick={() => handleCardClick('approved')} title="Click to view approved records">
+            <div className="kpi-label">Saved Records (Approved)</div>
+            <div className="kpi-number">{loading ? '…' : summary.approved}</div>
+            <div className="kpi-meta">Validated & complete</div>
+          </div>
+
+          <div className="kpi-card kpi-error" onClick={() => handleCardClick('error')} title="Click to view validation errors">
+            <div className="kpi-label">Validation Error</div>
+            <div className="kpi-number">{loading ? '…' : summary.error}</div>
+            <div className="kpi-meta">Requires specialist correction</div>
+          </div>
+        </div>
+      </section>
+
+      {/* Two-column middle layout: Client Breakdown & Specialist Workload */}
+      <section className="dashboard-grid-2">
+        <div className="panel-card">
+          <div className="panel-header">
+            <h3>Volume by Client Sheet (8 Clients)</h3>
+            <span className="panel-sub">VOB_format.xlsx canonical distribution</span>
+          </div>
+          <div className="client-volume-list">
+            {CLIENTS.map(c => {
+              const count = recentVobs.filter(v => v.client === c.id).length;
+              const pct = recentVobs.length ? Math.round((count / recentVobs.length) * 100) : 0;
+              return (
+                <div key={c.id} className="client-vol-row" onClick={() => setSelectedClient(c.id)}>
+                  <div className="vol-client-meta">
+                    <span className="vol-color-dot" style={{ background: c.color }} />
+                    <span className="vol-client-name">{c.name}</span>
+                  </div>
+                  <div className="vol-bar-track">
+                    <div className="vol-bar-fill" style={{ width: `${pct}%`, background: c.color }} />
+                  </div>
+                  <div className="vol-count">
+                    <strong>{count}</strong> <span className="vol-pct">({pct}%)</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="panel-card">
+          <div className="panel-header">
+            <h3>Specialist Allocation & Velocity</h3>
+            <span className="panel-sub">Active staff workload</span>
+          </div>
+          <div className="specialist-workload-list">
+            {[
+              { name: "Rohit K", email: "rohit.k@us24solutions.com", count: 4, complete: 2, capacity: "80%" },
+              { name: "Manish V", email: "manish.v@us24solutions.com", count: 2, complete: 1, capacity: "65%" },
+              { name: "Jitender S", email: "jitender.s@us24solutions.com", count: 2, complete: 2, capacity: "50%" }
+            ].map(sp => (
+              <div key={sp.email} className="spec-row">
+                <div className="spec-info">
+                  <div className="spec-avatar">{sp.name.split(' ').map(p => p[0]).join('')}</div>
+                  <div>
+                    <div className="spec-name">{sp.name}</div>
+                    <div className="spec-email">{sp.email}</div>
+                  </div>
+                </div>
+                <div className="spec-stats">
+                  <div><span>Assigned:</span> <strong>{sp.count}</strong></div>
+                  <div><span>Completed:</span> <strong className="green">{sp.complete}</strong></div>
+                  <span className="capacity-pill">{sp.capacity} load</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Live Recent Verification Feed (One-tap drilldown) */}
+      <section className="dashboard-section">
+        <div className="panel-card">
+          <div className="panel-header">
+            <h3>Active VOB Records Feed</h3>
+            <span className="panel-sub">Tap any record to open full 28 canonical columns and audit log</span>
+          </div>
+
+          <div className="table-responsive">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Client</th>
+                  <th>Patient Name & DOB</th>
+                  <th>Date of Service</th>
+                  <th>Insurance & Plan</th>
+                  <th>Status</th>
+                  <th>Assigned Specialist</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentVobs.map(v => (
+                  <tr key={v.id} className="interactive-row" onClick={() => setInspectVobId(v.id)}>
+                    <td><ClientBadge clientId={v.client} /></td>
+                    <td>
+                      <div className="patient-name-cell">{v.patientName}</div>
+                      <div className="patient-sub-cell">DOB: {v.dob}</div>
+                    </td>
+                    <td>
+                      <div>{v.dos}</div>
+                      <div className="patient-sub-cell">{v.appointmentType}</div>
+                    </td>
+                    <td>
+                      <div>{v.insurance}</div>
+                      <div className="patient-sub-cell">{v.planTypeAndName}</div>
+                    </td>
+                    <td><StatusBadge status={v.vobStatus} /></td>
+                    <td>
+                      <span className="assignee-tag">{v.assignedTo?.split('@')[0]}</span>
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="table-action-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setInspectVobId(v.id);
+                        }}
+                      >
+                        Inspect
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      {/* Modal Inspector for One-Tap Drilldown */}
+      <RecordDetailModal
+        vobId={inspectVobId}
+        isOpen={Boolean(inspectVobId)}
+        onClose={() => setInspectVobId(null)}
+      />
+    </div>
+  );
+}
