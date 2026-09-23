@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { DataError } from '../../components/DataError';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { vobsApi } from '../../api/vobs';
 import { ClientBadge } from '../../components/vob/ClientBadge';
@@ -8,21 +9,30 @@ export function SavedRecordsView() {
   const { currentUser, openVerification } = useWorkspace();
   const [approvedVobs, setApprovedVobs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
   const [docVob, setDocVob] = useState(null);
 
   useEffect(() => {
     setLoading(true);
+    setLoadError('');
     vobsApi.getVobs({
       status: 'Approved',
       userEmail: currentUser.role === 'admin' ? undefined : currentUser.email
     }).then(list => {
       setApprovedVobs(list);
       setLoading(false);
-    }).catch(console.error);
-  }, [currentUser.email]);
+    }).catch((err) => {
+      console.error(err);
+      setLoadError(err?.message || 'Could not load this data.');
+      setLoading(false);
+    });
+  }, [currentUser.email, reloadKey]);
 
   return (
     <div className="saved-records-view">
+      <DataError message={loadError} onRetry={() => setReloadKey(k => k + 1)} />
+
       <div className="panel-card">
         <div className="panel-header">
           <div>
@@ -51,6 +61,8 @@ export function SavedRecordsView() {
             <tbody>
               {loading ? (
                 <tr><td colSpan="8" className="table-empty">Loading Approved Records…</td></tr>
+              ) : loadError ? (
+                <tr><td colSpan="8" className="table-empty">Could not load this data.</td></tr>
               ) : approvedVobs.length === 0 ? (
                 <tr><td colSpan="8" className="table-empty">No approved records completed yet.</td></tr>
               ) : (

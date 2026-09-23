@@ -57,18 +57,11 @@ export default defineConfig(({ mode }) => {
       port: 3000,
       host: true,
       open: false,
+      // Every API call goes through /api/v1 (see src/api/*.js), which is the prefix
+      // the backend mounts. The bare /vobs, /dashboard, /users … entries that used to
+      // sit here matched nothing and are gone.
       proxy: {
         '/api': proxyConfig,
-        '/auth': proxyConfig,
-        '/me': proxyConfig,
-        '/dashboard': proxyConfig,
-        '/vobs': proxyConfig,
-        '/uploads': proxyConfig,
-        '/assignments': proxyConfig,
-        '/users': proxyConfig,
-        '/clients': proxyConfig,
-        '/audit': proxyConfig,
-        '/exports': proxyConfig,
       }
     }
   };

@@ -4,7 +4,7 @@ export const uploadsApi = {
   // POST /uploads
   uploadFile(fileData, client) {
     return apiClient.request({
-      path: '/uploads',
+      path: '/api/v1/uploads',
       method: 'POST',
       data: fileData,
       params: { client }
@@ -14,14 +14,14 @@ export const uploadsApi = {
   // GET /uploads/:id/preview
   getPreview(uploadId) {
     return apiClient.request({
-      path: `/uploads/${uploadId}/preview`
+      path: `/api/v1/uploads/${uploadId}/preview`
     });
   },
 
   // POST /uploads/:id/commit
   commitUpload(uploadId, adminEmail) {
     return apiClient.request({
-      path: `/uploads/${uploadId}/commit`,
+      path: `/api/v1/uploads/${uploadId}/commit`,
       method: 'POST',
       data: { adminEmail }
     });
@@ -30,7 +30,7 @@ export const uploadsApi = {
   // POST /assignments
   assignVobs({ vobIds, assignees, adminEmail }) {
     return apiClient.request({
-      path: '/assignments',
+      path: '/api/v1/assignments',
       method: 'POST',
       data: { vobIds, assignees },
       params: { adminEmail }

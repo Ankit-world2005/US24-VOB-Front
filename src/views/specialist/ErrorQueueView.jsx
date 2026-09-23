@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { DataError } from '../../components/DataError';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { vobsApi } from '../../api/vobs';
 import { ClientBadge } from '../../components/vob/ClientBadge';
@@ -8,20 +9,29 @@ export function ErrorQueueView() {
   const { currentUser, openVerification } = useWorkspace();
   const [errorVobs, setErrorVobs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     setLoading(true);
+    setLoadError('');
     vobsApi.getVobs({
       status: 'Error',
       userEmail: currentUser.role === 'admin' ? undefined : currentUser.email
     }).then(list => {
       setErrorVobs(list);
       setLoading(false);
-    }).catch(console.error);
-  }, [currentUser.email]);
+    }).catch((err) => {
+      console.error(err);
+      setLoadError(err?.message || 'Could not load this data.');
+      setLoading(false);
+    });
+  }, [currentUser.email, reloadKey]);
 
   return (
     <div className="error-queue-view">
+      <DataError message={loadError} onRetry={() => setReloadKey(k => k + 1)} />
+
       <div className="panel-card">
         <div className="panel-header">
           <div>
@@ -49,6 +59,8 @@ export function ErrorQueueView() {
             <tbody>
               {loading ? (
                 <tr><td colSpan="7" className="table-empty">Loading Error Queue…</td></tr>
+              ) : loadError ? (
+                <tr><td colSpan="7" className="table-empty">Could not load this data.</td></tr>
               ) : errorVobs.length === 0 ? (
                 <tr><td colSpan="7" className="table-empty">🎉 Clean slate! Zero validation errors in your queue.</td></tr>
               ) : (

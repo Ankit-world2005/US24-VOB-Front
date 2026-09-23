@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { DataError } from '../../components/DataError';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { usersApi } from '../../api/users';
 
@@ -6,18 +7,25 @@ export function UserManagementView() {
   const { showToast } = useWorkspace();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
 
   const loadUsers = () => {
     setLoading(true);
+    setLoadError('');
     usersApi.getUsers().then(res => {
       setUsers(res);
       setLoading(false);
-    }).catch(console.error);
+    }).catch((err) => {
+      console.error(err);
+      setLoadError(err?.message || 'Could not load this data.');
+      setLoading(false);
+    });
   };
 
   useEffect(() => {
     loadUsers();
-  }, []);
+  }, [reloadKey]);
 
   const handleToggleStatus = async (user) => {
     const nextStatus = user.status === 'active' ? 'deactivated' : 'active';
@@ -43,6 +51,8 @@ export function UserManagementView() {
 
   return (
     <div className="user-management-view">
+      <DataError message={loadError} onRetry={() => setReloadKey(k => k + 1)} />
+
       <div className="panel-card">
         <div className="panel-header">
           <div>
@@ -69,6 +79,8 @@ export function UserManagementView() {
             <tbody>
               {loading ? (
                 <tr><td colSpan="6" className="table-empty">Loading users…</td></tr>
+              ) : loadError ? (
+                <tr><td colSpan="6" className="table-empty">Could not load this data.</td></tr>
               ) : (
                 users.map(u => (
                   <tr key={u.id}>

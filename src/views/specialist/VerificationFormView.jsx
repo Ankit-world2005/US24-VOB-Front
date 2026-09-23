@@ -157,16 +157,20 @@ export function VerificationFormView() {
 
   const { filledCount, totalCount } = getVerificationProgress(formData);
 
-  // Grouped canonical fields matching Parker document structure
+  // One section per block of the Parker document, in the order it reads, so
+  // working down the form works down the document. The row numbers are the
+  // document's own table rows — see CANONICAL_FIELDS.
   const fieldGroups = [
-    { id: 'request', title: 'I. Project & Request Intake', fields: CANONICAL_FIELDS.filter(f => f.group === 'request') },
-    { id: 'patient', title: 'II. Patient & Demographics', fields: CANONICAL_FIELDS.filter(f => f.group === 'patient') },
-    { id: 'insurance', title: 'III. Insurance Carrier & Policy Info', fields: CANONICAL_FIELDS.filter(f => f.group === 'insurance') },
-    { id: 'coverage', title: 'IV. Coverage & Network Status', fields: CANONICAL_FIELDS.filter(f => f.group === 'coverage') },
-    { id: 'financials', title: 'V. Cost Share, Deductibles & Out of Pocket', fields: CANONICAL_FIELDS.filter(f => f.group === 'financials') },
-    { id: 'auth', title: 'VI. Prior Authorization & Visit Limitations', fields: CANONICAL_FIELDS.filter(f => f.group === 'auth') },
-    { id: 'contact_claims', title: 'VII. Audit, Rep & Claim Filing', fields: CANONICAL_FIELDS.filter(f => f.group === 'contact' || f.group === 'claims') },
-    { id: 'secondary', title: 'VIII. Secondary Insurance', fields: CANONICAL_FIELDS.filter(f => f.group === 'secondary') }
+    { id: 'patient', title: 'I. Patient (rows 1–2)', fields: CANONICAL_FIELDS.filter(f => f.group === 'patient') },
+    { id: 'insurance', title: 'II. Insurance & Policy (row 3)', fields: CANONICAL_FIELDS.filter(f => f.group === 'insurance') },
+    { id: 'coverage', title: 'III. Plan, Network & Dates (row 4)', fields: CANONICAL_FIELDS.filter(f => f.group === 'coverage') },
+    { id: 'costshare', title: 'IV. Co-pay & Deductible (row 5)', fields: CANONICAL_FIELDS.filter(f => f.group === 'costshare') },
+    { id: 'oop', title: 'V. Co-insurance & Out of Pocket (row 6)', fields: CANONICAL_FIELDS.filter(f => f.group === 'oop') },
+    { id: 'visits', title: 'VI. Visits (row 7)', fields: CANONICAL_FIELDS.filter(f => f.group === 'visits') },
+    { id: 'auth', title: 'VII. Authorization & Referral (rows 8–9)', fields: CANONICAL_FIELDS.filter(f => f.group === 'auth') },
+    { id: 'rep', title: 'VIII. Coordination & Rep (row 10)', fields: CANONICAL_FIELDS.filter(f => f.group === 'rep') },
+    { id: 'claims', title: 'IX. Claim Filing (row 11)', fields: CANONICAL_FIELDS.filter(f => f.group === 'claims') },
+    { id: 'secondary', title: 'X. Secondary Insurance (rows 12–15)', fields: CANONICAL_FIELDS.filter(f => f.group === 'secondary') }
   ];
 
   return (
@@ -235,11 +239,11 @@ export function VerificationFormView() {
 
           <button
             type="button"
-            className="btn btn-ai-sparkle"
+            className="btn btn-sm"
             onClick={() => setIsAiDrawerOpen(true)}
             title="Paste call transcript or payer portal text to auto-fill"
           >
-            ✨ AI Auto-Fill from Transcript
+            Paste Transcript
           </button>
         </div>
       </div>

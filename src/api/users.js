@@ -3,13 +3,13 @@ import { apiClient } from './client';
 export const usersApi = {
   // GET /users
   getUsers() {
-    return apiClient.request({ path: '/users' });
+    return apiClient.request({ path: '/api/v1/users' });
   },
 
   // POST /users
   createUser(userData) {
     return apiClient.request({
-      path: '/users',
+      path: '/api/v1/users',
       method: 'POST',
       data: userData
     });
@@ -18,7 +18,7 @@ export const usersApi = {
   // PATCH /users/:id
   patchUser(id, updates) {
     return apiClient.request({
-      path: `/users/${id}`,
+      path: `/api/v1/users/${id}`,
       method: 'PATCH',
       data: updates
     });

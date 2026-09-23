@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { DataError } from '../../components/DataError';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { dashboardApi } from '../../api/dashboard';
 import { vobsApi } from '../../api/vobs';
@@ -12,10 +13,13 @@ export function AdminDashboardView() {
   const [summary, setSummary] = useState({ total: 0, pending: 0, authQueue: 0, error: 0, approved: 0 });
   const [recentVobs, setRecentVobs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
   const [inspectVobId, setInspectVobId] = useState(null);
 
   useEffect(() => {
     setLoading(true);
+    setLoadError('');
     Promise.all([
       dashboardApi.getSummary({ clientId: selectedClient }),
       vobsApi.getVobs({ clientId: selectedClient })
@@ -23,8 +27,12 @@ export function AdminDashboardView() {
       setSummary(sumData);
       setRecentVobs(vobsList);
       setLoading(false);
-    }).catch(console.error);
-  }, [selectedClient]);
+    }).catch((err) => {
+      console.error(err);
+      setLoadError(err?.message || 'Could not load this data.');
+      setLoading(false);
+    });
+  }, [selectedClient, reloadKey]);
 
   const handleCardClick = (targetStatus) => {
     setActiveTab('records');
@@ -32,6 +40,8 @@ export function AdminDashboardView() {
 
   return (
     <div className="admin-dashboard-view">
+      <DataError message={loadError} onRetry={() => setReloadKey(k => k + 1)} />
+
       {/* KPI Overview Metrics */}
       <section className="dashboard-section">
         <div className="section-title-row">
@@ -52,31 +62,31 @@ export function AdminDashboardView() {
         <div className="kpi-cards-grid">
           <div className="kpi-card" onClick={() => handleCardClick('all')} title="Click to view all records">
             <div className="kpi-label">Total Volume</div>
-            <div className="kpi-number">{loading ? '…' : summary.total}</div>
+            <div className="kpi-number">{loading ? '…' : loadError ? '—' : summary.total}</div>
             <div className="kpi-meta">All client requests</div>
           </div>
 
           <div className="kpi-card kpi-pending" onClick={() => handleCardClick('pending')} title="Click to view pending records">
             <div className="kpi-label">Pending Verification</div>
-            <div className="kpi-number">{loading ? '…' : summary.pending}</div>
+            <div className="kpi-number">{loading ? '…' : loadError ? '—' : summary.pending}</div>
             <div className="kpi-meta">Assigned & In Progress</div>
           </div>
 
           <div className="kpi-card kpi-auth" onClick={() => handleCardClick('auth_queue')} title="Click to view auth queue">
             <div className="kpi-label">Auth Queue</div>
-            <div className="kpi-number">{loading ? '…' : summary.authQueue}</div>
+            <div className="kpi-number">{loading ? '…' : loadError ? '—' : summary.authQueue}</div>
             <div className="kpi-meta">Awaiting prior auth determination</div>
           </div>
 
           <div className="kpi-card kpi-approved" onClick={() => handleCardClick('approved')} title="Click to view approved records">
             <div className="kpi-label">Saved Records (Approved)</div>
-            <div className="kpi-number">{loading ? '…' : summary.approved}</div>
+            <div className="kpi-number">{loading ? '…' : loadError ? '—' : summary.approved}</div>
             <div className="kpi-meta">Validated & complete</div>
           </div>
 
           <div className="kpi-card kpi-error" onClick={() => handleCardClick('error')} title="Click to view validation errors">
             <div className="kpi-label">Validation Error</div>
-            <div className="kpi-number">{loading ? '…' : summary.error}</div>
+            <div className="kpi-number">{loading ? '…' : loadError ? '—' : summary.error}</div>
             <div className="kpi-meta">Requires specialist correction</div>
           </div>
         </div>

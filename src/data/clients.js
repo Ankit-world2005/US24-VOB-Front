@@ -71,13 +71,17 @@ export const CLIENTS = [
   }
 ];
 
-// 20 FIELDS TO ASK FROM THE REP (Matches User's Call Verification reference)
+// 19 FIELDS TO ASK FROM THE REP (Matches User's Call Verification reference)
+//
+// Every key here must also exist in CANONICAL_FIELDS, or the progress meter
+// counts a field the specialist has no box to type into. "planName" and
+// "inNetworkGroup" were dropped when the form was aligned to the Parker
+// document; "networkStatus" is the document's equivalent of the latter.
 export const REP_VERIFICATION_FIELDS = [
   { key: "idCard", label: "Policy ID", group: "rep" },
   { key: "groupNo", label: "Group ID", group: "rep" },
   { key: "planType", label: "Plan Type", group: "rep" },
-  { key: "planName", label: "Plan Name", group: "rep" },
-  { key: "inNetworkGroup", label: "Network Status (Group)", group: "rep" },
+  { key: "networkStatus", label: "Network Status", group: "rep" },
   { key: "coverageStatus", label: "Coverage", group: "rep" },
   { key: "effectiveDate", label: "Effective Date", group: "rep" },
   { key: "terminationDate", label: "Termination Date", group: "rep" },
@@ -95,22 +99,24 @@ export const REP_VERIFICATION_FIELDS = [
   { key: "pcpReferral", label: "PCP Referral", group: "rep" }
 ];
 
-// 5 FIELDS TO FILL IN - OURS (Internal / Intake Fields)
+// 3 FIELDS TO FILL IN - OURS (Internal / Intake Fields)
+//
+// project, requestDate, enteredBy and initialDos went with the same alignment:
+// the Parker document has no line for any of them, so the form no longer
+// collects them and counting them here would strand the meter below 100%.
 export const OURS_VERIFICATION_FIELDS = [
-  { key: "project", label: "Project", group: "ours" },
-  { key: "requestDate", label: "Request Date", group: "ours" },
-  { key: "enteredBy", label: "Entered By", group: "ours" },
-  { key: "initialDos", label: "Initial Treatment Date", group: "ours" },
-  { key: "insurance", label: "Insurance", group: "ours" }
+  { key: "todayDate", label: "Today's Date", group: "ours" },
+  { key: "insurance", label: "Insurance", group: "ours" },
+  { key: "pat", label: "PAT", group: "ours" }
 ];
 
-// 2 CORE FIELDS ALREADY VERIFIED / INITIALIZED (Makes total 27 fields: FORM 2/27)
+// 2 CORE FIELDS ALREADY VERIFIED / INITIALIZED (Makes total 24 fields)
 export const CORE_VERIFICATION_FIELDS = [
   { key: "serviceType", label: "Service type", group: "core", defaultValue: "PT" },
   { key: "patientName", label: "Patient Name", group: "core" }
 ];
 
-// All 27 tracked fields in Call Verification
+// All 24 tracked fields in Call Verification
 export const ALL_VERIFIED_TRACKED_FIELDS = [
   ...CORE_VERIFICATION_FIELDS,
   ...OURS_VERIFICATION_FIELDS,
@@ -136,9 +142,9 @@ export function getStillToFillFields(formData) {
   return OURS_VERIFICATION_FIELDS.filter(f => !isFieldFilled(formData, f.key));
 }
 
-// Calculate progress: filled / 27
+// Calculate progress across the tracked call-verification fields
 export function getVerificationProgress(formData) {
-  const total = ALL_VERIFIED_TRACKED_FIELDS.length; // 27
+  const total = ALL_VERIFIED_TRACKED_FIELDS.length;
   let filledCount = 0;
   for (const field of ALL_VERIFIED_TRACKED_FIELDS) {
     if (isFieldFilled(formData, field.key)) {
@@ -159,82 +165,91 @@ export function getVerificationProgress(formData) {
   };
 }
 
-// Comprehensive Canonical Form Fields for VOB Verification (Parker + PRD Standard)
+/**
+ * The verification form's fields.
+ *
+ * One entry per labelled line in docs/VOB_PARKER - Copy.docx, in the order the
+ * document reads, so filling the form top-to-bottom fills the document
+ * top-to-bottom. `row` is the document table row an entry belongs to (0 = the
+ * PAT box above the table); ParkerLivePreview renders those same rows.
+ *
+ * Adding a field here without adding it to the document would put a box on the
+ * form that never reaches the client's deliverable.
+ */
 export const CANONICAL_FIELDS = [
-  // Section 1: Project & Request
-  { key: "project", label: "Project", group: "request", required: true },
-  { key: "category", label: "Category", group: "request", required: false, options: ["Commercial", "Medicare Advantage", "Medicaid HMO", "Workers Comp", "Auto / PIP"] },
-  { key: "requestType", label: "Request Type", group: "request", required: true, options: ["CALL", "PORTAL", "FAX", "EMAIL"] },
-  { key: "requestDate", label: "Request Date", group: "request", required: true },
-  { key: "verificationType", label: "Verification", group: "request", required: true, options: ["INITIAL", "RE-VERIFICATION", "ADDITIONAL VISITS"] },
-  { key: "enteredBy", label: "Entered By", group: "request", required: false },
+  // PAT box, above the table
+  { key: "pat", label: "PAT", group: "patient", row: 0, required: false, placeholder: "100%(RESP)" },
 
-  // Section 2: Patient Demographics & Responsibility
-  { key: "patientName", label: "Patient Name", group: "patient", required: true },
-  { key: "dob", label: "Date of Birth", group: "patient", required: true },
-  { key: "todayDate", label: "Today's Date", group: "patient", required: true },
-  { key: "pat", label: "PAT (Patient Responsibility)", group: "patient", required: false, placeholder: "$0.00 (100% COVERED)" },
-  { key: "additionalInfo", label: "Additional Info", group: "patient", required: false },
+  // Row 1–2: patient identity
+  { key: "patientName", label: "Name", group: "patient", row: 1, required: true },
+  { key: "dob", label: "DOB", group: "patient", row: 1, required: true, placeholder: "00/00/0000" },
+  { key: "todayDate", label: "Today's Date", group: "patient", row: 2, required: true, placeholder: "00/00/0000_xx" },
+  { key: "additionalInfo", label: "Additional Info", group: "patient", row: 2, required: false },
 
-  // Section 3: Insurance & Policy Identification
-  { key: "insurance", label: "Insurance Carrier / Name", group: "insurance", required: true },
-  { key: "insurancePhone", label: "Insurance Contact Number", group: "insurance", required: true },
-  { key: "idCard", label: "Policy ID / Member ID", group: "insurance", required: true },
-  { key: "groupNo", label: "Group ID", group: "insurance", required: false },
-  { key: "primarySecondary", label: "Coordination of Benefits", group: "insurance", required: true, options: ["Primary", "Secondary", "Tertiary"] },
+  // Row 3: carrier and policy identifiers
+  { key: "insurance", label: "Insurance Name", group: "insurance", row: 3, required: true },
+  { key: "insurancePhone", label: "Insurance Contact Number", group: "insurance", row: 3, required: true, placeholder: "(000) 000-0000" },
+  { key: "idCard", label: "Policy ID", group: "insurance", row: 3, required: true, placeholder: "XXX0000000" },
+  { key: "groupNo", label: "GROUP ID", group: "insurance", row: 3, required: false, placeholder: "000000" },
 
-  // Section 4: Coverage, Plan & Network Status
-  { key: "serviceType", label: "Service Type", group: "coverage", required: true, options: ["PT", "OT", "ST", "Chiropractic", "Acupuncture"] },
-  { key: "planType", label: "Plan Type", group: "coverage", required: true, options: ["PPO", "HMO", "EPO", "POS", "Indemnity", "Medicare", "Medicaid"] },
-  { key: "planName", label: "Plan Name", group: "coverage", required: false },
-  { key: "networkStatus", label: "Network Status (Overall)", group: "coverage", required: true, options: ["In-Network", "Out-of-Network"] },
-  { key: "inNetworkGroup", label: "Network Status (Group)", group: "coverage", required: false, options: ["Yes", "No", "N/A"] },
-  { key: "coverageStatus", label: "Coverage Status", group: "coverage", required: true, options: ["Active", "Terminated", "Inactive", "Pending"] },
-  { key: "effectiveDate", label: "Effective Date", group: "coverage", required: true },
-  { key: "terminationDate", label: "Termination Date", group: "coverage", required: false, placeholder: "NO or YYYY-MM-DD" },
-  { key: "hsaHraAmt", label: "HSA / HRA Amount", group: "coverage", required: false, placeholder: "NA or $0.00" },
+  // Row 4: plan, network and dates
+  { key: "serviceType", label: "Service Type", group: "coverage", row: 4, required: true, options: ["PT", "OT", "ST", "Chiropractic", "Acupuncture"] },
+  { key: "planType", label: "Plan Type", group: "coverage", row: 4, required: true, options: ["PPO", "HMO", "EPO", "POS", "Indemnity", "Medicare", "Medicaid"] },
+  { key: "networkStatus", label: "Network Status", group: "coverage", row: 4, required: true, options: ["IN-NETWORK", "OUT-OF-NETWORK"] },
+  { key: "coverageStatus", label: "Coverage", group: "coverage", row: 4, required: true },
+  { key: "effectiveDate", label: "Effective Date", group: "coverage", row: 4, required: true, placeholder: "00/00/0000" },
+  { key: "terminationDate", label: "Termination Date", group: "coverage", row: 4, required: false, placeholder: "NA" },
+  // "HCA" is the source document's spelling; the key stays hsaHraAmt.
+  { key: "hsaHraAmt", label: "HCA/HRA AMT", group: "coverage", row: 4, required: false, placeholder: "NA" },
 
-  // Section 5: Cost Share, Deductibles & Out of Pocket
-  { key: "copay", label: "Co-pay?", group: "financials", required: false, options: ["NO", "YES"] },
-  { key: "copayAmount", label: "Co-pay Amount", group: "financials", required: false, placeholder: "$0.00" },
-  { key: "deductibleApplicable", label: "Deductible Applied for PT Services", group: "financials", required: true, options: ["Yes", "No"] },
-  { key: "deductibleIndividual", label: "Deductible Individual", group: "financials", required: false, placeholder: "$0.00" },
-  { key: "deductibleMet", label: "Deductible Met Amount", group: "financials", required: false, placeholder: "$0.00" },
-  { key: "deductibleRemaining", label: "Deductible Remaining Amount", group: "financials", required: false, placeholder: "$0.00" },
-  { key: "copayCoinsurance", label: "Co-Insurance Rate", group: "financials", required: true, placeholder: "0% or 20%" },
-  { key: "coinsuranceCovered", label: "Coinsurance Covered %", group: "financials", required: false, placeholder: "100%" },
-  { key: "outOfPocket", label: "Out of Pocket Max", group: "financials", required: false, placeholder: "$0.00" },
-  { key: "oopMet", label: "OOP Met Amount", group: "financials", required: false, placeholder: "$0.00" },
-  { key: "oopRemaining", label: "OOP Amount Remaining", group: "financials", required: false, placeholder: "$0.00" },
+  // Row 5: co-pay and deductible
+  { key: "copay", label: "Co-pay", group: "costshare", row: 5, required: false, options: ["NO", "YES"] },
+  { key: "copayAmount", label: "Amount", group: "costshare", row: 5, required: false, placeholder: "$0000.00" },
+  { key: "deductibleApplicable", label: "Is Deductible Applied for PT Services", group: "costshare", row: 5, required: true, options: ["YES", "NO"] },
+  { key: "deductibleIndividual", label: "Deductible Individual", group: "costshare", row: 5, required: false, placeholder: "$0000.00" },
+  { key: "deductibleMet", label: "Met Amount", group: "costshare", row: 5, required: false, placeholder: "$0000.00" },
+  { key: "deductibleRemaining", label: "Remaining Amount", group: "costshare", row: 5, required: false, placeholder: "$0000.00" },
 
-  // Section 6: Visit Limits & Authorizations
-  { key: "visitsLimitation", label: "Visit Limitations", group: "auth", required: false, placeholder: "e.g. 30 visits/year" },
-  { key: "initialDos", label: "Initial Treatment Date / DOS", group: "auth", required: true },
-  { key: "visitsUsed", label: "Used Visit / Prior Visits", group: "auth", required: false, placeholder: "NO or count" },
-  { key: "authInitialEval", label: "Authorization Required for Initial Eval?", group: "auth", required: true, options: ["NO", "YES"] },
-  { key: "authTreatment", label: "Authorization Required for Treatment?", group: "auth", required: true, options: ["NO", "YES"] },
-  { key: "referral", label: "Referral Required?", group: "auth", required: false, options: ["NO", "YES"] },
-  { key: "pcpReferral", label: "Referral Required from PCP for Approval?", group: "auth", required: false, options: ["NO", "YES"] },
-  { key: "howToObtainAuth", label: "How to Obtain Authorization?", group: "auth", required: false, placeholder: "Portal / Phone / Fax" },
-  { key: "authRequestTat", label: "Within How Many Days We Can Request Auth?", group: "auth", required: false, placeholder: "e.g. 3-5 days from DOS" },
-  { key: "authNumber", label: "Authorization #", group: "auth", required: false },
-  { key: "authCoverageDates", label: "Auth Coverage Dates", group: "auth", required: false, placeholder: "MM/DD/YYYY - MM/DD/YYYY" },
+  // Row 6: co-insurance and out of pocket
+  { key: "copayCoinsurance", label: "Co-insurance", group: "oop", row: 6, required: true, options: ["YES", "NO"] },
+  { key: "coinsuranceCovered", label: "Covered", group: "oop", row: 6, required: false, placeholder: "0%" },
+  { key: "outOfPocket", label: "Out of Pocket", group: "oop", row: 6, required: false, placeholder: "$0000.00" },
+  { key: "oopMet", label: "Met Amount", group: "oop", row: 6, required: false, placeholder: "$0000.00" },
+  { key: "oopRemaining", label: "Amount Remaining", group: "oop", row: 6, required: false, placeholder: "$0000.00" },
 
-  // Section 7: Audit, Rep & Claim Details
-  { key: "insuranceRep", label: "Insurance Rep Name", group: "contact", required: false },
-  { key: "callReference", label: "Call Reference Number", group: "contact", required: false },
-  { key: "claimMailingAddress", label: "Claim Mailing Address", group: "claims", required: false },
-  { key: "payerId", label: "Payer ID for Claims", group: "claims", required: true },
-  { key: "tflDaysClaims", label: "TFL Days for Claims", group: "claims", required: false, placeholder: "90 days" },
-  { key: "tflCorrectedClaims", label: "TFL for Corrected Claims", group: "claims", required: false, placeholder: "180 days" },
+  // Row 7: visits
+  { key: "visitsLimitation", label: "Visit Limitations", group: "visits", row: 7, required: false, placeholder: "0" },
+  { key: "visitsUsed", label: "Used Visit", group: "visits", row: 7, required: false, placeholder: "NO" },
 
-  // Section 8: Secondary Insurance
-  { key: "secondaryYesNo", label: "Secondary (Yes/No)", group: "secondary", required: false, options: ["NO", "YES"] },
-  { key: "secondaryInsName", label: "Secondary Ins Name", group: "secondary", required: false },
-  { key: "secondaryPlanName", label: "Secondary Plan Name", group: "secondary", required: false },
-  { key: "secondaryPolicyId", label: "Secondary Policy ID", group: "secondary", required: false },
-  { key: "secondaryEffectiveDate", label: "Secondary Effective Date", group: "secondary", required: false },
-  { key: "secondaryDeductible", label: "Secondary Deductible", group: "secondary", required: false, placeholder: "NA or $0.00" },
-  { key: "secondaryVisitLimit", label: "Secondary Visit Limit", group: "secondary", required: false, placeholder: "MN or count" },
-  { key: "secondaryUsedLimit", label: "Secondary Used Limit", group: "secondary", required: false }
+  // Rows 8–9: authorization and referral
+  { key: "authInitialEval", label: "Is Authorization Required for Initial Eval", group: "auth", row: 8, required: true, options: ["NO", "YES"] },
+  { key: "authTreatment", label: "Is Authorization Required for Treatment", group: "auth", row: 8, required: true, options: ["NO", "YES"] },
+  { key: "referral", label: "Referral Required", group: "auth", row: 8, required: false, options: ["NO", "YES"] },
+  { key: "pcpReferral", label: "Is Referral Required from PCP for Approval", group: "auth", row: 8, required: false, options: ["NO", "YES"] },
+  { key: "howToObtainAuth", label: "How to obtain Authorization?", group: "auth", row: 8, required: false, placeholder: "Portal / Phone / Fax" },
+  { key: "authRequestTat", label: "With In How many days we can request for Auth from DOS?", group: "auth", row: 8, required: false },
+  { key: "authNumber", label: "Authorization #", group: "auth", row: 9, required: false },
+  { key: "authCoverageDates", label: "Auth Coverage Dates", group: "auth", row: 9, required: false, placeholder: "MM/DD/YYYY - MM/DD/YYYY" },
+
+  // Row 10: coordination of benefits and who we spoke to
+  { key: "primary", label: "PRIMARY", group: "rep", row: 10, required: false },
+  { key: "secondary", label: "SECONDARY", group: "rep", row: 10, required: false, options: ["NO", "YES"] },
+  { key: "insuranceRep", label: "Insurance Rep Name", group: "rep", row: 10, required: false },
+  { key: "callReference", label: "Call Reference", group: "rep", row: 10, required: false, placeholder: "00000000" },
+
+  // Row 11: claim filing (spans both columns in the document)
+  { key: "claimMailingAddress", label: "Claim Mailing Address", group: "claims", row: 11, required: false },
+  { key: "payerId", label: "Payer ID", group: "claims", row: 11, required: true },
+  { key: "tflDaysClaims", label: "TFL days for claims", group: "claims", row: 11, required: false },
+  { key: "tflCorrectedClaims", label: "TFL for corrected claims", group: "claims", row: 11, required: false },
+
+  // Rows 12–15: secondary insurance
+  { key: "secondaryYesNo", label: "SECONDARY (YES/NO)", group: "secondary", row: 12, required: false, options: ["NO", "YES"] },
+  { key: "secondaryInsName", label: "SECONDARY INS NAME", group: "secondary", row: 12, required: false },
+  { key: "secondaryPlanName", label: "PLAN NAME", group: "secondary", row: 13, required: false },
+  { key: "secondaryPolicyId", label: "POLICY ID", group: "secondary", row: 13, required: false },
+  { key: "secondaryEffectiveDate", label: "EFFECTIVE DATE", group: "secondary", row: 14, required: false },
+  { key: "secondaryDeductible", label: "DEDUCTIBLE", group: "secondary", row: 14, required: false, placeholder: "NA" },
+  { key: "secondaryVisitLimit", label: "VISIT LIMIT", group: "secondary", row: 15, required: false, placeholder: "MN" },
+  { key: "secondaryUsedLimit", label: "USED LIMIT", group: "secondary", row: 15, required: false }
 ];

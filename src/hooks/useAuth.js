@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { USERS } from '../data/users';
 import { sha256 } from '../utils/crypto';
 import { authApi } from '../api/auth';
-import { apiClient } from '../api/client';
+import { apiClient, SESSION_EXPIRED_EVENT } from '../api/client';
 
 const MAX_ATTEMPTS = 5;
 const LOCK_MS = 60 * 1000;
@@ -94,7 +94,10 @@ export function useAuth() {
   const login = useCallback(async ({ email, password, remember }) => {
     setError('');
 
-    const cleanEmail = email.trim().toLowerCase();
+    // Trimmed but NOT lowercased. The API preserves address case on purpose and
+    // holds accounts that differ only in the case of their local part, so folding
+    // the case here makes one of them impossible to sign in to.
+    const cleanEmail = email.trim();
     const now = Date.now();
 
     if (lockState.until > now) {
@@ -133,7 +136,13 @@ export function useAuth() {
           } else {
             saveLock({ ...lockState, attempts: nextAttempts });
             const left = MAX_ATTEMPTS - nextAttempts;
-            setError(apiErr.message || `Incorrect email or password. ${left} attempt${left === 1 ? '' : 's'} remaining.`);
+            const friendly = `Incorrect email or password. ${left} attempt${left === 1 ? '' : 's'} remaining.`;
+            // A 401 here only ever means the credentials did not match, and the API's
+            // own wording for it ('Sign in to continue.') tells the user nothing they
+            // do not already know. 400 and 403 do carry a real reason — a disabled
+            // password login, say — so those are passed through when present.
+            const useServerWording = apiErr.status !== 401 && !apiErr.generic && apiErr.message;
+            setError(useServerWording ? apiErr.message : friendly);
           }
           setLoading(false);
           return false;
@@ -142,8 +151,11 @@ export function useAuth() {
         // Only fall back to local dev credentials if backend is unreachable AND fallback is enabled
         if (import.meta.env.VITE_FALLBACK_MOCK === 'true') {
           console.warn('[Auth] Backend unreachable, checking local user fallback...');
-          const hash = await sha256(`us24|${cleanEmail}|${password}`);
-          const localUser = USERS[cleanEmail];
+          // This table is keyed by lowercase address, and its hashes were computed
+          // over one, so the fold happens here rather than on what is sent to the API.
+          const localKey = cleanEmail.toLowerCase();
+          const hash = await sha256(`us24|${localKey}|${password}`);
+          const localUser = USERS[localKey];
           if (localUser && localUser.hashes.includes(hash)) {
             authResponse = {
               access_token: 'local_dev_token_' + Date.now(),
@@ -164,6 +176,8 @@ export function useAuth() {
 
       if (authResponse?.access_token) {
         apiClient.setToken(authResponse.access_token, remember);
+        // Present in development only; production keeps it in an HttpOnly cookie.
+        apiClient.setRefreshToken(authResponse.refresh_token, remember);
         saveLock({ attempts: 0, until: 0 });
 
         if (typeof window !== 'undefined') {
@@ -213,6 +227,23 @@ export function useAuth() {
     }
     setSession(null);
     setError('');
+  }, []);
+
+  // The client rotates an expired access token by itself. It only raises this
+  // when the refresh is refused too, which means the session is genuinely over —
+  // idle timeout, absolute cap, or an admin revoking access mid-session (SEC-7).
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const onExpired = () => {
+      apiClient.clearToken();
+      storage.del(window.sessionStorage, SESSION_KEY);
+      setSession(null);
+      setError('Your session has expired. Please sign in again.');
+    };
+
+    window.addEventListener(SESSION_EXPIRED_EVENT, onExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired);
   }, []);
 
   const clearError = useCallback(() => {

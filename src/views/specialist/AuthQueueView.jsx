@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { DataError } from '../../components/DataError';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { vobsApi } from '../../api/vobs';
 import { ClientBadge } from '../../components/vob/ClientBadge';
@@ -8,23 +9,30 @@ export function AuthQueueView() {
   const { currentUser, showToast, openVerification } = useWorkspace();
   const [authVobs, setAuthVobs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
   const [editingAuthId, setEditingAuthId] = useState(null);
   const [authInputs, setAuthInputs] = useState({ authNumber: '', authStartDate: '', authEndDate: '', notes: '' });
 
   const loadAuthQueue = () => {
     setLoading(true);
+    setLoadError('');
     vobsApi.getVobs({
       status: 'Auth Queue',
       userEmail: currentUser.role === 'admin' ? undefined : currentUser.email
     }).then(list => {
       setAuthVobs(list);
       setLoading(false);
-    }).catch(console.error);
+    }).catch((err) => {
+      console.error(err);
+      setLoadError(err?.message || 'Could not load this data.');
+      setLoading(false);
+    });
   };
 
   useEffect(() => {
     loadAuthQueue();
-  }, [currentUser.email]);
+  }, [currentUser.email, reloadKey]);
 
   const handleOpenAuthModal = (vob) => {
     setEditingAuthId(vob.id);
@@ -60,6 +68,8 @@ export function AuthQueueView() {
 
   return (
     <div className="auth-queue-view">
+      <DataError message={loadError} onRetry={() => setReloadKey(k => k + 1)} />
+
       <div className="panel-card">
         <div className="panel-header">
           <div>
@@ -88,6 +98,8 @@ export function AuthQueueView() {
             <tbody>
               {loading ? (
                 <tr><td colSpan="8" className="table-empty">Loading Auth Queue…</td></tr>
+              ) : loadError ? (
+                <tr><td colSpan="8" className="table-empty">Could not load this data.</td></tr>
               ) : authVobs.length === 0 ? (
                 <tr><td colSpan="8" className="table-empty">No pending prior authorizations in your queue. Great job!</td></tr>
               ) : (

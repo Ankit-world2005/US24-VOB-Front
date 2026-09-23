@@ -1,18 +1,26 @@
 import React, { useState, useEffect } from 'react';
+import { DataError } from '../../components/DataError';
 import { vobsApi } from '../../api/vobs';
 
 export function AuditLogsView() {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
   const [filterAction, setFilterAction] = useState('all');
 
   useEffect(() => {
     setLoading(true);
+    setLoadError('');
     vobsApi.getAllAuditLogs().then(data => {
       setLogs(data);
       setLoading(false);
-    }).catch(console.error);
-  }, []);
+    }).catch((err) => {
+      console.error(err);
+      setLoadError(err?.message || 'Could not load this data.');
+      setLoading(false);
+    });
+  }, [reloadKey]);
 
   const filteredLogs = logs.filter(l =>
     filterAction === 'all' ? true : l.action === filterAction
@@ -20,6 +28,8 @@ export function AuditLogsView() {
 
   return (
     <div className="audit-logs-view">
+      <DataError message={loadError} onRetry={() => setReloadKey(k => k + 1)} />
+
       <div className="panel-card">
         <div className="panel-header">
           <div>
@@ -70,6 +80,8 @@ export function AuditLogsView() {
             <tbody>
               {loading ? (
                 <tr><td colSpan="8" className="table-empty">Loading audit trail…</td></tr>
+              ) : loadError ? (
+                <tr><td colSpan="8" className="table-empty">Could not load this data.</td></tr>
               ) : filteredLogs.length === 0 ? (
                 <tr><td colSpan="8" className="table-empty">No audit logs matching selection.</td></tr>
               ) : (

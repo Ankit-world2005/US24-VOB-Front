@@ -1,13 +1,33 @@
 import React from 'react';
 
+/**
+ * The VOB output document.
+ *
+ * Mirrors docs/VOB_PARKER - Copy.docx, which is the master template every
+ * client's VOB is generated from. That file is a PAT strip, a title, and a
+ * 15-row two-column table whose eleventh row spans both columns. Rows, labels
+ * and their order are reproduced from it; do not add or reorder rows here
+ * unless the source document changes.
+ *
+ * DocumentGeneratorModal renders this same component, so the printed/saved
+ * output and the on-screen preview cannot drift apart.
+ */
+
+/** One `Label: value` line inside a cell. */
+function Line({ label, value, fallback = '—', mono = false, bold = false }) {
+  const shown = value === 0 || value ? value : fallback;
+  return (
+    <div className="p-line">
+      <span className="p-lbl">{label}</span>{' '}
+      <span className={`p-val${mono ? ' font-mono' : ''}${bold ? ' font-semibold' : ''}`}>{shown}</span>
+    </div>
+  );
+}
+
 export function ParkerLivePreview({ formData = {}, onPrint }) {
-  const handlePrint = () => {
-    if (onPrint) {
-      onPrint();
-    } else {
-      window.print();
-    }
-  };
+  const f = formData;
+  const handlePrint = () => (onPrint ? onPrint() : window.print());
+  const todayDate = f.todayDate || new Date().toISOString().split('T')[0];
 
   return (
     <div className="parker-preview-card">
@@ -28,7 +48,9 @@ export function ParkerLivePreview({ formData = {}, onPrint }) {
 
       <div className="parker-sheet-container">
         <div className="parker-sheet">
-          {/* Top Brand & Summary Header */}
+          {/* Letterhead. The source document carries the logo as a page-header image,
+              with the PAT box as a separate table floated to the right of it
+              (tblpX=9237, anchored to the page) rather than a full-width strip. */}
           <div className="parker-top-bar">
             <div className="parker-logo-box">
               <div className="parker-brand-title">
@@ -39,191 +61,154 @@ export function ParkerLivePreview({ formData = {}, onPrint }) {
               <div className="brand-orange-bar"></div>
             </div>
 
-            <div className="parker-meta-boxes">
-              <div className="meta-box pat-box">
-                <span className="meta-box-label">PAT:</span>
-                <span className="meta-box-val">{formData.pat || "$0.00 (100% COVERED)"}</span>
-              </div>
-              <div className="meta-box ins-box">
-                <span className="meta-box-label">INS:</span>
-                <span className="meta-box-val">{formData.insAmount || "—"}</span>
-              </div>
-            </div>
+            <div className="parker-pat-box">PAT: {f.pat || '—'}</div>
           </div>
 
-          {/* Form Title */}
           <div className="parker-doc-title-row">
-            <h2 className="parker-doc-title">Pre-Authorization & Benefits Determination</h2>
+            <h2 className="parker-doc-title">Pre-Authorization &amp; Benefits Determination</h2>
           </div>
 
-          {/* Parker 2-Column Medical Benefits Table */}
           <div className="parker-table">
-            {/* Row 1: Project & Request metadata */}
+            {/* 1 */}
+            <div className="p-row">
+              <div className="p-cell p-cell-left"><Line label="Name:" value={f.patientName} bold /></div>
+              <div className="p-cell p-cell-right"><Line label="DOB:" value={f.dob} /></div>
+            </div>
+
+            {/* 2 */}
+            <div className="p-row">
+              <div className="p-cell p-cell-left"><Line label="Today&rsquo;s Date:" value={todayDate} /></div>
+              <div className="p-cell p-cell-right"><Line label="Additional Info:" value={f.additionalInfo} /></div>
+            </div>
+
+            {/* 3 */}
             <div className="p-row">
               <div className="p-cell p-cell-left">
-                <div className="p-line"><span className="p-lbl">Project:</span> <span className="p-val">{formData.project || "—"}</span></div>
-                <div className="p-line"><span className="p-lbl">Category:</span> <span className="p-val">{formData.category || "—"}</span></div>
+                <Line label="Insurance Name:" value={f.insurance} bold />
+                <Line label="Insurance Contact Number:" value={f.insurancePhone} />
               </div>
               <div className="p-cell p-cell-right">
-                <div className="p-line"><span className="p-lbl">Request Type:</span> <span className="p-val">{formData.requestType || "CALL"}</span></div>
-                <div className="p-line"><span className="p-lbl">Request Date:</span> <span className="p-val">{formData.requestDate || "—"}</span></div>
-                <div className="p-line"><span className="p-lbl">Verification:</span> <span className="p-val">{formData.verificationType || "INITIAL"}</span></div>
+                <Line label="Policy ID:" value={f.idCard} mono />
+                <Line label="GROUP ID:" value={f.groupNo} mono />
               </div>
             </div>
 
-            {/* Row 2: Patient Name & DOB */}
+            {/* 4 */}
             <div className="p-row">
               <div className="p-cell p-cell-left">
-                <div className="p-line"><span className="p-lbl">Name:</span> <span className="p-val font-semibold">{formData.patientName || "—"}</span></div>
+                <Line label="Service Type:" value={f.serviceType} />
+                <Line label="Plan Type:" value={f.planType} />
+                <Line label="Network Status:" value={f.networkStatus} />
+                <Line label="Coverage:" value={f.coverageStatus} />
               </div>
               <div className="p-cell p-cell-right">
-                <div className="p-line"><span className="p-lbl">DOB:</span> <span className="p-val">{formData.dob || "—"}</span></div>
+                <Line label="Effective Date:" value={f.effectiveDate} />
+                <Line label="Termination Date:" value={f.terminationDate} fallback="NA" />
+                {/* "HCA" is what the source document says. It reads like a slip for HSA,
+                    but the export reproduces the template verbatim. */}
+                <Line label="HCA/HRA AMT:" value={f.hsaHraAmt} fallback="NA" />
               </div>
             </div>
 
-            {/* Row 3: Today's Date, PAT & Additional Info */}
+            {/* 5 */}
             <div className="p-row">
               <div className="p-cell p-cell-left">
-                <div className="p-line"><span className="p-lbl">Today's Date:</span> <span className="p-val">{formData.todayDate || new Date().toISOString().split('T')[0]}</span></div>
-                <div className="p-line"><span className="p-lbl">PAT:</span> <span className="p-val">{formData.pat || "—"}</span></div>
+                <Line label="Co-pay-" value={f.copay} fallback="NO" />
+                <Line label="Amount:" value={f.copayAmount} />
               </div>
               <div className="p-cell p-cell-right">
-                <div className="p-line"><span className="p-lbl">Additional Info:</span> <span className="p-val highlight-text">{formData.additionalInfo || "PATIENT IS 100% COVERED BY THE PAYER AS PER MEMBER'S PLAN."}</span></div>
+                <Line label="Is Deductible Applied for PT Services:" value={f.deductibleApplicable} />
+                <Line label="Deductible Individual:" value={f.deductibleIndividual} />
+                <Line label="Met Amount:" value={f.deductibleMet} />
+                <Line label="Remaining Amount:" value={f.deductibleRemaining} />
               </div>
             </div>
 
-            {/* Row 4: Insurance & IDs */}
+            {/* 6 */}
             <div className="p-row">
               <div className="p-cell p-cell-left">
-                <div className="p-line"><span className="p-lbl">Insurance Name:</span> <span className="p-val font-semibold">{formData.insurance || "—"}</span></div>
-                <div className="p-line"><span className="p-lbl">Insurance Contact Number:</span> <span className="p-val">{formData.insurancePhone || "—"}</span></div>
+                <Line label="Co-insurance:" value={f.copayCoinsurance} />
+                <Line label="Covered:" value={f.coinsuranceCovered} />
               </div>
               <div className="p-cell p-cell-right">
-                <div className="p-line"><span className="p-lbl">Policy ID:</span> <span className="p-val font-mono">{formData.idCard || "—"}</span></div>
-                <div className="p-line"><span className="p-lbl">GROUP ID:</span> <span className="p-val font-mono">{formData.groupNo || "—"}</span></div>
+                <Line label="Out of Pocket:" value={f.outOfPocket} />
+                <Line label="Met Amount:" value={f.oopMet} />
+                <Line label="Amount Remaining:" value={f.oopRemaining} />
               </div>
             </div>
 
-            {/* Row 5: Service, Plan, Network & Effective */}
+            {/* 7 */}
+            <div className="p-row">
+              <div className="p-cell p-cell-left"><Line label="Visit Limitations:" value={f.visitsLimitation} /></div>
+              <div className="p-cell p-cell-right"><Line label="Used Visit:" value={f.visitsUsed} fallback="NO" /></div>
+            </div>
+
+            {/* 8 */}
             <div className="p-row">
               <div className="p-cell p-cell-left">
-                <div className="p-line"><span className="p-lbl">Service Type:</span> <span className="p-val">{formData.serviceType || "PT"}</span></div>
-                <div className="p-line"><span className="p-lbl">Plan Type:</span> <span className="p-val">{formData.planType || "—"}</span></div>
-                <div className="p-line"><span className="p-lbl">Plan Name:</span> <span className="p-val">{formData.planName || "—"}</span></div>
-                <div className="p-line"><span className="p-lbl">Network Status:</span> <span className="p-val">{formData.networkStatus || "—"}</span></div>
-                <div className="p-line"><span className="p-lbl">Coverage:</span> <span className="p-val">{formData.coverageStatus || "—"}</span></div>
+                <Line label="Is Authorization Required for Initial Eval-" value={f.authInitialEval} fallback="NO" />
+                <Line label="Is Authorization Required for Treatment-" value={f.authTreatment} fallback="NO" />
+                <Line label="Referral Required -" value={f.referral} fallback="NO" />
+                <Line label="Is Referral Required from PCP for Approval -" value={f.pcpReferral} fallback="NO" />
               </div>
               <div className="p-cell p-cell-right">
-                <div className="p-line"><span className="p-lbl">Effective Date:</span> <span className="p-val">{formData.effectiveDate || "—"}</span></div>
-                <div className="p-line"><span className="p-lbl">Termination Date:</span> <span className="p-val">{formData.terminationDate || "NO"}</span></div>
-                <div className="p-line"><span className="p-lbl">HSA/HRA AMT:</span> <span className="p-val">{formData.hsaHraAmt || "NA"}</span></div>
+                <Line label="How to obtain Authorization?" value={f.howToObtainAuth} />
+                <Line label="With In How many days we can request for Auth from DOS?" value={f.authRequestTat} />
               </div>
             </div>
 
-            {/* Row 6: Copay & Deductibles */}
+            {/* 9 */}
             <div className="p-row">
               <div className="p-cell p-cell-left">
-                <div className="p-line"><span className="p-lbl">Co-pay?</span> <span className="p-val">{formData.copay || "NO"}</span></div>
-                <div className="p-line"><span className="p-lbl">Amount:</span> <span className="p-val">{formData.copayAmount || "—"}</span></div>
+                <Line label="Authorization #" value={f.authNumber || f.authDetails?.authNumber} mono />
+              </div>
+              <div className="p-cell p-cell-right"><Line label="Auth Coverage Dates:" value={f.authCoverageDates} /></div>
+            </div>
+
+            {/* 10 */}
+            <div className="p-row">
+              <div className="p-cell p-cell-left">
+                <Line label="PRIMARY:" value={f.primary} fallback="YES" />
+                <Line label="SECONDARY:" value={f.secondary} fallback="NO" />
               </div>
               <div className="p-cell p-cell-right">
-                <div className="p-line"><span className="p-lbl">Is Deductible Applied for PT Services:</span> <span className="p-val">{formData.deductibleApplicable || "—"}</span></div>
-                <div className="p-line"><span className="p-lbl">Deductible Individual:</span> <span className="p-val">{formData.deductibleIndividual || "—"}</span></div>
-                <div className="p-line"><span className="p-lbl">Met Amount:</span> <span className="p-val">{formData.deductibleMet || "—"}</span></div>
-                <div className="p-line"><span className="p-lbl">Remaining Amount:</span> <span className="p-val">{formData.deductibleRemaining || "—"}</span></div>
+                <Line label="Insurance Rep Name:" value={f.insuranceRep} />
+                <Line label="Call Reference:" value={f.callReference} mono />
               </div>
             </div>
 
-            {/* Row 7: Co-Insurance & OOP */}
-            <div className="p-row">
-              <div className="p-cell p-cell-left">
-                <div className="p-line"><span className="p-lbl">Co-Insurance:</span> <span className="p-val">{formData.copayCoinsurance || formData.coinsurance || "—"}</span></div>
-                <div className="p-line"><span className="p-lbl">Covered:</span> <span className="p-val">{formData.coinsuranceCovered || "—"}</span></div>
-              </div>
-              <div className="p-cell p-cell-right">
-                <div className="p-line"><span className="p-lbl">Out of Pocket:</span> <span className="p-val">{formData.outOfPocket || "—"}</span></div>
-                <div className="p-line"><span className="p-lbl">Met Amount:</span> <span className="p-val">{formData.oopMet || "—"}</span></div>
-                <div className="p-line"><span className="p-lbl">Amount Remaining:</span> <span className="p-val">{formData.oopRemaining || "—"}</span></div>
+            {/* 11 — spans both columns in the source document. */}
+            <div className="p-row p-row-full">
+              <div className="p-cell">
+                <Line label="Claim Mailing Address:" value={f.claimMailingAddress} />
+                <Line label="Payer ID:" value={f.payerId} mono />
+                <Line label="TFL days for claims:" value={f.tflDaysClaims} />
+                <Line label="TFL for corrected claims:" value={f.tflCorrectedClaims} />
               </div>
             </div>
 
-            {/* Row 8: Visit Limitations */}
+            {/* 12 */}
             <div className="p-row">
-              <div className="p-cell p-cell-left">
-                <div className="p-line"><span className="p-lbl">Visit Limitations:</span> <span className="p-val">{formData.visitsLimitation || "—"}</span></div>
-                <div className="p-line"><span className="p-lbl">Initial Treatment Date:</span> <span className="p-val">{formData.initialDos || formData.initialTreatmentDate || "—"}</span></div>
-              </div>
-              <div className="p-cell p-cell-right">
-                <div className="p-line"><span className="p-lbl">Used Visit:</span> <span className="p-val">{formData.visitsUsed || "NO"}</span></div>
-              </div>
+              <div className="p-cell p-cell-left"><Line label="SECONDARY (YES/NO):" value={f.secondaryYesNo} fallback="NO" /></div>
+              <div className="p-cell p-cell-right"><Line label="SECONDARY INS NAME-" value={f.secondaryInsName} /></div>
             </div>
 
-            {/* Row 9: Authorization & Referrals */}
+            {/* 13 */}
             <div className="p-row">
-              <div className="p-cell p-cell-left">
-                <div className="p-line"><span className="p-lbl">Is Authorization Required for Initial Eval?</span> <span className="p-val">{formData.authInitialEval || "NO"}</span></div>
-                <div className="p-line"><span className="p-lbl">Is Authorization Required for Treatment?</span> <span className="p-val">{formData.authTreatment || "NO"}</span></div>
-                <div className="p-line"><span className="p-lbl">Referral Required?</span> <span className="p-val">{formData.referral || "NO"}</span></div>
-                <div className="p-line"><span className="p-lbl">Is Referral Required from PCP for Approval?</span> <span className="p-val">{formData.pcpReferral || "NO"}</span></div>
-              </div>
-              <div className="p-cell p-cell-right">
-                <div className="p-line"><span className="p-lbl">How to obtain Authorization?</span> <span className="p-val">{formData.howToObtainAuth || "—"}</span></div>
-                <div className="p-line"><span className="p-lbl">With In How many days we can request for Auth?</span> <span className="p-val">{formData.authRequestTat || "—"}</span></div>
-              </div>
+              <div className="p-cell p-cell-left"><Line label="PLAN NAME:" value={f.secondaryPlanName} /></div>
+              <div className="p-cell p-cell-right"><Line label="POLICY ID:" value={f.secondaryPolicyId} mono /></div>
             </div>
 
-            {/* Row 10: Auth Confirmation */}
+            {/* 14 */}
             <div className="p-row">
-              <div className="p-cell p-cell-left">
-                <div className="p-line"><span className="p-lbl">Authorization #:</span> <span className="p-val font-mono">{formData.authNumber || formData.authDetails?.authNumber || "—"}</span></div>
-              </div>
-              <div className="p-cell p-cell-right">
-                <div className="p-line"><span className="p-lbl">Auth Coverage Dates:</span> <span className="p-val">{formData.authCoverageDates || "—"}</span></div>
-              </div>
+              <div className="p-cell p-cell-left"><Line label="EFFECTIVE DATE:" value={f.secondaryEffectiveDate} /></div>
+              <div className="p-cell p-cell-right"><Line label="DEDUCTIBLE:" value={f.secondaryDeductible} fallback="NA" /></div>
             </div>
 
-            {/* Row 11: Coordination & Rep Info */}
+            {/* 15 */}
             <div className="p-row">
-              <div className="p-cell p-cell-left">
-                <div className="p-line">
-                  <span className="p-lbl">PRIMARY:</span> <span className="p-val">{formData.primary || "YES"}</span> &nbsp;&nbsp;
-                  <span className="p-lbl">SECONDARY:</span> <span className="p-val">{formData.secondary || "NO"}</span>
-                </div>
-              </div>
-              <div className="p-cell p-cell-right">
-                <div className="p-line"><span className="p-lbl">Insurance Rep Name:</span> <span className="p-val">{formData.insuranceRep || "—"}</span></div>
-                <div className="p-line"><span className="p-lbl">Call Reference:</span> <span className="p-val font-mono">{formData.callReference || "—"}</span></div>
-              </div>
-            </div>
-
-            {/* Row 12: Claim Filing & Secondary */}
-            <div className="p-row">
-              <div className="p-cell p-cell-left">
-                <div className="p-line"><span className="p-lbl">Claim Mailing Address:</span> <span className="p-val">{formData.claimMailingAddress || "—"}</span></div>
-                <div className="p-line"><span className="p-lbl">Payer ID:</span> <span className="p-val font-mono">{formData.payerId || "—"}</span></div>
-                <div className="p-line">
-                  <span className="p-lbl">TFL days for claims:</span> <span className="p-val">{formData.tflDaysClaims || "90 days"}</span> &nbsp;
-                  <span className="p-lbl">TFL for corrected:</span> <span className="p-val">{formData.tflCorrectedClaims || "180 days"}</span>
-                </div>
-              </div>
-              <div className="p-cell p-cell-right">
-                <div className="p-line"><span className="p-lbl">SECONDARY (YES/NO):</span> <span className="p-val">{formData.secondaryYesNo || "NO"}</span></div>
-                <div className="p-line"><span className="p-lbl">SECONDARY INS NAME:</span> <span className="p-val">{formData.secondaryInsName || "—"}</span></div>
-                <div className="p-line"><span className="p-lbl">POLICY ID:</span> <span className="p-val">{formData.secondaryPolicyId || "—"}</span></div>
-              </div>
-            </div>
-
-            {/* Row 13: Secondary details */}
-            <div className="p-row">
-              <div className="p-cell p-cell-left">
-                <div className="p-line"><span className="p-lbl">PLAN NAME:</span> <span className="p-val">{formData.secondaryPlanName || "—"}</span></div>
-                <div className="p-line"><span className="p-lbl">EFFECTIVE DATE:</span> <span className="p-val">{formData.secondaryEffectiveDate || "—"}</span></div>
-                <div className="p-line"><span className="p-lbl">VISIT LIMIT:</span> <span className="p-val">{formData.secondaryVisitLimit || "MN"}</span></div>
-              </div>
-              <div className="p-cell p-cell-right">
-                <div className="p-line"><span className="p-lbl">DEDUCTIBLE:</span> <span className="p-val">{formData.secondaryDeductible || "NA"}</span></div>
-                <div className="p-line"><span className="p-lbl">USED LIMIT:</span> <span className="p-val">{formData.secondaryUsedLimit || "—"}</span></div>
-              </div>
+              <div className="p-cell p-cell-left"><Line label="VISIT LIMIT:" value={f.secondaryVisitLimit} fallback="MN" /></div>
+              <div className="p-cell p-cell-right"><Line label="USED LIMIT:" value={f.secondaryUsedLimit} /></div>
             </div>
           </div>
 

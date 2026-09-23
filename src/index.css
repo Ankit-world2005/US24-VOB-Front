@@ -1290,42 +1290,6 @@ body::before {
   background: #16a34a;
 }
 
-.role-switcher-toggle {
-  display: flex;
-  align-items: center;
-  background: var(--surface-2);
-  border: 1px solid var(--rule);
-  padding: 2px;
-  border-radius: var(--r-md);
-  gap: 2px;
-}
-
-.role-switch-label {
-  font-family: var(--mono);
-  font-size: 11px;
-  color: var(--ink-soft);
-  padding: 0 6px 0 8px;
-}
-
-.role-btn {
-  padding: 5px 10px;
-  border-radius: var(--r-sm);
-  border: 0;
-  font-family: var(--sans);
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--ink-soft);
-  background: transparent;
-  cursor: pointer;
-  transition: all .12s ease;
-}
-
-.role-btn.active {
-  background: var(--navy);
-  color: #fff;
-  box-shadow: 0 1px 3px rgba(0,0,0,.15);
-}
-
 .header-right-group {
   display: flex;
   align-items: center;
@@ -3305,7 +3269,7 @@ body::before {
 
 /* 2-Column Medical Benefits Table */
 .parker-table {
-  border: 1.5px solid #8ba4bf;
+  border: 1.5px solid #8EAADB;
   display: flex;
   flex-direction: column;
   background: #ffffff;
@@ -3313,27 +3277,27 @@ body::before {
 
 .p-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  border-bottom: 1px solid #8ba4bf;
+  /* w:gridCol 5520 and 5428 twips. */
+  grid-template-columns: 5520fr 5428fr;
+  border-bottom: 1px solid #8EAADB;
 }
 
 .p-row:last-child {
   border-bottom: none;
 }
 
-.p-row:nth-child(odd) {
-  background: #f8fafc;
-}
-
 .p-cell {
-  padding: 6px 10px;
-  font-size: 11.5px;
-  line-height: 1.45;
-  color: #334155;
+  padding: 4px 8px;
+  font-size: 11pt;
+  line-height: 1.3;
+  /* Table style "a": run colour 2F5496, first and last column bold — which for a
+     two-column table means every cell. */
+  color: #2F5496;
+  font-weight: 700;
 }
 
 .p-cell-left {
-  border-right: 1px solid #8ba4bf;
+  border-right: 1px solid #8EAADB;
 }
 
 .p-line {
@@ -3346,11 +3310,11 @@ body::before {
 
 .p-lbl {
   font-weight: 700;
-  color: #0f172a;
+  color: inherit;
 }
 
 .p-val {
-  color: #1e293b;
+  color: inherit;
 }
 
 .highlight-text {
@@ -3367,8 +3331,28 @@ body::before {
   font-style: italic;
 }
 
-/* Print Stylesheet */
+/* Print Stylesheet — this is also the "Save as PDF" path, so it has to produce
+   the document, not an approximation of it. */
+@page {
+  /* w:pgSz 12240 x 15840 twips, w:pgMar 1440 left/right. */
+  size: 8.5in 11in;
+  margin: 0.75in 0.5in;
+}
+
 @media print {
+  /* Browsers drop background colours when printing unless told otherwise, which
+     would silently strip the D9E2F3 row banding out of every exported PDF. */
+  .parker-sheet, .parker-sheet * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Keep a row's lines together rather than splitting a cell across pages. */
+  .p-row {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
   body * {
     visibility: hidden;
   }
@@ -3389,4 +3373,519 @@ body::before {
     padding: 0;
     margin: 0;
   }
+}
+
+/* ---- Inline data-load failure (DataError) ---- */
+.data-error {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--danger-bg);
+  color: var(--danger);
+  border: 1px solid color-mix(in srgb, var(--danger) 28%, transparent);
+  border-left-width: 3px;
+  padding: 11px 14px;
+  border-radius: var(--r-md);
+  font-size: 13.5px;
+  line-height: 1.45;
+  margin-bottom: 18px;
+}
+
+.data-error svg {
+  flex: none;
+}
+
+.data-error-text {
+  flex: 1;
+}
+
+.data-error-retry {
+  flex: none;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  color: var(--danger);
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
+  border-radius: var(--r-sm);
+  padding: 4px 12px;
+}
+
+.data-error-retry:hover {
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+
+/* =========================================================
+   WORKSPACE PRIMITIVES
+
+   These classes were used throughout the admin and specialist
+   views but had no rules, so the elements fell back to browser
+   defaults — which is why blocks sat flush against each other
+   and every "small" button rendered at full login-form size.
+   ========================================================= */
+
+/* ---- Button sizes ----
+   .btn is width:100%/height:52px for the login form's submit. Table and
+   toolbar buttons opt out of that here; the compound selector is needed to
+   outrank the base .btn declarations. */
+.btn.btn-sm {
+  width: auto;
+  height: auto;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.btn.btn-lg {
+  width: auto;
+  height: auto;
+  padding: 14px 24px;
+  font-size: 15.5px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* ---- Text utilities ---- */
+.mono {
+  font-family: var(--mono);
+  font-size: 12.5px;
+}
+
+.font-mono {
+  font-family: var(--mono);
+}
+
+.bold,
+.font-semibold {
+  font-weight: 600;
+}
+
+.text-sm {
+  font-size: 13px;
+}
+
+.text-xs {
+  font-size: 11.5px;
+}
+
+/* ---- Responsive visibility ----
+   .hide-sm existed only as .nav-link.hide-sm, so it did nothing in the portal
+   header. Both are generic utilities now. */
+@media (max-width: 1100px) {
+  .hide-md {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .hide-sm {
+    display: none;
+  }
+}
+
+/* ---- View roots ----
+   One place defines the vertical rhythm between a view's blocks. The direct
+   children drop the margin-bottom they used to fake it with, so a block's
+   spacing no longer depends on which view it happens to sit in. */
+.admin-dashboard-view,
+.audit-logs-view,
+.auth-queue-view,
+.error-queue-view,
+.global-records-view,
+.master-data-view,
+.saved-records-view,
+.specialist-dashboard-view,
+.upload-assign-view,
+.user-management-view {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.admin-dashboard-view > *,
+.audit-logs-view > *,
+.auth-queue-view > *,
+.error-queue-view > *,
+.global-records-view > *,
+.master-data-view > *,
+.saved-records-view > *,
+.specialist-dashboard-view > *,
+.upload-assign-view > *,
+.user-management-view > * {
+  margin-bottom: 0;
+}
+
+/* ---- Layout containers ---- */
+.workspace-content-area {
+  padding-top: 24px;
+}
+
+/* ---- Heading / subtitle pairs ----
+   The global `* { margin: 0 }` reset leaves these touching. */
+.dashboard-heading + .dashboard-sub {
+  margin-top: 4px;
+}
+
+.panel-header h3 + .panel-sub {
+  margin-top: 3px;
+}
+
+.spec-banner-title + .spec-banner-desc {
+  margin-top: 6px;
+}
+
+/* ---- Empty / loading table row ---- */
+.table-empty {
+  padding: 30px 14px;
+  text-align: center;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+/* ---- Filter toolbars ---- */
+.filter-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.filter-selects,
+.header-actions,
+.action-buttons-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.search-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 260px;
+}
+
+.search-input,
+.select-input {
+  height: 38px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 13.5px;
+  padding: 0 12px;
+  transition: border-color .12s ease, box-shadow .12s ease;
+}
+
+.search-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.search-input::placeholder {
+  color: var(--ink-soft);
+  opacity: .6;
+}
+
+.search-input:hover,
+.select-input:hover {
+  border-color: var(--ink-soft);
+}
+
+.search-input:focus,
+.select-input:focus {
+  outline: none;
+  border-color: var(--ink);
+  box-shadow: 0 0 0 4px var(--focus);
+}
+
+.select-input {
+  cursor: pointer;
+}
+
+.select-sm {
+  height: 34px;
+  font-size: 13px;
+}
+
+/* Toolbar buttons match the height of the inputs they sit beside. */
+.search-form .btn.btn-sm,
+.filter-toolbar .btn.btn-sm,
+.header-actions .btn.btn-sm {
+  height: 38px;
+}
+
+/* =========================================================
+   INLINE VOCABULARY — avatars, pills, tags, action links
+
+   Follows the badge convention already set by .status-badge,
+   .client-badge and .role: inline-flex, mono 11px, 1px border,
+   999px radius for pills and --r-sm for square tags. These are
+   the pieces that sit inside table cells and panel headers.
+   ========================================================= */
+
+/* ---- Identity cell ----
+   The avatar and the name were rendering as bare inline spans, so the
+   initials ran straight into the name ("SSaurabh"). */
+.user-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.user-avatar-sm {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--mint-soft);
+  color: var(--navy);
+  border: 1px solid color-mix(in srgb, var(--navy) 22%, transparent);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+/* ---- Pill base ---- */
+.security-pill,
+.status-pill,
+.badge-all-clients,
+.badge-pending-auth,
+.action-pill,
+.tat-chip,
+.client-badge-pill,
+.auth-pill-count,
+.error-pill-count,
+.saved-pill-count,
+.user-email-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid;
+  white-space: nowrap;
+}
+
+/* ---- Pill variants ---- */
+.security-pill,
+.client-badge-pill {
+  background: var(--mint-soft);
+  color: var(--navy);
+  border-color: color-mix(in srgb, var(--navy) 30%, transparent);
+}
+
+.status-pill.active-green,
+.saved-pill-count {
+  background: rgba(22, 163, 74, .08);
+  color: #15803d;
+  border-color: rgba(22, 163, 74, .28);
+}
+
+.status-pill.revoked-red,
+.error-pill-count {
+  background: var(--danger-bg);
+  color: var(--danger);
+  border-color: rgba(201, 25, 46, .28);
+}
+
+.badge-pending-auth,
+.auth-pill-count,
+.tat-chip {
+  background: rgba(249, 115, 22, .08);
+  color: #c2410c;
+  border-color: rgba(249, 115, 22, .3);
+}
+
+.badge-all-clients {
+  background: var(--navy);
+  color: #ffffff;
+  border-color: var(--navy);
+}
+
+.action-pill,
+.user-email-tag {
+  background: var(--surface-2);
+  color: var(--ink-soft);
+  border-color: var(--rule);
+}
+
+/* ---- Square tags ---- */
+.mini-tag,
+.failing-reason-tag {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  padding: 3px 7px;
+  border-radius: var(--r-sm);
+  border: 1px solid;
+}
+
+.mini-tag {
+  background: var(--surface-2);
+  color: var(--ink-soft);
+  border-color: var(--rule);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.failing-reason-tag {
+  background: var(--danger-bg);
+  color: var(--danger);
+  border-color: rgba(201, 25, 46, .25);
+}
+
+.client-tags-group,
+.failing-reasons-cell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+/* ---- In-table action links ---- */
+.btn-action-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  font-family: var(--sans);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--cobalt);
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.btn-action-link:hover {
+  text-decoration: underline;
+}
+
+.btn-action-link.danger-link {
+  color: var(--danger);
+}
+
+.btn-action-link.success-link {
+  color: #15803d;
+}
+
+/* ---- Button variants (layered on .btn.btn-sm) ---- */
+.btn.btn-doc {
+  background: transparent;
+  color: var(--navy);
+  border-color: var(--rule);
+}
+
+.btn.btn-doc:hover:not(:disabled) {
+  background: var(--mint-soft);
+  border-color: var(--navy);
+}
+
+.btn.btn-danger-action {
+  background: var(--danger);
+  border-color: var(--danger);
+}
+
+.btn.btn-danger-action:hover:not(:disabled) {
+  background: #a81326;
+  border-color: #a81326;
+}
+
+/* ---- Cell and row states ---- */
+.cell-old {
+  color: var(--ink-soft);
+  text-decoration: line-through;
+}
+
+.cell-new {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.row-has-error,
+.row-rejected {
+  background: color-mix(in srgb, var(--danger) 5%, transparent);
+}
+
+.copay-highlight {
+  font-weight: 600;
+  color: var(--navy);
+}
+
+.empty-val {
+  color: var(--ink-soft);
+}
+
+.log-count-text {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
+/* Wrapper accent for a field that failed validation; .input-error already
+   handles the control itself. */
+.field-has-error {
+  border-left: 3px solid var(--danger);
+  padding-left: 10px;
+}
+
+/* ---- Parker document: row 11 spans both columns, and the PAT strip ---- */
+.p-row-full {
+  grid-template-columns: 1fr;
+}
+
+/* ---- Parker document: banding, typography and the floated PAT box ----
+   Taken from the source file: table style "a" (tblStyleRowBandSize 1,
+   band1Horz fill D9E2F3) with tblLook firstRow=1 / noHBand=0, so banding
+   starts below the header row — the even rows carry the fill. */
+.parker-table {
+  font-family: Calibri, "Segoe UI", system-ui, sans-serif;
+}
+
+.p-row:nth-child(even) {
+  background: #D9E2F3;
+}
+
+/* Title: 18pt bold underlined, colour 1F4E79, first-line indent 720 twips. */
+.parker-doc-title {
+  font-family: Calibri, "Segoe UI", system-ui, sans-serif;
+  font-size: 18pt;
+  font-weight: 700;
+  color: #1F4E79;
+  text-decoration: underline;
+  margin-left: 0.5in;
+}
+
+/* The document floats this as its own small table to the right of the logo. */
+.parker-top-bar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.parker-pat-box {
+  flex: none;
+  align-self: flex-start;
+  border: 1px solid #000000;
+  background: #ffffff;
+  /* w:gridCol 2448 twips wide; no bold, colour or size overrides on its runs. */
+  width: 1.7in;
+  padding: 10px 12px;
+  font-family: Calibri, "Segoe UI", system-ui, sans-serif;
+  font-size: 11pt;
+  font-weight: 400;
+  color: #000000;
 }

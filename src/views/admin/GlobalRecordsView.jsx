@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { DataError } from '../../components/DataError';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { vobsApi } from '../../api/vobs';
 import { clientsApi } from '../../api/clients';
@@ -13,11 +14,14 @@ export function GlobalRecordsView() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
   const [inspectVobId, setInspectVobId] = useState(null);
   const [isExporting, setIsExporting] = useState(false);
 
   const fetchRecords = () => {
     setLoading(true);
+    setLoadError('');
     vobsApi.getVobs({
       clientId: selectedClient,
       status: statusFilter,
@@ -25,12 +29,16 @@ export function GlobalRecordsView() {
     }).then(res => {
       setVobs(res);
       setLoading(false);
-    }).catch(console.error);
+    }).catch((err) => {
+      console.error(err);
+      setLoadError(err?.message || 'Could not load this data.');
+      setLoading(false);
+    });
   };
 
   useEffect(() => {
     fetchRecords();
-  }, [selectedClient, statusFilter]);
+  }, [selectedClient, statusFilter, reloadKey]);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
@@ -51,6 +59,8 @@ export function GlobalRecordsView() {
 
   return (
     <div className="global-records-view">
+      <DataError message={loadError} onRetry={() => setReloadKey(k => k + 1)} />
+
       <div className="panel-card">
         <div className="panel-header">
           <div>
@@ -129,6 +139,8 @@ export function GlobalRecordsView() {
             <tbody>
               {loading ? (
                 <tr><td colSpan="9" className="table-empty">Loading records…</td></tr>
+              ) : loadError ? (
+                <tr><td colSpan="9" className="table-empty">Could not load this data.</td></tr>
               ) : vobs.length === 0 ? (
                 <tr><td colSpan="9" className="table-empty">No records matching the selected filters.</td></tr>
               ) : (

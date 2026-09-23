@@ -11,10 +11,12 @@ export const authApi = {
   },
 
   // GET /api/v1/auth/me
-  getMe(email) {
+  //
+  // Takes no argument on purpose: the server resolves the caller from the bearer
+  // token. Passing an email here would suggest you can ask about another user.
+  getMe() {
     return apiClient.request({
-      path: '/api/v1/auth/me',
-      params: email ? { email } : undefined
+      path: '/api/v1/auth/me'
     });
   },
 

@@ -4,7 +4,7 @@ import { uploadsApi } from '../../api/uploads';
 import { CLIENTS } from '../../data/clients';
 
 export function UploadAssignView() {
-  const { showToast, setActiveTab } = useWorkspace();
+  const { showToast, setActiveTab, currentUser } = useWorkspace();
   const [selectedClient, setSelectedClient] = useState('arra');
   const [isUploading, setIsUploading] = useState(false);
   const [previewData, setPreviewData] = useState(null);
@@ -29,13 +29,15 @@ export function UploadAssignView() {
     if (!previewData) return;
     setIsCommitting(true);
     try {
-      const commitRes = await uploadsApi.commitUpload(previewData.uploadId, "saurabh@us24solutions.com");
+      // The acting admin is whoever is signed in — this is the actor the commit and
+      // the assignment are audited against (SEC-6), so it must not be hardcoded.
+      const commitRes = await uploadsApi.commitUpload(previewData.uploadId, currentUser.email);
       const createdIds = commitRes.createdVobs.map(v => v.id);
 
       await uploadsApi.assignVobs({
         vobIds: createdIds,
         assignees: [selectedAssignee],
-        adminEmail: "saurabh@us24solutions.com"
+        adminEmail: currentUser.email
       });
 
       showToast(`Successfully created & assigned ${commitRes.count} VOBs to ${selectedAssignee}! Pre-fill completed.`, "success");

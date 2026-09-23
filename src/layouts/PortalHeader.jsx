@@ -7,7 +7,6 @@ export function PortalHeader({ isDark, toggleTheme }) {
   const {
     currentUser,
     activeRole,
-    switchRole,
     selectedClient,
     setSelectedClient,
     onLogout
@@ -67,24 +66,6 @@ export function PortalHeader({ isDark, toggleTheme }) {
             </div>
           )}
 
-          {/* Role Switcher Demo Widget */}
-          <div className="role-switcher-toggle" title="Switch workspace view to test Admin or Specialist">
-            <span className="role-switch-label hide-sm">View as:</span>
-            <button
-              type="button"
-              className={`role-btn ${isAdmin ? 'active' : ''}`}
-              onClick={() => switchRole('admin')}
-            >
-              ★ Admin
-            </button>
-            <button
-              type="button"
-              className={`role-btn ${!isAdmin ? 'active' : ''}`}
-              onClick={() => switchRole('user')}
-            >
-              ● Specialist
-            </button>
-          </div>
         </div>
 
         {/* Right: HIPAA status badge, User info, Theme & Logout */}

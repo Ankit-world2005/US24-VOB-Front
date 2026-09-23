@@ -4,16 +4,18 @@ import { authApi } from '../api/auth';
 const WorkspaceContext = createContext(null);
 
 export function WorkspaceProvider({ session, onLogout, children }) {
+  // App only renders this provider once a session exists, so the session is the
+  // authoritative identity here — there is no signed-out case to cover for.
   const [currentUser, setCurrentUser] = useState({
-    name: session?.name || "Saurabh",
-    email: session?.email || "saurabh@us24solutions.com",
-    role: session?.role || "admin",
+    name: session.name,
+    email: session.email,
+    role: session.role,
     accessibleClients: []
   });
 
-  const [activeRole, setActiveRole] = useState(session?.role || "admin");
+  const [activeRole, setActiveRole] = useState(session.role);
   const [selectedClient, setSelectedClient] = useState("all");
-  const [activeTab, setActiveTab] = useState(activeRole === "admin" ? "dashboard" : "my_dashboard");
+  const [activeTab, setActiveTab] = useState(session.role === "admin" ? "dashboard" : "my_dashboard");
   const [activeVobId, setActiveVobId] = useState("vob_001");
   const [toast, setToast] = useState(null);
 
@@ -31,34 +33,31 @@ export function WorkspaceProvider({ session, onLogout, children }) {
     }
   }, [session]);
 
-  // Load user profile and accessible clients
+  // Load user profile and accessible clients.
+  //
+  // Keyed on the session token rather than currentUser.email: /auth/me resolves the
+  // caller from the token and writes the answer back into currentUser, so keying it
+  // on a field it sets would make the effect re-trigger itself.
   useEffect(() => {
-    authApi.getMe(currentUser.email).then(me => {
+    authApi.getMe().then(me => {
       setCurrentUser(prev => ({
         ...prev,
-        ...me
+        ...me,
+        // GET /auth/me returns the caller's client access as `clients`; the workspace
+        // reads it as `accessibleClients`.
+        accessibleClients: me.clients ?? me.accessibleClients ?? prev.accessibleClients
       }));
-    }).catch(console.error);
-  }, [currentUser.email]);
+    }).catch((err) => {
+      // Not fatal: the session from login already carries name, email and role.
+      console.error('[Workspace] Could not load profile from /auth/me:', err.message);
+    });
+  }, [session.token]);
 
   const showToast = (message, type = "info") => {
     setToast({ message, type, id: Date.now() });
     setTimeout(() => {
       setToast(prev => (prev?.message === message ? null : prev));
     }, 3500);
-  };
-
-  const switchRole = (newRole) => {
-    setActiveRole(newRole);
-    if (newRole === "admin") {
-      setActiveTab("dashboard");
-      setCurrentUser(prev => ({ ...prev, role: "admin", name: "Saurabh", email: "saurabh@us24solutions.com" }));
-      showToast("Switched to Administrator Workspace", "success");
-    } else {
-      setActiveTab("my_dashboard");
-      setCurrentUser(prev => ({ ...prev, role: "user", name: "Rohit K", email: "rohit.k@us24solutions.com" }));
-      showToast("Switched to Specialist Workspace (Rohit K)", "success");
-    }
   };
 
   const openVerification = (vobId) => {
@@ -72,7 +71,6 @@ export function WorkspaceProvider({ session, onLogout, children }) {
         session,
         currentUser,
         activeRole,
-        switchRole,
         selectedClient,
         setSelectedClient,
         activeTab,
