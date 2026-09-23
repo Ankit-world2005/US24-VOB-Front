@@ -337,7 +337,7 @@ export const mockServer = {
       callWebsite: "Payer Website",
       idCard: r.idCard || "ID-AUTO",
       dialedTime: "",
-      assignedTo: "rohit.k@us24solutions.com",
+      assignedTo: r.assignedTo || "rohit.k@us24solutions.com",
       version: 1,
       provenance: {
         patientName: { source: "intake_upload" },
@@ -366,21 +366,26 @@ export const mockServer = {
   },
 
   // POST /assignments
-  async assignVobs({ vobIds, assignees }, adminEmail = "saurabh@us24solutions.com") {
+  async assignVobs({ vobIds, assignees, assignmentMap }, adminEmail = "saurabh@us24solutions.com") {
     await sleep(250);
-    const targetAssignee = assignees[0];
+    const targetAssignee = Array.isArray(assignees) ? assignees[0] : (assignees || "rohit.k@us24solutions.com");
 
     vobsState = vobsState.map(v => {
       if (vobIds.includes(v.id)) {
+        const assignedUser = (assignmentMap && assignmentMap[v.id]) || targetAssignee;
         return {
           ...v,
-          assignedTo: targetAssignee,
-          vobStatus: v.vobStatus === "Assigned" ? "Assigned" : v.vobStatus,
+          assignedTo: assignedUser,
+          vobStatus: "Assigned",
           version: v.version + 1
         };
       }
       return v;
     });
+
+    const assigneeSummary = assignmentMap 
+      ? Array.from(new Set(Object.values(assignmentMap))).join(', ')
+      : targetAssignee;
 
     auditState.unshift({
       id: `aud_${Date.now()}`,
@@ -392,8 +397,8 @@ export const mockServer = {
       client: "multi",
       field: "assignedTo",
       oldValue: "various",
-      newValue: targetAssignee,
-      notes: `Bulk assigned ${vobIds.length} records to ${targetAssignee}`
+      newValue: assigneeSummary,
+      notes: `Assigned ${vobIds.length} records to ${assigneeSummary}`
     });
 
     return { success: true, updatedCount: vobIds.length };
