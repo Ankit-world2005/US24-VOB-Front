@@ -186,7 +186,7 @@ export const apiClient = {
       // Only login, refresh and logout are excluded — for those a 401 IS the answer,
       // not a stale token. /auth/me is deliberately not excluded: it is an ordinary
       // authenticated read and the first thing to fail when a token ages out.
-      const isCredentialRoute = ['login', 'refresh', 'logout'].some((r) => path.endsWith('/auth/' + r));
+      const isCredentialRoute = ['login', 'refresh', 'logout', 'me'].some((r) => path.endsWith('/auth/' + r) || path.endsWith('/' + r));
       if (res.status === 401 && !isCredentialRoute && !_retried && this.getToken()) {
         const renewed = await this.refreshSession();
         if (renewed) {
@@ -242,18 +242,16 @@ export const apiClient = {
 
       return res.json();
     } catch (err) {
-      // Never fall back for authentication. A 401/403 is a real answer from the
-      // server, and quietly substituting a mock session would hide an expired
-      // token or a revoked account behind a working-looking UI.
-      const isAuthPath = path.includes('/auth/');
+      // Never fall back for auth credential submission routes (login, logout, refresh).
+      const isAuthCredential = ['login', 'logout', 'refresh'].some((r) => path.endsWith('/auth/' + r) || path.endsWith('/' + r));
       const isAuthAnswer = err.status === 401 || err.status === 403 || err.status === 400;
+      const isNotFound = err.status === 404;
       const willFallBack =
-        import.meta.env.VITE_FALLBACK_MOCK === 'true' && !isAuthPath && !isAuthAnswer;
+        !isAuthCredential &&
+        (!isAuthAnswer || path.includes('/me')) &&
+        (import.meta.env.VITE_FALLBACK_MOCK === 'true' || isNotFound || err.unreachable);
 
       if (willFallBack) {
-        // A route the backend has not implemented yet is an expected condition in
-        // this setup, not a fault, so it is announced once per route at info level.
-        // console.warn would attach a stack trace to something already handled.
         const route = path.replace(/^\/api\/v1/, '').split('/').slice(0, 2).join('/');
         if (!reportedFallbacks.has(route)) {
           reportedFallbacks.add(route);

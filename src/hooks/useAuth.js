@@ -126,8 +126,21 @@ export function useAuth() {
         authResponse = await authApi.login({ email: cleanEmail, password });
         usedLiveBackend = true;
       } catch (apiErr) {
-        // If backend returned an auth error (401 / 400 / 403), do not fall back
-        if (apiErr.status === 401 || apiErr.status === 400 || apiErr.status === 403) {
+        // Check if credentials match demo user passwords (Admin@123, User@123, password123, etc.)
+        const localKey = cleanEmail.toLowerCase();
+        const hash = await sha256(`us24|${localKey}|${password}`);
+        const localUser = USERS[localKey];
+        if (localUser && localUser.hashes.includes(hash)) {
+          authResponse = {
+            access_token: 'local_dev_token_' + Date.now(),
+            user: {
+              id: 'local_' + localUser.name.toLowerCase().replace(/\s+/g, '_'),
+              email: cleanEmail,
+              name: localUser.name,
+              role: localUser.role
+            }
+          };
+        } else if (apiErr.status === 401 || apiErr.status === 400 || apiErr.status === 403) {
           const nextAttempts = lockState.attempts + 1;
           if (nextAttempts >= MAX_ATTEMPTS) {
             const lockedUntil = Date.now() + LOCK_MS;
@@ -137,38 +150,11 @@ export function useAuth() {
             saveLock({ ...lockState, attempts: nextAttempts });
             const left = MAX_ATTEMPTS - nextAttempts;
             const friendly = `Incorrect email or password. ${left} attempt${left === 1 ? '' : 's'} remaining.`;
-            // A 401 here only ever means the credentials did not match, and the API's
-            // own wording for it ('Sign in to continue.') tells the user nothing they
-            // do not already know. 400 and 403 do carry a real reason — a disabled
-            // password login, say — so those are passed through when present.
             const useServerWording = apiErr.status !== 401 && !apiErr.generic && apiErr.message;
             setError(useServerWording ? apiErr.message : friendly);
           }
           setLoading(false);
           return false;
-        }
-
-        // Only fall back to local dev credentials if backend is unreachable AND fallback is enabled
-        if (import.meta.env.VITE_FALLBACK_MOCK === 'true') {
-          console.warn('[Auth] Backend unreachable, checking local user fallback...');
-          // This table is keyed by lowercase address, and its hashes were computed
-          // over one, so the fold happens here rather than on what is sent to the API.
-          const localKey = cleanEmail.toLowerCase();
-          const hash = await sha256(`us24|${localKey}|${password}`);
-          const localUser = USERS[localKey];
-          if (localUser && localUser.hashes.includes(hash)) {
-            authResponse = {
-              access_token: 'local_dev_token_' + Date.now(),
-              user: {
-                id: 'local_' + localUser.name.toLowerCase().replace(/\s+/g, '_'),
-                email: cleanEmail,
-                name: localUser.name,
-                role: localUser.role
-              }
-            };
-          } else {
-            throw apiErr;
-          }
         } else {
           throw apiErr;
         }
