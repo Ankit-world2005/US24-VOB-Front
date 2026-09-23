@@ -265,22 +265,27 @@ export const mockServer = {
 
   // POST /uploads
   async uploadFile(formData, client = "arra") {
-    await sleep(400);
+    await sleep(250);
     const uploadId = `upl_${Date.now()}`;
-    const previewRows = [
-      { row: 1, patientName: "Arthur Dent", dob: "1978-05-11", dos: "2026-10-04", appointmentType: "General Consult", insurance: "BCBS", idCard: "XYZ-1234", valid: true },
-      { row: 2, patientName: "Trillian Astra", dob: "1983-09-22", dos: "2026-10-05", appointmentType: "Physical Therapy", insurance: "Aetna", idCard: "AET-9921", valid: true },
-      { row: 3, patientName: "Ford Prefect", dob: "", dos: "2026-10-06", appointmentType: "Initial Eval", insurance: "Cigna", idCard: "CIG-8821", valid: false, reason: "Missing Date of Birth (DOB)" },
-      { row: 4, patientName: "Zaphod Beeblebrox", dob: "1965-03-15", dos: "2026-10-07", appointmentType: "Specialist Spine", insurance: "UHC", idCard: "UHC-7731", valid: true }
-    ];
+    const previewRows = Array.isArray(formData?.rows) && formData.rows.length > 0
+      ? formData.rows
+      : [
+          { row: 1, patientName: "Arthur Dent", dob: "1978-05-11", dos: "2026-10-04", appointmentType: "General Consult", insurance: "BCBS", idCard: "XYZ-1234", valid: true },
+          { row: 2, patientName: "Trillian Astra", dob: "1983-09-22", dos: "2026-10-05", appointmentType: "Physical Therapy", insurance: "Aetna", idCard: "AET-9921", valid: true },
+          { row: 3, patientName: "Ford Prefect", dob: "", dos: "2026-10-06", appointmentType: "Initial Eval", insurance: "Cigna", idCard: "CIG-8821", valid: false, reason: "Missing Date of Birth (DOB)" },
+          { row: 4, patientName: "Zaphod Beeblebrox", dob: "1965-03-15", dos: "2026-10-07", appointmentType: "Specialist Spine", insurance: "UHC", idCard: "UHC-7731", valid: true }
+        ];
+
+    const validCount = previewRows.filter(r => r.valid).length;
+    const rejectedCount = previewRows.length - validCount;
 
     uploadsState[uploadId] = {
       uploadId,
       client,
       filename: formData?.filename || "Client_VOB_Batch_Intake.xlsx",
-      totalRows: 4,
-      validRows: 3,
-      rejectedRows: 1,
+      totalRows: previewRows.length,
+      validRows: validCount,
+      rejectedRows: rejectedCount,
       rows: previewRows,
       status: "preview"
     };
@@ -296,7 +301,7 @@ export const mockServer = {
 
   // POST /uploads/:id/commit
   async commitUpload(uploadId, adminEmail = "saurabh@us24solutions.com") {
-    await sleep(300);
+    await sleep(250);
     const upl = uploadsState[uploadId];
     if (!upl) throw new Error("Upload batch not found");
 
@@ -306,11 +311,11 @@ export const mockServer = {
       client: upl.client,
       patientName: r.patientName,
       dob: r.dob,
-      dos: r.dos,
-      appointmentType: r.appointmentType,
-      insurance: r.insurance,
-      planTypeAndName: `${r.insurance} Choice`,
-      groupNo: "GRP-AUTO",
+      dos: r.dos || new Date().toISOString().split('T')[0],
+      appointmentType: r.appointmentType || "Physical Therapy",
+      insurance: r.insurance || "General Healthcare",
+      planTypeAndName: `${r.insurance || 'General'} Choice`,
+      groupNo: r.groupNo || "GRP-AUTO",
       primarySecondary: "Primary",
       coverageStatus: "Active",
       networkStatus: "In-Network",
@@ -323,20 +328,20 @@ export const mockServer = {
       deductibleApplicable: "Yes",
       copayCoinsurance: "$30 Copay",
       visitsLimitation: "20 visits",
-      initialDos: r.dos,
+      initialDos: r.dos || new Date().toISOString().split('T')[0],
       vobCompletionDate: "",
       vobStatus: "Assigned",
       dosMoreThan15Days: "No",
       payerId: "99102",
       insurancePhone: "1-800-555-0199",
       callWebsite: "Payer Website",
-      idCard: r.idCard,
+      idCard: r.idCard || "ID-AUTO",
       dialedTime: "",
       assignedTo: "rohit.k@us24solutions.com",
       version: 1,
       provenance: {
-        patientName: { source: "master_data" },
-        dob: { source: "master_data" }
+        patientName: { source: "intake_upload" },
+        dob: { source: "intake_upload" }
       }
     }));
 

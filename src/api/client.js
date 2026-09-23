@@ -115,6 +115,8 @@ export const apiClient = {
           body: JSON.stringify(stored ? { refresh_token: stored } : {}),
         });
         if (!res.ok) return null;
+        const contentType = res.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) return null;
 
         const session = await res.json();
         if (!session?.access_token) return null;
@@ -227,6 +229,15 @@ export const apiClient = {
         err.unreachable = unreachable;
         err.generic = !serverMessage;
         throw err;
+      }
+
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        const text = await res.text().catch(() => '');
+        throw new Error(
+          `Expected JSON response but received ${contentType || 'non-JSON'}. ` +
+          (text.includes('<!DOCTYPE') ? 'Received HTML page instead of API response. Check that your backend proxy/URL is reachable.' : text.slice(0, 100))
+        );
       }
 
       return res.json();
