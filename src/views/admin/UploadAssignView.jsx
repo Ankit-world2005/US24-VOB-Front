@@ -29,23 +29,28 @@ function formatDateValue(val) {
   return String(val).trim();
 }
 
-// Headers are compared with everything but letters and digits stripped, so
-// "D.O.B", "DOB (MM/DD/YYYY)" and "Patient's Name" all match.
-const normalizeHeader = (header) => String(header).toLowerCase().replace(/[^a-z0-9]/g, '');
+// Headers and Project names are compared with everything but letters and digits
+// stripped, so "D.O.B", "DOB (MM/DD/YYYY)" and "Patient's Name" all match.
+const normalizeKey = (text) => String(text).toLowerCase().replace(/[^a-z0-9]/g, '');
 
 // Patterns in priority order. `exclude` keeps a broad pattern such as `name` or
 // `service` from claiming a neighbouring column ("Client Name", "Service Date").
 const FIELDS = {
   patientName: {
     patterns: ['patientname', 'ptname', 'patient', 'membername', 'name'],
-    exclude: ['patientid', 'client', 'provider', 'insurance', 'payer', 'carrier', 'plan', 'clinic', 'facility', 'specialist', 'assign', 'subscriber', 'employer', 'user', 'file']
+    exclude: ['patientid', 'client', 'project', 'provider', 'insurance', 'payer', 'carrier', 'plan', 'clinic', 'facility', 'specialist', 'assign', 'subscriber', 'employer', 'user', 'file']
   },
   dob: { patterns: ['dob', 'dateofbirth', 'birthdate', 'birthday', 'birth'], exclude: [] },
   dos: { patterns: ['dos', 'dateofservice', 'servicedate', 'apptdate', 'appointmentdate'], exclude: [] },
+  // The Client Request sheet has no insurance column: its "PRIMARY / SECONDARY"
+  // column holds the payer ("UHC", "MED/ AARP"), so it is the last resort here.
   insurance: {
-    patterns: ['insurancename', 'insurancecarrier', 'insurance', 'payername', 'payer', 'carrier', 'inscompany', 'plan'],
+    patterns: ['insurancename', 'insurancecarrier', 'insurance', 'payername', 'payer', 'carrier', 'inscompany', 'plan', 'primarysecondary'],
     exclude: ['phone', 'fax', 'address', 'payerid', 'insuranceid', 'policyid', 'memberid']
   },
+  emrId: { patterns: ['emrid', 'emr', 'mrn', 'medicalrecordnumber'], exclude: [] },
+  project: { patterns: ['project', 'projectname', 'client', 'clientname'], exclude: [] },
+  vobStatus: { patterns: ['vobstatus', 'status'], exclude: ['coverage', 'network'] },
   idCard: {
     patterns: ['memberid', 'memberpolicyid', 'policyid', 'subscriberid', 'idcard', 'idnum', 'policynumber', 'membernumber', 'member'],
     exclude: ['name']
@@ -55,18 +60,22 @@ const FIELDS = {
     patterns: ['appointmenttype', 'appttype', 'visittype', 'servicetype', 'service', 'requesttype'],
     exclude: ['date']
   },
-  assignee: { patterns: ['assignee', 'assignedto', 'assignedspecialist', 'allocatedspecialist', 'specialist', 'staff', 'user'], exclude: [] }
+  assignee: { patterns: ['assignee', 'assignedto', 'allocatedto', 'assignedspecialist', 'allocatedspecialist', 'allocated', 'specialist', 'staff', 'user'], exclude: [] }
 };
+
+// A header row names the patient plus at least one of these. The Client Request
+// sheet has no DOB column; the per-client trackers have no EMR ID.
+const HEADER_COMPANIONS = ['dob', 'dos', 'emrId', 'assignee'];
 
 function findHeader(headers, field) {
   const { patterns, exclude } = FIELDS[field];
   const candidates = headers.filter((h) => {
-    const key = normalizeHeader(h);
+    const key = normalizeKey(h);
     return key && !exclude.some((x) => key.includes(x));
   });
   for (const pat of patterns) {
-    const hit = candidates.find((h) => normalizeHeader(h) === pat) ||
-      candidates.find((h) => normalizeHeader(h).includes(pat));
+    const hit = candidates.find((h) => normalizeKey(h) === pat) ||
+      candidates.find((h) => normalizeKey(h).includes(pat));
     if (hit !== undefined) return hit;
   }
   return undefined;
@@ -78,11 +87,20 @@ function getFieldValue(row, field) {
   return val !== undefined && val !== null ? val : '';
 }
 
+const hasData = (cells) => cells.some((c) => String(c).trim() !== '');
+
+/** "ARRA" is Arra and "Harikrishna" is "Harikrishna - 2"; "HRK" is not guessed at. */
+const projectMatchesClient = (project, client) => {
+  const p = normalizeKey(project);
+  return [client.id, client.name].map(normalizeKey).some((c) => c.startsWith(p) || p.startsWith(c));
+};
+
 /**
- * Rows of the first sheet whose header row names both a patient and a DOB column.
- * Intake sheets often carry a title or blank rows above the header, and some keep
- * the data on a later sheet. Falls back to the first sheet's first row as header,
- * so the preview can still show why its rows are rejected.
+ * Rows of the first sheet that has a recognisable header row and data under it.
+ * Intake sheets often carry a title or blank rows above the header, and a workbook
+ * may hold header-only template sheets beside the one with data. Falls back to a
+ * header-only sheet, then to the first sheet's first row, so the preview can still
+ * show why nothing was imported.
  */
 function readIntakeRows(workbook) {
   const HEADER_SCAN_ROWS = 15;
@@ -90,18 +108,21 @@ function readIntakeRows(workbook) {
     XLSX.utils.sheet_to_json(workbook.Sheets[name], { header: 1, defval: '', blankrows: false })
   );
 
-  let found = null;
-  for (const grid of sheets) {
-    const headerIdx = grid.slice(0, HEADER_SCAN_ROWS).findIndex((cells) => {
-      const labels = cells.map(String);
-      return findHeader(labels, 'patientName') !== undefined && findHeader(labels, 'dob') !== undefined;
-    });
-    if (headerIdx !== -1) {
-      found = { grid, headerIdx };
-      break;
-    }
-  }
-  if (!found) found = { grid: sheets[0] || [], headerIdx: 0 };
+  const candidates = sheets
+    .map((grid) => ({
+      grid,
+      headerIdx: grid.slice(0, HEADER_SCAN_ROWS).findIndex((cells) => {
+        const labels = cells.map(String);
+        return findHeader(labels, 'patientName') !== undefined &&
+          HEADER_COMPANIONS.some((field) => findHeader(labels, field) !== undefined);
+      })
+    }))
+    .filter(({ headerIdx }) => headerIdx !== -1);
+
+  const found =
+    candidates.find(({ grid, headerIdx }) => grid.slice(headerIdx + 1).some(hasData)) ||
+    candidates[0] ||
+    { grid: sheets[0] || [], headerIdx: 0 };
 
   const { grid, headerIdx } = found;
   const seen = {};
@@ -113,7 +134,7 @@ function readIntakeRows(workbook) {
 
   const rows = grid
     .slice(headerIdx + 1)
-    .filter((cells) => cells.some((c) => String(c).trim() !== ''))
+    .filter(hasData)
     .map((cells) => Object.fromEntries(headers.map((h, i) => [h, cells[i] ?? ''])));
 
   return { headers, rows };
@@ -151,12 +172,21 @@ export function UploadAssignView() {
     const initialAssignees = {};
     const validIndices = new Set();
 
+    // DOB is required only when the file has a DOB column: the Client Request
+    // sheet identifies the patient by EMR ID and leaves DOB to the specialist.
+    const dobRequired = findHeader(headers, 'dob') !== undefined;
+    const client = CLIENTS.find(c => c.id === selectedClient);
+
     const mappedRows = rawRows.map((r, index) => {
       const patientName = String(getFieldValue(r, 'patientName')).trim();
       const dob = formatDateValue(getFieldValue(r, 'dob'));
+      const emrId = String(getFieldValue(r, 'emrId')).trim();
+      const project = String(getFieldValue(r, 'project')).trim();
+      const vobStatus = String(getFieldValue(r, 'vobStatus')).trim();
       const dos = formatDateValue(getFieldValue(r, 'dos')) || formatDateValue(new Date());
       const insurance = String(getFieldValue(r, 'insurance')).trim() || 'General Healthcare';
-      const idCard = String(getFieldValue(r, 'idCard')).trim() || `ID-${Math.floor(1000 + Math.random() * 9000)}`;
+      // Left empty when the file has none: a made-up member ID looks real on a payer call.
+      const idCard = String(getFieldValue(r, 'idCard')).trim();
       const groupNo = String(getFieldValue(r, 'groupNo')).trim() || 'GRP-AUTO';
       const appointmentType = String(getFieldValue(r, 'appointmentType')).trim() || 'Physical Therapy';
 
@@ -176,9 +206,17 @@ export function UploadAssignView() {
       if (!patientName) {
         valid = false;
         reason = 'Missing Patient Name';
-      } else if (!dob) {
+      } else if (dobRequired && !dob) {
         valid = false;
         reason = 'Missing Date of Birth (DOB)';
+      } else if (/complet/i.test(vobStatus)) {
+        // Client Request sheets are running logs; re-importing a finished row duplicates work.
+        valid = false;
+        reason = 'Already completed';
+      } else if (project && client && !projectMatchesClient(project, client)) {
+        // One client's patients must never land in another client's queue.
+        valid = false;
+        reason = `Project "${project}" is not ${client.name}`;
       }
 
       if (valid) {
@@ -189,6 +227,8 @@ export function UploadAssignView() {
         row: index + 1,
         patientName: patientName || 'Unknown Patient',
         dob,
+        dobRequired,
+        emrId,
         dos,
         appointmentType,
         insurance,
@@ -219,8 +259,7 @@ export function UploadAssignView() {
       const reasons = Object.entries(reasonCounts).map(([reason, n]) => `${n} × ${reason}`).join(', ');
       const columns = headers.filter(Boolean).slice(0, 10).join(', ');
       showToast(
-        `0 of ${mappedRows.length} rows can be imported (${reasons}). Columns found: ${columns}. ` +
-        `Each row needs a patient name and a DOB column, e.g. "Patient Name" and "DOB".`,
+        `0 of ${mappedRows.length} rows can be imported (${reasons}). Columns found: ${columns}.`,
         "warning"
       );
       return;
@@ -569,10 +608,12 @@ export function UploadAssignView() {
                         </td>
                         <td style={{ padding: '10px 12px', fontFamily: 'var(--mono)', color: 'var(--ink-soft)' }}>#{r.row}</td>
                         <td style={{ padding: '10px 12px', fontWeight: 600 }}>{r.patientName}</td>
-                        <td style={{ padding: '10px 12px' }}>{r.dob || <span style={{ color: 'var(--danger)', fontWeight: 600 }}>Missing</span>}</td>
+                        <td style={{ padding: '10px 12px' }}>{r.dob || (r.dobRequired
+                          ? <span style={{ color: 'var(--danger)', fontWeight: 600 }}>Missing</span>
+                          : <span style={{ color: 'var(--ink-soft)' }}>—</span>)}</td>
                         <td style={{ padding: '10px 12px' }}>{r.dos}</td>
                         <td style={{ padding: '10px 12px' }}>{r.insurance}</td>
-                        <td style={{ padding: '10px 12px', fontFamily: 'var(--mono)', fontSize: '12px' }}>{r.idCard}</td>
+                        <td style={{ padding: '10px 12px', fontFamily: 'var(--mono)', fontSize: '12px' }}>{r.idCard || <span style={{ color: 'var(--ink-soft)' }}>—</span>}</td>
                         <td style={{ padding: '8px 12px' }}>
                           <select
                             disabled={!r.valid}
