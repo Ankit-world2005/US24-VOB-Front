@@ -2,6 +2,7 @@ import { INITIAL_MOCK_VOBS } from './mockVobsData.js';
 import { MOCK_USERS } from './mockUsersData.js';
 import { MOCK_AUDIT_LOGS } from './mockAuditData.js';
 import { CLIENTS, CANONICAL_FIELDS } from '../../data/clients.js';
+import { extractFieldsFromTranscript } from '../../utils/transcriptParser.js';
 
 // Persistent in-browser state with fallback
 const STORAGE_KEY = 'us24_vobs_state';
@@ -226,6 +227,7 @@ export const mockServer = {
     jobsState[jobId] = {
       id: jobId,
       vobId: id,
+      text: text || '',
       status: "processing",
       createdAt: Date.now()
     };
@@ -236,49 +238,21 @@ export const mockServer = {
   async getExtractionResult(id, jobId) {
     await sleep(150);
     const job = jobsState[jobId];
-    // Simulate ~1.5s extraction completion
+    // Simulate ~1.2s extraction processing
     const elapsed = Date.now() - (job?.createdAt || 0);
     if (elapsed < 1200) {
       return { jobId, status: "processing", progress: Math.min(90, Math.floor((elapsed / 1200) * 100)) };
     }
 
-    // Completed AI Extraction result based on realistic transcript content
+    // Dynamically extract fields directly from the user's uploaded or pasted transcript
+    const targetVob = vobsState.find(v => v.id === id) || {};
+    const extractedFields = extractFieldsFromTranscript(job?.text || '', targetVob);
+
     return {
       jobId,
       status: "completed",
       progress: 100,
-      extractedFields: {
-        project: "Parker Clinic",
-        requestDate: new Date().toISOString().split("T")[0],
-        enteredBy: "rohit.k@us24solutions.com",
-        initialDos: "2026-09-24",
-        insurance: "UnitedHealthcare (UHC)",
-        idCard: "UHC-992817263",
-        groupNo: "904128",
-        planType: "PPO",
-        planName: "UHC Choice Plus",
-        networkStatus: "In-Network",
-        inNetworkGroup: "Yes",
-        coverageStatus: "Active",
-        effectiveDate: "2026-01-01",
-        terminationDate: "NO",
-        visitsLimitation: "30 visits / plan year",
-        visitsUsed: "NO",
-        insuranceRep: "Sarah Miller",
-        callReference: "REF-8891204",
-        deductibleApplicable: "Yes",
-        deductibleIndividual: "$500.00",
-        copayCoinsurance: "$25.00 Copay",
-        outOfPocket: "$2,500.00",
-        authInitialEval: "NO",
-        authTreatment: "NO",
-        referral: "NO",
-        pcpReferral: "NO",
-        payerId: "87726",
-        insurancePhone: "1-800-842-8000",
-        dialedTime: "08:14",
-        callWebsite: "Phone Call"
-      }
+      extractedFields
     };
   },
 

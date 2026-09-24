@@ -188,19 +188,6 @@ export function UploadAssignView() {
     }
   };
 
-  const downloadTemplate = () => {
-    const headers = ['Patient Name', 'DOB', 'Date of Service', 'Insurance', 'Member ID', 'Group #', 'Appointment Type', 'Assignee Email'];
-    const csvContent = headers.join(',') + '\n';
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `US24_VOB_Intake_Template_${selectedClient.toUpperCase()}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showToast("Downloaded intake template (.csv)", "info");
-  };
 
   const handleRowAssigneeChange = (rowIndex, assigneeEmail) => {
     setRowAssignees(prev => ({
@@ -305,14 +292,6 @@ export function UploadAssignView() {
           </div>
 
           <div style={{ display: 'flex', gap: '10px' }}>
-            <button
-              type="button"
-              className="btn btn-sm ghost"
-              onClick={downloadTemplate}
-              title="Download blank CSV intake template"
-            >
-              📄 Download Intake Template (.csv)
-            </button>
             <button
               type="button"
               className="btn btn-sm ghost"
