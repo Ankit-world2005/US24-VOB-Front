@@ -1,10 +1,19 @@
 import { apiClient } from './client';
+import { toServerClientId } from './clientIds';
 import {
   normalizeVobListItem,
   normalizeSingleVob,
   toBackendPatchPayload,
   STATUS_MAP_TO_BACKEND
 } from '../utils/vobAdapter';
+
+/** An empty result in the shape getVobs() returns. */
+function emptyPage() {
+  const list = [];
+  list.page = { limit: 0, next_cursor: null, has_more: false };
+  list.data = list;
+  return list;
+}
 
 export const vobsApi = {
   /**
@@ -24,11 +33,11 @@ export const vobsApi = {
       }
     }
 
-    // Map client_id
-    const clientId = query.client_id || query.clientId;
-    if (clientId && clientId !== 'all') {
-      params.client_id = clientId;
-    }
+    // Map client_id: the UI's slug to the API's UUID. A client the server does not
+    // hold for this caller has no VOBs, so there is nothing to ask for.
+    const clientId = await toServerClientId(query.client_id || query.clientId);
+    if (clientId === null) return emptyPage();
+    if (clientId) params.client_id = clientId;
 
     // Map assignee_id (Admin only)
     const assigneeId = query.assignee_id || query.assigneeId;

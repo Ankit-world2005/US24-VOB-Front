@@ -137,14 +137,21 @@ export const apiClient = {
   },
 
   /**
+   * Whether requests go to the mock server. A demo sign-in (made while the backend
+   * was unreachable) holds a token the real API rejects, so that session stays on
+   * mock data.
+   */
+  usesMock() {
+    return this.isMock || /^(local_dev_token_|mock_jwt_token_)/.test(this.getToken() || '');
+  },
+
+  /**
    * `mockParams` reach only the mock server. The real backend scopes lists to the
    * caller's token and rejects query params it does not know (400).
    */
   async request({ path, method = 'GET', data = null, params = null, mockParams = null, _retried = false }) {
-    // A demo sign-in (made while the backend was unreachable) holds a token the
-    // real API rejects, so that session stays on mock data.
     const token = this.getToken();
-    if (this.isMock || /^(local_dev_token_|mock_jwt_token_)/.test(token || '')) {
+    if (this.usesMock()) {
       return this.dispatchMock(path, method, data, { ...params, ...mockParams });
     }
 
