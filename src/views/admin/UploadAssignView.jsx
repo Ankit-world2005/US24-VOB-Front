@@ -89,9 +89,19 @@ function getFieldValue(row, field) {
 
 const hasData = (cells) => cells.some((c) => String(c).trim() !== '');
 
-/** "ARRA" is Arra and "Harikrishna" is "Harikrishna - 2"; "HRK" is not guessed at. */
+// Short forms and misspellings the Client Request sheets use for a project,
+// confirmed with ops. Anything else must match the client's id or name.
+const PROJECT_ALIASES = {
+  aara: 'arra',
+  hrk: 'harikrishna_2',
+  hek: 'harikrishna_2',
+  namaste: 'namste'
+};
+
+/** "ARRA" is Arra and "Harikrishna" is "Harikrishna - 2"; other short forms come from PROJECT_ALIASES. */
 const projectMatchesClient = (project, client) => {
   const p = normalizeKey(project);
+  if (PROJECT_ALIASES[p]) return PROJECT_ALIASES[p] === client.id;
   return [client.id, client.name].map(normalizeKey).some((c) => c.startsWith(p) || p.startsWith(c));
 };
 
