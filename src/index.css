@@ -2190,29 +2190,6 @@ body::before {
   line-height: 1.45;
 }
 
-.sample-buttons-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.sample-label {
-  font-family: var(--mono);
-  font-size: 11px;
-  color: var(--ink-soft);
-}
-
-.btn-sample {
-  padding: 4px 10px;
-  font-size: 12px;
-  background: var(--surface-2);
-  border: 1px solid var(--rule);
-  border-radius: var(--r-sm);
-  color: var(--ink);
-  cursor: pointer;
-}
-
 .transcript-textarea {
   width: 100%;
   border-radius: var(--r-md);

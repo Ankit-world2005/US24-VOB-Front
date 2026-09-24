@@ -1,12 +1,7 @@
 import React, { useState } from 'react';
 import { vobsApi } from '../../api/vobs';
-import { SAMPLE_TRANSCRIPTS } from '../../DB';
-
-const SAMPLE_TRANSCRIPT_CALL = SAMPLE_TRANSCRIPTS[0]?.transcript || '';
-const SAMPLE_TRANSCRIPT_PORTAL = SAMPLE_TRANSCRIPTS[1]?.transcript || '';
-
 export function AiTranscriptDrawer({ isOpen, onClose, vobId, onApplyFields }) {
-  const [transcript, setTranscript] = useState(SAMPLE_TRANSCRIPT_CALL);
+  const [transcript, setTranscript] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [extractedData, setExtractedData] = useState(null);
@@ -69,23 +64,6 @@ export function AiTranscriptDrawer({ isOpen, onClose, vobId, onApplyFields }) {
             Paste payer phone call transcripts or provider portal eligibility text. The AI extracts coverage rules and fills <strong>only empty fields</strong> without overwriting existing data.
           </p>
 
-          <div className="sample-buttons-row">
-            <span className="sample-label">Load Sample:</span>
-            <button
-              type="button"
-              className="btn-sample"
-              onClick={() => setTranscript(SAMPLE_TRANSCRIPT_CALL)}
-            >
-              UHC Phone Call
-            </button>
-            <button
-              type="button"
-              className="btn-sample"
-              onClick={() => setTranscript(SAMPLE_TRANSCRIPT_PORTAL)}
-            >
-              Cigna Availity Text
-            </button>
-          </div>
 
           <div className="transcript-input-wrap">
             <textarea

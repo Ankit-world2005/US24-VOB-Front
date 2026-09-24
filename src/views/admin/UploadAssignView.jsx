@@ -188,15 +188,9 @@ export function UploadAssignView() {
     }
   };
 
-  const downloadSampleTemplate = () => {
+  const downloadTemplate = () => {
     const headers = ['Patient Name', 'DOB', 'Date of Service', 'Insurance', 'Member ID', 'Group #', 'Appointment Type', 'Assignee Email'];
-    const sampleData = [
-      ['Eleanor Vance', '1982-04-14', '2026-09-25', 'Blue Cross Blue Shield', 'BCBS-882910', 'GRP-1049', 'Physical Therapy', 'rohit.k@us24solutions.com'],
-      ['Marcus Thorne', '1975-11-20', '2026-09-26', 'UnitedHealthcare', 'UHC-449102', 'GRP-2201', 'MRI Lumbar Spine', 'manish.v@us24solutions.com'],
-      ['Clara Oswald', '1989-08-05', '2026-09-28', 'Aetna', 'AET-993810', 'GRP-9944', 'Initial Orthopedic Eval', 'jitender.s@us24solutions.com']
-    ];
-
-    const csvContent = [headers.join(','), ...sampleData.map(r => r.map(c => `"${c}"`).join(','))].join('\n');
+    const csvContent = headers.join(',') + '\n';
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -205,7 +199,7 @@ export function UploadAssignView() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    showToast("Downloaded sample intake template (.csv)", "info");
+    showToast("Downloaded intake template (.csv)", "info");
   };
 
   const handleRowAssigneeChange = (rowIndex, assigneeEmail) => {
@@ -314,10 +308,10 @@ export function UploadAssignView() {
             <button
               type="button"
               className="btn btn-sm ghost"
-              onClick={downloadSampleTemplate}
-              title="Download formatted CSV intake template"
+              onClick={downloadTemplate}
+              title="Download blank CSV intake template"
             >
-              📄 Download Sample Template (.csv)
+              📄 Download Intake Template (.csv)
             </button>
             <button
               type="button"
