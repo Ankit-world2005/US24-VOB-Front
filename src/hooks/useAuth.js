@@ -126,11 +126,14 @@ export function useAuth() {
         authResponse = await authApi.login({ email: cleanEmail, password });
         usedLiveBackend = true;
       } catch (apiErr) {
-        // Check if credentials match demo user passwords (Admin@123, User@123, password123, etc.)
+        // Demo accounts (Admin@123, User@123, …) only when there is no backend to
+        // ask. Its token is not a JWT: once a backend answered — even to refuse —
+        // a demo sign-in would make every API call fail with "Sign in to continue."
+        const backendAnswered = Boolean(apiErr.status) && !apiErr.unreachable && apiErr.status !== 404;
         const localKey = cleanEmail.toLowerCase();
-        const hash = await sha256(`us24|${localKey}|${password}`);
+        const hash = backendAnswered ? null : await sha256(`us24|${localKey}|${password}`);
         const localUser = USERS[localKey];
-        if (localUser && localUser.hashes.includes(hash)) {
+        if (localUser && hash && localUser.hashes.includes(hash)) {
           authResponse = {
             access_token: 'local_dev_token_' + Date.now(),
             user: {
@@ -222,10 +225,12 @@ export function useAuth() {
     if (typeof window === 'undefined') return undefined;
 
     const onExpired = () => {
+      // A signed-out request can raise this too; only a real session has expired.
+      const hadSession = Boolean(storage.get(window.sessionStorage, SESSION_KEY));
       apiClient.clearToken();
       storage.del(window.sessionStorage, SESSION_KEY);
       setSession(null);
-      setError('Your session has expired. Please sign in again.');
+      if (hadSession) setError('Your session has expired. Please sign in again.');
     };
 
     window.addEventListener(SESSION_EXPIRED_EVENT, onExpired);

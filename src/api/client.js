@@ -141,8 +141,10 @@ export const apiClient = {
    * caller's token and rejects query params it does not know (400).
    */
   async request({ path, method = 'GET', data = null, params = null, mockParams = null, _retried = false }) {
-    if (this.isMock) {
-      // Direct mock server router
+    // A demo sign-in (made while the backend was unreachable) holds a token the
+    // real API rejects, so that session stays on mock data.
+    const token = this.getToken();
+    if (this.isMock || /^(local_dev_token_|mock_jwt_token_)/.test(token || '')) {
       return this.dispatchMock(path, method, data, { ...params, ...mockParams });
     }
 
@@ -173,7 +175,6 @@ export const apiClient = {
     };
 
     // Attach Bearer token if available
-    const token = this.getToken();
     if (token) {
       options.headers['Authorization'] = `Bearer ${token}`;
     }
@@ -202,8 +203,12 @@ export const apiClient = {
       // Only login, refresh and logout are excluded — for those a 401 IS the answer,
       // not a stale token. /auth/me is deliberately not excluded: it is an ordinary
       // authenticated read and the first thing to fail when a token ages out.
-      const isCredentialRoute = ['login', 'refresh', 'logout', 'me'].some((r) => path.endsWith('/auth/' + r) || path.endsWith('/' + r));
-      if (res.status === 401 && !isCredentialRoute && !_retried && this.getToken()) {
+      //
+      // A request that went out with no access token at all is renewed too: the
+      // refresh cookie may still hold a session, and if it does not, the app must
+      // return to sign-in rather than keep failing with "Sign in to continue."
+      const isCredentialRoute = ['login', 'refresh', 'logout'].some((r) => path.endsWith('/auth/' + r) || path.endsWith('/' + r));
+      if (res.status === 401 && !isCredentialRoute && !_retried) {
         const renewed = await this.refreshSession();
         if (renewed) {
           return this.request({ path, method, data, params, mockParams, _retried: true });
