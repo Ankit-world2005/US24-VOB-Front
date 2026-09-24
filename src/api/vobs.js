@@ -1,38 +1,178 @@
 import { apiClient } from './client';
+import {
+  normalizeVobListItem,
+  normalizeSingleVob,
+  toBackendPatchPayload,
+  STATUS_MAP_TO_BACKEND
+} from '../utils/vobAdapter';
 
 export const vobsApi = {
-  // GET /vobs
-  getVobs({ clientId, status, userEmail, search } = {}) {
-    return apiClient.request({
+  /**
+   * GET /api/v1/vobs - The task list filtered to caller's role and parameters
+   * Supports: status, client_id, assignee_id, dos_from, dos_to, updated_since, q, sort, limit, cursor
+   */
+  async getVobs(query = {}) {
+    const params = {};
+
+    // Map status (can be array or string, e.g. ['assigned', 'in_progress'] or 'Approved')
+    if (query.status && query.status !== 'all') {
+      if (Array.isArray(query.status)) {
+        params.status = query.status.map(s => STATUS_MAP_TO_BACKEND[s] || s.toLowerCase());
+      } else {
+        const mapped = STATUS_MAP_TO_BACKEND[query.status] || query.status.toLowerCase();
+        params.status = mapped;
+      }
+    }
+
+    // Map client_id
+    const clientId = query.client_id || query.clientId;
+    if (clientId && clientId !== 'all') {
+      params.client_id = clientId;
+    }
+
+    // Map assignee_id (Admin only)
+    const assigneeId = query.assignee_id || query.assigneeId;
+    if (assigneeId) {
+      params.assignee_id = assigneeId;
+    }
+
+    // Map search query (q)
+    const q = query.q || query.search;
+    if (q) {
+      params.q = q;
+    }
+
+    // Dates & sorting
+    if (query.dos_from || query.dosFrom) params.dos_from = query.dos_from || query.dosFrom;
+    if (query.dos_to || query.dosTo) params.dos_to = query.dos_to || query.dosTo;
+    if (query.updated_since || query.updatedSince) params.updated_since = query.updated_since || query.updatedSince;
+    if (query.sort) params.sort = query.sort;
+    if (query.limit) params.limit = query.limit;
+    if (query.cursor) params.cursor = query.cursor;
+
+    // Fallback support for email filter when mock is active
+    if (query.userEmail) {
+      params.userEmail = query.userEmail;
+    }
+
+    const res = await apiClient.request({
       path: '/api/v1/vobs',
-      params: { clientId, status, userEmail, search }
+      params
     });
+
+    // Handle both { data: [...], page: {...} } backend format and legacy array
+    const rawList = Array.isArray(res) ? res : (res?.data || []);
+    const normalizedList = rawList.map(normalizeVobListItem);
+
+    // Attach pagination info to the array so callers can inspect page if needed
+    normalizedList.page = res?.page || { limit: normalizedList.length, next_cursor: null, has_more: false };
+    normalizedList.data = normalizedList;
+
+    return normalizedList;
   },
 
-  // GET /vobs/:id
-  getVobById(id) {
-    return apiClient.request({ path: `/api/v1/vobs/${id}` });
+  /**
+   * GET /api/v1/vobs/:id - One VOB with everything the fill screen needs
+   */
+  async getVobById(id) {
+    const raw = await apiClient.request({
+      path: `/api/v1/vobs/${id}`
+    });
+    return normalizeSingleVob(raw);
   },
 
-  // PATCH /vobs/:id
-  patchVob(id, edits, version, userEmail) {
+  /**
+   * PATCH /api/v1/vobs/:id - User (the assignee) only. Saves field edits.
+   * Body: { version, fields: { ... }, extra: { ... }, confirm: [...] }
+   */
+  async patchVob(id, edits, version = 1, userEmail) {
+    let payload;
+    if (edits && edits.fields !== undefined) {
+      payload = {
+        version: edits.version !== undefined ? edits.version : version,
+        fields: edits.fields || {},
+        extra: edits.extra || {},
+        confirm: edits.confirm || []
+      };
+    } else {
+      payload = toBackendPatchPayload(edits, version);
+    }
+
+    // Include userEmail for mockServer audit log when offline
+    if (userEmail) {
+      payload.userEmail = userEmail;
+    }
+
     return apiClient.request({
       path: `/api/v1/vobs/${id}`,
       method: 'PATCH',
-      data: { edits, version, userEmail }
+      data: payload
     });
   },
 
-  // POST /vobs/:id/submit
-  submitVob(id, userEmail) {
+  /**
+   * POST /api/v1/vobs/:id/submit - User (the assignee) only. Checks VOB and routes it.
+   * Body: { version }
+   */
+  async submitVob(id, versionOrEmail, optionalVersion) {
+    // Handle both submitVob(id, version) and legacy submitVob(id, userEmail)
+    let version = 1;
+    let userEmail = null;
+
+    if (typeof versionOrEmail === 'number') {
+      version = versionOrEmail;
+    } else if (typeof optionalVersion === 'number') {
+      version = optionalVersion;
+      userEmail = versionOrEmail;
+    } else if (typeof versionOrEmail === 'string') {
+      userEmail = versionOrEmail;
+    }
+
+    try {
+      const res = await apiClient.request({
+        path: `/api/v1/vobs/${id}/submit`,
+        method: 'POST',
+        data: { version, userEmail }
+      });
+      return res;
+    } catch (err) {
+      // Backend returns 422 with validation_failed when required fields are empty
+      if (err.status === 422 && err.data?.error) {
+        const errDetails = err.data.error.details || {};
+        return {
+          status: 'Error',
+          error: err.data.error,
+          version: errDetails.version,
+          failingRules: errDetails.failures || []
+        };
+      }
+      throw err;
+    }
+  },
+
+  /**
+   * POST /api/v1/vobs/:id/auth - Auth role only, for VOBs in auth_queue.
+   * Records prior authorization and closes the VOB as approved.
+   * Body: { version, auth_number, auth_valid_from, auth_valid_to }
+   */
+  async authVob(id, { version, auth_number, auth_valid_from, auth_valid_to, authNumber, authStartDate, authEndDate }) {
+    const payload = {
+      version: version || 1,
+      auth_number: auth_number || authNumber || '',
+      auth_valid_from: auth_valid_from || authStartDate || '',
+      auth_valid_to: auth_valid_to || authEndDate || ''
+    };
+
     return apiClient.request({
-      path: `/api/v1/vobs/${id}/submit`,
+      path: `/api/v1/vobs/${id}/auth`,
       method: 'POST',
-      data: { userEmail }
+      data: payload
     });
   },
 
-  // POST /vobs/:id/transcript
+  /**
+   * POST /api/v1/vobs/:id/transcript - Enqueues transcript extraction job
+   */
   postTranscript(id, transcript) {
     return apiClient.request({
       path: `/api/v1/vobs/${id}/transcript`,
@@ -41,20 +181,30 @@ export const vobsApi = {
     });
   },
 
-  // GET /vobs/:id/extraction/:jobId
+  /**
+   * GET /api/v1/vobs/:id/extraction/:jobId - Polls extraction progress and result
+   */
   getExtraction(id, jobId) {
     return apiClient.request({
       path: `/api/v1/vobs/${id}/extraction/${jobId}`
     });
   },
 
-  // GET /vobs/:id/audit
+  /**
+   * GET /api/v1/vobs/:id/audit - HIPAA audit log for this VOB
+   */
   getAudit(id) {
-    return apiClient.request({ path: `/api/v1/vobs/${id}/audit` });
+    return apiClient.request({
+      path: `/api/v1/vobs/${id}/audit`
+    });
   },
 
-  // GET /audit (all logs for Admin)
+  /**
+   * GET /api/v1/audit - All audit logs (Admin only)
+   */
   getAllAuditLogs() {
-    return apiClient.request({ path: '/api/v1/audit' });
+    return apiClient.request({
+      path: '/api/v1/audit'
+    });
   }
 };

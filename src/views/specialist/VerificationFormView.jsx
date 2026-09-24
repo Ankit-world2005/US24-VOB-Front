@@ -100,7 +100,10 @@ export function VerificationFormView() {
 
   const handleSaveDraft = async () => {
     try {
-      await vobsApi.patchVob(activeVobId, { ...formData, provenance }, vob.version, currentUser.email);
+      const patchRes = await vobsApi.patchVob(activeVobId, { ...formData, provenance }, vob.version, currentUser.email);
+      if (patchRes?.version) {
+        setVob(prev => ({ ...prev, version: patchRes.version }));
+      }
       showToast("Draft changes saved successfully.", "info");
     } catch (err) {
       if (err.status === 409) {
@@ -119,15 +122,18 @@ export function VerificationFormView() {
     setIsSubmitting(true);
     try {
       // Save latest form edits first
-      await vobsApi.patchVob(activeVobId, { ...formData, provenance }, vob.version, currentUser.email);
+      const patchRes = await vobsApi.patchVob(activeVobId, { ...formData, provenance }, vob.version, currentUser.email);
+      const currentVersion = patchRes?.version || (vob.version ? vob.version + 1 : 1);
+      setVob(prev => ({ ...prev, version: currentVersion }));
 
       // Run submission validation
-      const result = await vobsApi.submitVob(activeVobId, currentUser.email);
+      const result = await vobsApi.submitVob(activeVobId, currentVersion, currentUser.email);
 
-      if (result.status === 'Error') {
+      const status = (result.status || '').toLowerCase();
+      if (status === 'error') {
         setFailingRules(result.failingRules || []);
         showToast("Validation failed. Check highlighted errors and resubmit.", "error");
-      } else if (result.status === 'Auth Queue') {
+      } else if (status === 'auth_queue' || status === 'auth queue') {
         showToast("Prior Authorization required! VOB moved to Auth Queue.", "info");
         setActiveTab('auth_queue');
       } else {
@@ -135,7 +141,16 @@ export function VerificationFormView() {
         setActiveTab('saved_records');
       }
     } catch (err) {
-      showToast("Submission error", "error");
+      console.error(err);
+      if (err.status === 409) {
+        showToast("Conflict 409: Record version mismatch. Reloading record.", "error");
+        vobsApi.getVobById(activeVobId).then(data => {
+          setVob(data);
+          setFormData(data);
+        });
+      } else {
+        showToast(err?.message || "Submission error", "error");
+      }
     } finally {
       setIsSubmitting(false);
     }

@@ -52,17 +52,19 @@ export function AuthQueueView() {
 
     try {
       const vob = authVobs.find(v => v.id === editingAuthId);
-      await vobsApi.patchVob(editingAuthId, {
-        authDetails: authInputs,
-        vobStatus: "Approved",
-        vobCompletionDate: new Date().toISOString().split("T")[0]
-      }, vob.version, currentUser.email);
+      await vobsApi.authVob(editingAuthId, {
+        version: vob?.version || 1,
+        auth_number: authInputs.authNumber,
+        auth_valid_from: authInputs.authStartDate,
+        auth_valid_to: authInputs.authEndDate
+      });
 
       showToast(`Auth #${authInputs.authNumber} verified! Record moved to Saved Records.`, "success");
       setEditingAuthId(null);
       loadAuthQueue();
     } catch (err) {
-      showToast("Error updating authorization", "error");
+      console.error(err);
+      showToast(err?.message || "Error updating authorization", "error");
     }
   };
 

@@ -1,4 +1,5 @@
 import { apiClient } from './client';
+import { assignmentsApi } from './assignments';
 
 export const uploadsApi = {
   // POST /uploads
@@ -27,13 +28,11 @@ export const uploadsApi = {
     });
   },
 
-  // POST /assignments
-  assignVobs({ vobIds, assignees, adminEmail }) {
-    return apiClient.request({
-      path: '/api/v1/assignments',
-      method: 'POST',
-      data: { vobIds, assignees },
-      params: { adminEmail }
+  // POST /api/v1/assignments
+  assignVobs(params, adminEmail) {
+    return assignmentsApi.assignVobs({
+      ...params,
+      adminEmail
     });
   }
 };

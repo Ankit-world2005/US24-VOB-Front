@@ -43,6 +43,16 @@ let jobsState = {};
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 export const mockServer = {
+  // GET /healthz
+  async getHealthz() {
+    return { status: "ok" };
+  },
+
+  // GET /readyz
+  async getReadyz() {
+    return { status: "ok", database: true };
+  },
+
   // GET /me
   async getMe(email = "saurabh@us24solutions.com") {
     await sleep(80);
@@ -82,30 +92,52 @@ export const mockServer = {
     };
   },
 
-  // GET /vobs?client=&status=&user=&search=
-  async getVobs({ clientId, status, userEmail, search } = {}) {
+  // GET /api/v1/vobs
+  async getVobs({ clientId, client_id, status, userEmail, assignee_id, assigneeId, search, q } = {}) {
     await sleep(120);
     let list = [...vobsState];
 
-    if (clientId && clientId !== "all") {
-      list = list.filter(v => v.client === clientId);
+    const targetClient = client_id || clientId;
+    if (targetClient && targetClient !== "all") {
+      list = list.filter(v => v.client === targetClient);
     }
+
     if (status && status !== "all") {
-      list = list.filter(v => v.vobStatus.toLowerCase() === status.toLowerCase());
+      const statusArr = Array.isArray(status) ? status.map(s => s.toLowerCase()) : [status.toLowerCase()];
+      list = list.filter(v => {
+        const vStatus = (v.vobStatus || v.status || '').toLowerCase().replace(/\s+/g, '_');
+        return statusArr.includes(vStatus) || statusArr.includes((v.vobStatus || '').toLowerCase());
+      });
     }
-    if (userEmail) {
+
+    const targetAssignee = assignee_id || assigneeId;
+    if (targetAssignee) {
+      if (targetAssignee === 'none') {
+        list = list.filter(v => !v.assignedTo || v.assignedTo === 'none');
+      } else {
+        list = list.filter(v => v.assignedTo === targetAssignee || v.assignee_id === targetAssignee);
+      }
+    } else if (userEmail) {
       list = list.filter(v => v.assignedTo?.toLowerCase() === userEmail.toLowerCase());
     }
-    if (search) {
-      const q = search.toLowerCase();
+
+    const searchQuery = (q || search || '').toLowerCase();
+    if (searchQuery) {
       list = list.filter(v =>
-        v.patientName.toLowerCase().includes(q) ||
-        v.insurance.toLowerCase().includes(q) ||
-        v.idCard.toLowerCase().includes(q)
+        (v.patientName || '').toLowerCase().includes(searchQuery) ||
+        (v.insurance || '').toLowerCase().includes(searchQuery) ||
+        (v.idCard || '').toLowerCase().includes(searchQuery)
       );
     }
 
-    return list;
+    return {
+      data: list,
+      page: {
+        limit: list.length,
+        next_cursor: null,
+        has_more: false
+      }
+    };
   },
 
   // GET /vobs/:id
@@ -373,43 +405,87 @@ export const mockServer = {
     return { success: true, count: createdVobs.length, createdVobs };
   },
 
-  // POST /assignments
-  async assignVobs({ vobIds, assignees, assignmentMap }, adminEmail = "saurabh@us24solutions.com") {
-    await sleep(250);
-    const targetAssignee = Array.isArray(assignees) ? assignees[0] : (assignees || "rohit.k@us24solutions.com");
+  // POST /vobs/:id/auth - Auth role only
+  async authVob(id, { version, auth_number, auth_valid_from, auth_valid_to } = {}) {
+    await sleep(200);
+    const idx = vobsState.findIndex(v => v.id === id);
+    if (idx === -1) {
+      const err = new Error("VOB not found");
+      err.status = 404;
+      throw err;
+    }
+    const current = vobsState[idx];
+    const today = new Date().toISOString().split("T")[0];
+    const nextVersion = (version || current.version || 1) + 1;
 
-    vobsState = vobsState.map(v => {
-      if (vobIds.includes(v.id)) {
-        const assignedUser = (assignmentMap && assignmentMap[v.id]) || targetAssignee;
+    current.authDetails = {
+      authNumber: auth_number,
+      authStartDate: auth_valid_from,
+      authEndDate: auth_valid_to
+    };
+    current.vobStatus = "Approved";
+    current.status = "approved";
+    current.vobCompletionDate = today;
+    current.version = nextVersion;
+
+    saveVobsToStorage(vobsState);
+
+    auditState.unshift({
+      id: `aud_${Date.now()}`,
+      vobId: id,
+      timestamp: new Date().toISOString(),
+      user: "auth@us24.test",
+      role: "auth",
+      action: "AUTH_APPROVAL",
+      client: current.client,
+      field: "vobStatus",
+      oldValue: "auth_queue",
+      newValue: "approved",
+      notes: `Authorization ${auth_number} recorded`
+    });
+
+    return {
+      id,
+      status: "approved",
+      version: nextVersion,
+      vob_completion_date: today
+    };
+  },
+
+  // POST /api/v1/assignments
+  async assignVobs(payload = {}, adminEmail = "saurabh@us24solutions.com") {
+    await sleep(250);
+    const vobIds = payload.vob_ids || payload.vobIds || [];
+    const assigneeIds = payload.assignee_ids || (Array.isArray(payload.assignees) ? payload.assignees : [payload.assignees || "rohit.k@us24solutions.com"]);
+    const strategy = payload.strategy || "even";
+    const assignmentMap = payload.assignmentMap;
+
+    const results = [];
+
+    vobsState = vobsState.map((v, i) => {
+      const targetIndex = vobIds.indexOf(v.id);
+      if (targetIndex !== -1) {
+        // Even distribution
+        const assignedUser = (assignmentMap && assignmentMap[v.id]) || assigneeIds[targetIndex % assigneeIds.length];
+        const changed = v.assignedTo !== assignedUser;
+        results.push({
+          vob_id: v.id,
+          assignee_id: assignedUser,
+          changed
+        });
         return {
           ...v,
           assignedTo: assignedUser,
-          vobStatus: "Assigned",
+          vobStatus: v.vobStatus === "In Progress" ? "In Progress" : "Assigned",
           version: v.version + 1
         };
       }
       return v;
     });
 
-    const assigneeSummary = assignmentMap
-      ? Array.from(new Set(Object.values(assignmentMap))).join(', ')
-      : targetAssignee;
+    saveVobsToStorage(vobsState);
 
-    auditState.unshift({
-      id: `aud_${Date.now()}`,
-      vobId: vobIds.join(", "),
-      timestamp: new Date().toISOString(),
-      user: adminEmail,
-      role: "admin",
-      action: "ASSIGNMENT",
-      client: "multi",
-      field: "assignedTo",
-      oldValue: "various",
-      newValue: assigneeSummary,
-      notes: `Assigned ${vobIds.length} records to ${assigneeSummary}`
-    });
-
-    return { success: true, updatedCount: vobIds.length };
+    return { data: results, success: true, updatedCount: results.length };
   },
 
   // GET /users

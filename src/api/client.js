@@ -147,7 +147,13 @@ export const apiClient = {
     if (params) {
       const searchParams = new URLSearchParams();
       for (const [k, v] of Object.entries(params)) {
-        if (v !== undefined && v !== null) searchParams.append(k, v);
+        if (v !== undefined && v !== null) {
+          if (Array.isArray(v)) {
+            v.forEach(val => searchParams.append(k, val));
+          } else {
+            searchParams.append(k, v);
+          }
+        }
       }
       const qs = searchParams.toString();
       if (qs) url += `?${qs}`;
@@ -292,6 +298,8 @@ export const apiClient = {
         }
       });
     }
+    if (path === '/healthz') return mockServer.getHealthz();
+    if (path === '/readyz') return mockServer.getReadyz();
     if (path === '/me' || path === '/auth/me') return mockServer.getMe(params?.email);
     if (path === '/auth/logout' || path === '/api/v1/auth/logout') return mockServer.logout();
     if (path === '/dashboard/summary') return mockServer.getDashboardSummary(params || {});
@@ -310,7 +318,11 @@ export const apiClient = {
     }
     if (path.startsWith('/vobs/') && path.endsWith('/submit')) {
       const id = path.split('/')[2];
-      return mockServer.submitVob(id, data?.userEmail);
+      return mockServer.submitVob(id, data?.userEmail, data?.version);
+    }
+    if (path.startsWith('/vobs/') && path.endsWith('/auth') && method === 'POST') {
+      const id = path.split('/')[2];
+      return mockServer.authVob(id, data);
     }
     if (path.startsWith('/vobs/') && method === 'GET') {
       const id = path.split('/')[2];
