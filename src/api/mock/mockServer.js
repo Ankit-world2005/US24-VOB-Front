@@ -300,50 +300,60 @@ export const mockServer = {
     return [...auditState];
   },
 
-  // POST /uploads
-  async uploadFile(formData, client = "arra") {
+  // POST /uploads — same contract as the API: rows in, preview out (counts and row numbers only).
+  async uploadFile(upload, client = "arra") {
     await sleep(250);
     const uploadId = `upl_${Date.now()}`;
-    const previewRows = Array.isArray(formData?.rows) && formData.rows.length > 0
-      ? formData.rows
-      : [
-        { row: 1, patientName: "Arthur Dent", dob: "1978-05-11", dos: "2026-10-04", appointmentType: "General Consult", insurance: "BCBS", idCard: "XYZ-1234", valid: true },
-        { row: 2, patientName: "Trillian Astra", dob: "1983-09-22", dos: "2026-10-05", appointmentType: "Physical Therapy", insurance: "Aetna", idCard: "AET-9921", valid: true },
-        { row: 3, patientName: "Ford Prefect", dob: "", dos: "2026-10-06", appointmentType: "Initial Eval", insurance: "Cigna", idCard: "CIG-8821", valid: false, reason: "Missing Date of Birth (DOB)" },
-        { row: 4, patientName: "Zaphod Beeblebrox", dob: "1965-03-15", dos: "2026-10-07", appointmentType: "Specialist Spine", insurance: "UHC", idCard: "UHC-7731", valid: true }
-      ];
-
-    const validCount = previewRows.filter(r => r.valid).length;
-    const rejectedCount = previewRows.length - validCount;
+    const rows = (upload?.rows || []).map(r => ({
+      row: r.row,
+      patientName: r.patient_name,
+      dob: r.dob || "",
+      dos: r.dos || "",
+      emrId: r.emr_id || "",
+      insurance: r.insurance || "",
+      appointmentType: r.appointment_type || "",
+      groupNo: r.group_no || "",
+      idCard: r.member_id || "",
+      assignedTo: r.assignee_email || ""
+    }));
 
     uploadsState[uploadId] = {
-      uploadId,
+      id: uploadId,
       client,
-      filename: formData?.filename || "Client_VOB_Batch_Intake.xlsx",
-      totalRows: previewRows.length,
-      validRows: validCount,
-      rejectedRows: rejectedCount,
-      rows: previewRows,
-      status: "preview"
+      filename: upload?.filename || "Client_VOB_Batch_Intake.xlsx",
+      rows,
+      status: "parsed"
     };
 
-    return { uploadId, ...uploadsState[uploadId] };
+    return this.getUploadPreview(uploadId);
   },
 
   // GET /uploads/:id/preview
   async getUploadPreview(uploadId) {
     await sleep(100);
-    return uploadsState[uploadId] || null;
+    const upl = uploadsState[uploadId];
+    if (!upl) throw new Error("Upload batch not found");
+    return {
+      id: upl.id,
+      status: upl.status,
+      total_rows: upl.rows.length,
+      valid_rows: upl.rows.length,
+      rejected: [],
+      duplicates: []
+    };
   },
 
   // POST /uploads/:id/commit
-  async commitUpload(uploadId, adminEmail = "saurabh@us24solutions.com", assignedTo) {
+  async commitUpload(uploadId, { skip_rows = [] } = {}, adminEmail = "saurabh@us24solutions.com") {
     await sleep(250);
     const upl = uploadsState[uploadId];
     if (!upl) throw new Error("Upload batch not found");
+    if (upl.status === "committed") return upl.result;
 
-    const validItems = upl.rows.filter(r => r.valid);
-    const targetAssignee = assignedTo || upl.assignedTo || "rohit.k@us24solutions.com";
+    const skip = new Set(skip_rows);
+    const validItems = upl.rows.filter(r => !skip.has(r.row));
+    const assignees = [...new Set(validItems.map(r => r.assignedTo).filter(Boolean))];
+    const targetAssignee = assignees.join(", ") || "rohit.k@us24solutions.com";
 
     const createdVobs = validItems.map((r, i) => ({
       id: `vob_${Date.now()}_${i}`,
@@ -403,7 +413,8 @@ export const mockServer = {
       notes: `Batch intake from ${upl.filename} assigned to ${targetAssignee}`
     });
 
-    return { success: true, count: createdVobs.length, createdVobs };
+    upl.result = { id: upl.id, created: createdVobs.length, vob_ids: createdVobs.map(v => v.id) };
+    return upl.result;
   },
 
   // POST /vobs/:id/auth - Auth role only

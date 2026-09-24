@@ -345,7 +345,7 @@ export const apiClient = {
     }
     if (path.startsWith('/uploads/') && path.endsWith('/commit')) {
       const id = path.split('/')[2];
-      return mockServer.commitUpload(id, data?.adminEmail, data?.assignedTo);
+      return mockServer.commitUpload(id, data, params?.adminEmail);
     }
     if (path === '/assignments' && method === 'POST') return mockServer.assignVobs(data, params?.adminEmail);
     if (path === '/users' && method === 'GET') return mockServer.getUsers();

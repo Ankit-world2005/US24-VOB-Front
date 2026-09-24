@@ -26,8 +26,27 @@ function formatDateValue(val) {
       }
     } catch { }
   }
+  // Text dates in CSVs and pasted rows arrive as US M/D/YYYY; the API takes YYYY-MM-DD.
+  const us = String(val).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (us) return `${us[3]}-${us[1].padStart(2, '0')}-${us[2].padStart(2, '0')}`;
   return String(val).trim();
 }
+
+/** RFC 4122 v4. `crypto.randomUUID` exists only on https and localhost, not on a LAN address. */
+function uuidv4() {
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6] & 0x0f) | 0x40;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  const h = [...b].map(x => x.toString(16).padStart(2, '0')).join('');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
+// How the API names a rejected row's reason, in words for the admin.
+const SERVER_REASONS = {
+  missing_required: 'missing',
+  unparseable_date: 'date not understood',
+  assignee_invalid: 'assignee is not an active specialist'
+};
 
 // Headers and Project names are compared with everything but letters and digits
 // stripped, so "D.O.B", "DOB (MM/DD/YYYY)" and "Patient's Name" all match.
@@ -114,13 +133,20 @@ const projectMatchesClient = (project, client) => {
  */
 function readIntakeRows(workbook) {
   const HEADER_SCAN_ROWS = 15;
-  const sheets = workbook.SheetNames.map((name) =>
-    XLSX.utils.sheet_to_json(workbook.Sheets[name], { header: 1, defval: '', blankrows: false })
-  );
+  // Blank rows are kept so an index maps back to the spreadsheet's own row number,
+  // which is what the admin looks for when a row is rejected.
+  const sheets = workbook.SheetNames.map((name) => {
+    const ws = workbook.Sheets[name];
+    return {
+      grid: XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', blankrows: true }),
+      firstRow: ws['!ref'] ? XLSX.utils.decode_range(ws['!ref']).s.r + 1 : 1
+    };
+  });
 
   const candidates = sheets
-    .map((grid) => ({
+    .map(({ grid, firstRow }) => ({
       grid,
+      firstRow,
       headerIdx: grid.slice(0, HEADER_SCAN_ROWS).findIndex((cells) => {
         const labels = cells.map(String);
         return findHeader(labels, 'patientName') !== undefined &&
@@ -132,9 +158,9 @@ function readIntakeRows(workbook) {
   const found =
     candidates.find(({ grid, headerIdx }) => grid.slice(headerIdx + 1).some(hasData)) ||
     candidates[0] ||
-    { grid: sheets[0] || [], headerIdx: 0 };
+    { grid: sheets[0]?.grid || [], firstRow: sheets[0]?.firstRow || 1, headerIdx: 0 };
 
-  const { grid, headerIdx } = found;
+  const { grid, firstRow, headerIdx } = found;
   const seen = {};
   const headers = (grid[headerIdx] || []).map((cell, i) => {
     const base = String(cell).trim() || `Column ${i + 1}`;
@@ -142,12 +168,16 @@ function readIntakeRows(workbook) {
     return seen[base] > 1 ? `${base} (${seen[base]})` : base;
   });
 
-  const rows = grid
+  const body = grid
     .slice(headerIdx + 1)
-    .filter(hasData)
-    .map((cells) => Object.fromEntries(headers.map((h, i) => [h, cells[i] ?? ''])));
+    .map((cells, i) => ({ cells, rowNumber: firstRow + headerIdx + 1 + i }))
+    .filter(({ cells }) => hasData(cells));
 
-  return { headers, rows };
+  return {
+    headers,
+    rows: body.map(({ cells }) => Object.fromEntries(headers.map((h, i) => [h, cells[i] ?? '']))),
+    rowNumbers: body.map(({ rowNumber }) => rowNumber)
+  };
 }
 
 export function UploadAssignView() {
@@ -163,22 +193,26 @@ export function UploadAssignView() {
   const [uploadedFileName, setUploadedFileName] = useState('');
   const [showManualPaste, setShowManualPaste] = useState(false);
   const [manualText, setManualText] = useState('');
+  // A batch the server checked and found possible duplicates in, waiting for the
+  // admin to skip or keep them. Any edit to the selection makes it stale.
+  const [pendingBatch, setPendingBatch] = useState(null);
 
   const fileInputRef = useRef(null);
 
-  // Available specialists
-  const specialists = MOCK_USERS.map(u => ({
+  // Specialists only: the API gives a VOB to an active `user`, never to an admin.
+  const specialists = MOCK_USERS.filter(u => u.role === 'user').map(u => ({
     email: u.email,
     name: u.name,
     role: u.role
   }));
 
-  const parseAndSetRows = async ({ headers, rows: rawRows }, sourceName) => {
+  const parseAndSetRows = async ({ headers, rows: rawRows, rowNumbers }, sourceName) => {
     if (!rawRows || rawRows.length === 0) {
       showToast("No data rows found to import.", "warning");
       return;
     }
 
+    setPendingBatch(null);
     const initialAssignees = {};
     const validIndices = new Set();
 
@@ -193,12 +227,12 @@ export function UploadAssignView() {
       const emrId = String(getFieldValue(r, 'emrId')).trim();
       const project = String(getFieldValue(r, 'project')).trim();
       const vobStatus = String(getFieldValue(r, 'vobStatus')).trim();
-      const dos = formatDateValue(getFieldValue(r, 'dos')) || formatDateValue(new Date());
-      const insurance = String(getFieldValue(r, 'insurance')).trim() || 'General Healthcare';
-      // Left empty when the file has none: a made-up member ID looks real on a payer call.
+      // Blank stays blank. A made-up DOS, payer or member ID reads as real on a payer call.
+      const dos = formatDateValue(getFieldValue(r, 'dos'));
+      const insurance = String(getFieldValue(r, 'insurance')).trim();
       const idCard = String(getFieldValue(r, 'idCard')).trim();
-      const groupNo = String(getFieldValue(r, 'groupNo')).trim() || 'GRP-AUTO';
-      const appointmentType = String(getFieldValue(r, 'appointmentType')).trim() || 'Physical Therapy';
+      const groupNo = String(getFieldValue(r, 'groupNo')).trim();
+      const appointmentType = String(getFieldValue(r, 'appointmentType')).trim();
 
       // Look for specific assignee in row, otherwise use default. An empty cell must
       // not reach the name match: every name includes ''.
@@ -234,7 +268,7 @@ export function UploadAssignView() {
       }
 
       return {
-        row: index + 1,
+        row: rowNumbers[index],
         patientName: patientName || 'Unknown Patient',
         dob,
         dobRequired,
@@ -250,13 +284,14 @@ export function UploadAssignView() {
       };
     });
 
-    const res = await uploadsApi.uploadFile({
-      filename: sourceName,
+    // The preview is built here, from the file. Nothing reaches the server until
+    // Import, so an abandoned preview leaves no patient rows held on a batch.
+    setPreviewData({
+      totalRows: mappedRows.length,
+      validRows: validIndices.size,
+      rejectedRows: mappedRows.length - validIndices.size,
       rows: mappedRows
-    }, selectedClient);
-
-    const preview = await uploadsApi.getPreview(res.uploadId);
-    setPreviewData(preview);
+    });
     setRowAssignees(initialAssignees);
     setSelectedRowIndices(validIndices);
     setUploadedFileName(sourceName);
@@ -275,7 +310,7 @@ export function UploadAssignView() {
       return;
     }
 
-    showToast(`Imported ${preview.totalRows} records. ${preview.validRows} valid and ready for assignment.`, "info");
+    showToast(`Read ${mappedRows.length} rows. ${validIndices.size} ready to import and assign.`, "info");
   };
 
   const processFile = async (file) => {
@@ -331,6 +366,7 @@ export function UploadAssignView() {
 
 
   const handleRowAssigneeChange = (rowIndex, assigneeEmail) => {
+    setPendingBatch(null);
     setRowAssignees(prev => ({
       ...prev,
       [rowIndex]: assigneeEmail
@@ -338,6 +374,7 @@ export function UploadAssignView() {
   };
 
   const handleBulkAssigneeChange = (assigneeEmail) => {
+    setPendingBatch(null);
     setDefaultAssignee(assigneeEmail);
     if (previewData && previewData.rows) {
       const updated = {};
@@ -349,6 +386,7 @@ export function UploadAssignView() {
   };
 
   const toggleRowSelect = (index) => {
+    setPendingBatch(null);
     setSelectedRowIndices(prev => {
       const next = new Set(prev);
       if (next.has(index)) {
@@ -362,6 +400,7 @@ export function UploadAssignView() {
 
   const toggleSelectAll = () => {
     if (!previewData) return;
+    setPendingBatch(null);
     if (selectedRowIndices.size === previewData.validRows) {
       setSelectedRowIndices(new Set());
     } else {
@@ -384,27 +423,102 @@ export function UploadAssignView() {
       .filter((r, idx) => r.valid && selectedRowIndices.has(idx));
     if (rowsToCommit.length === 0) return;
 
+    // The API knows clients by id; /auth/me lists the ones this admin holds, by name.
+    // Without a match (mock mode) the slug goes, and only the mock server reads it.
+    const client = CLIENTS.find(c => c.id === selectedClient);
+    const serverClient = (currentUser.accessibleClients || []).find(c =>
+      c && typeof c === 'object' && client && normalizeKey(c.name) === normalizeKey(client.name)
+    );
+
     setIsCommitting(true);
     try {
-      const batch = await uploadsApi.uploadFile({
+      const preview = await uploadsApi.uploadFile({
+        client_id: serverClient?.id ?? selectedClient,
+        kind: 'tasks',
         filename: uploadedFileName || 'Imported_Data.xlsx',
-        rows: rowsToCommit
+        rows: rowsToCommit.map(r => ({
+          row: r.row,
+          patient_name: r.patientName,
+          dob: r.dob || null,
+          dos: r.dos || null,
+          emr_id: r.emrId || null,
+          insurance: r.insurance || null,
+          appointment_type: r.appointmentType || null,
+          group_no: r.groupNo || null,
+          member_id: r.idCard || null,
+          assignee_email: r.assignedTo || null
+        }))
       }, selectedClient);
 
-      const commitRes = await uploadsApi.commitUpload(batch.uploadId, currentUser.email);
-      const createdVobs = commitRes.createdVobs || [];
+      const batch = {
+        id: preview.id,
+        rejected: preview.rejected || [],
+        duplicates: preview.duplicates || [],
+        valid: preview.valid_rows ?? rowsToCommit.length
+      };
 
-      showToast(`Successfully created & assigned ${createdVobs.length} VOB tasks! Navigating to Global Tracker...`, "success");
-      setPreviewData(null);
-      setUploadedFileName('');
-      setActiveTab('records');
+      // Possible duplicates are the admin's call (FR-3): stop and ask.
+      if (batch.duplicates.length > 0) {
+        setPendingBatch(batch);
+        showToast(
+          `${batch.duplicates.length} row${batch.duplicates.length === 1 ? ' looks' : 's look'} like tasks already imported. Choose below whether to skip them.`,
+          "warning"
+        );
+        return;
+      }
+
+      await finishImport(batch, false);
     } catch (err) {
       console.error(err);
-      showToast("Error committing intake batch", "error");
+      showToast(`Import failed: ${err.message || 'the intake batch could not be committed.'}`, "error");
     } finally {
       setIsCommitting(false);
     }
   };
+
+  /** Commits a checked batch, leaving out its possible duplicates when `skipDuplicates`. */
+  const finishImport = async (batch, skipDuplicates) => {
+    const skipRows = skipDuplicates ? batch.duplicates.map(d => d.row) : [];
+    const result = await uploadsApi.commitUpload(
+      batch.id,
+      { skipRows, idempotencyKey: uuidv4() },
+      currentUser.email
+    );
+    setPendingBatch(null);
+
+    const notes = [
+      batch.rejected.length > 0 &&
+        `Not imported: ${batch.rejected.map(r => `row ${r.row} (${r.field}: ${SERVER_REASONS[r.reason] || r.reason})`).join(', ')}.`,
+      skipRows.length > 0 &&
+        `Skipped as already imported: row${skipRows.length === 1 ? '' : 's'} ${skipRows.join(', ')}.`
+    ].filter(Boolean).join(' ');
+
+    if (result.created === 0) {
+      showToast(`No VOB tasks created. ${notes}`, "warning");
+      return;
+    }
+
+    showToast(`Created & assigned ${result.created} VOB tasks. ${notes}`.trim(), notes ? "warning" : "success");
+    setPreviewData(null);
+    setUploadedFileName('');
+    setActiveTab('records');
+  };
+
+  const resolvePending = async (skipDuplicates) => {
+    if (!pendingBatch) return;
+    setIsCommitting(true);
+    try {
+      await finishImport(pendingBatch, skipDuplicates);
+    } catch (err) {
+      console.error(err);
+      showToast(`Import failed: ${err.message || 'the intake batch could not be committed.'}`, "error");
+    } finally {
+      setIsCommitting(false);
+    }
+  };
+
+  // Server verdicts by spreadsheet row, for the table.
+  const duplicateByRow = new Map((pendingBatch?.duplicates || []).map(d => [d.row, d]));
 
   const clientName = CLIENTS.find(c => c.id === selectedClient)?.name || 'Client';
 
@@ -438,7 +552,10 @@ export function UploadAssignView() {
             <select
               className="select-input"
               value={selectedClient}
-              onChange={(e) => setSelectedClient(e.target.value)}
+              onChange={(e) => {
+                setPendingBatch(null);
+                setSelectedClient(e.target.value);
+              }}
               style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid var(--rule)', background: 'var(--surface)', color: 'var(--ink)' }}
             >
               {CLIENTS.map(c => (
@@ -621,8 +738,8 @@ export function UploadAssignView() {
                         <td style={{ padding: '10px 12px' }}>{r.dob || (r.dobRequired
                           ? <span style={{ color: 'var(--danger)', fontWeight: 600 }}>Missing</span>
                           : <span style={{ color: 'var(--ink-soft)' }}>—</span>)}</td>
-                        <td style={{ padding: '10px 12px' }}>{r.dos}</td>
-                        <td style={{ padding: '10px 12px' }}>{r.insurance}</td>
+                        <td style={{ padding: '10px 12px' }}>{r.dos || <span style={{ color: 'var(--ink-soft)' }}>—</span>}</td>
+                        <td style={{ padding: '10px 12px' }}>{r.insurance || <span style={{ color: 'var(--ink-soft)' }}>—</span>}</td>
                         <td style={{ padding: '10px 12px', fontFamily: 'var(--mono)', fontSize: '12px' }}>{r.idCard || <span style={{ color: 'var(--ink-soft)' }}>—</span>}</td>
                         <td style={{ padding: '8px 12px' }}>
                           <select
@@ -644,7 +761,16 @@ export function UploadAssignView() {
                           </select>
                         </td>
                         <td style={{ padding: '10px 12px' }}>
-                          {r.valid ? (
+                          {r.valid && duplicateByRow.has(r.row) ? (
+                            <span
+                              title={duplicateByRow.get(r.row).on.includes('patient_name')
+                                ? 'Same name as a patient with an open task. May be a different person.'
+                                : 'Same patient already has this task.'}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', borderRadius: '12px', background: 'rgba(245, 158, 11, 0.14)', color: '#b45309', fontSize: '11.5px', fontWeight: 600 }}
+                            >
+                              ⚠ {duplicateByRow.get(r.row).on.includes('patient_name') ? 'Possible duplicate' : 'Already imported'}
+                            </span>
+                          ) : r.valid ? (
                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.12)', color: '#059669', fontSize: '11.5px', fontWeight: 600 }}>
                               ✓ Ready
                             </span>
@@ -663,31 +789,63 @@ export function UploadAssignView() {
 
             {/* Commit & Assign Bottom Action Bar */}
             <div style={{ marginTop: '20px', padding: '16px', background: 'var(--surface-2)', border: '1px solid var(--rule)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--ink-soft)' }}>
-                <span><strong>Selected rows</strong> are created as VOB tasks and assigned to the specialist chosen for each row.</span>
+              <div style={{ flex: pendingBatch ? '1 1 100%' : '1 1 280px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: pendingBatch ? '#b45309' : 'var(--ink-soft)' }}>
+                {pendingBatch ? (
+                  <span>
+                    <strong>{pendingBatch.duplicates.length} row{pendingBatch.duplicates.length === 1 ? '' : 's'}</strong> (
+                    {pendingBatch.duplicates.map(d => `#${d.row}`).join(', ')}) look like tasks that already exist. Skip them, or import them anyway.
+                  </span>
+                ) : (
+                  <span><strong>Selected rows</strong> are created as VOB tasks and assigned to the specialist chosen for each row.</span>
+                )}
               </div>
 
-              <div style={{ display: 'flex', gap: '10px' }}>
+              <div style={{ display: 'flex', gap: '10px', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
                 <button
                   type="button"
                   className="btn ghost"
                   onClick={() => {
+                    setPendingBatch(null);
                     setPreviewData(null);
                     setUploadedFileName('');
                   }}
                   disabled={isCommitting}
+                  style={{ width: 'auto', padding: '10px 18px' }}
                 >
                   Clear & Cancel
                 </button>
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={handleCommitAndAssign}
-                  disabled={isCommitting || selectedRowIndices.size === 0}
-                  style={{ minWidth: '220px' }}
-                >
-                  {isCommitting ? 'Importing & Allocating Tasks…' : `Import & Assign ${selectedRowIndices.size} VOB Tasks`}
-                </button>
+                {pendingBatch ? (
+                  <>
+                    <button
+                      type="button"
+                      className="btn ghost"
+                      onClick={() => resolvePending(false)}
+                      disabled={isCommitting}
+                      style={{ width: 'auto', padding: '10px 18px' }}
+                    >
+                      Import all {pendingBatch.valid}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={() => resolvePending(true)}
+                      disabled={isCommitting}
+                      style={{ minWidth: '220px', width: 'auto' }}
+                    >
+                      {isCommitting ? 'Importing & Allocating Tasks…' : `Skip duplicates & import ${pendingBatch.valid - pendingBatch.duplicates.length}`}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={handleCommitAndAssign}
+                    disabled={isCommitting || selectedRowIndices.size === 0}
+                    style={{ minWidth: '220px', width: 'auto' }}
+                  >
+                    {isCommitting ? 'Importing & Allocating Tasks…' : `Import & Assign ${selectedRowIndices.size} VOB Tasks`}
+                  </button>
+                )}
               </div>
             </div>
           </div>
