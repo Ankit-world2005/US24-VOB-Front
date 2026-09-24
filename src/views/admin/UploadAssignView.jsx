@@ -9,7 +9,11 @@ function formatDateValue(val) {
   if (!val) return '';
   if (val instanceof Date) {
     if (isNaN(val.getTime())) return '';
-    return val.toISOString().split('T')[0];
+    // Local parts, not toISOString(): east of UTC a local midnight is the previous day in UTC.
+    const y = String(val.getFullYear()).padStart(4, '0');
+    const m = String(val.getMonth() + 1).padStart(2, '0');
+    const d = String(val.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
   }
   if (typeof val === 'number') {
     try {
@@ -25,16 +29,94 @@ function formatDateValue(val) {
   return String(val).trim();
 }
 
-function getFieldValue(row, patterns) {
-  for (const [key, val] of Object.entries(row)) {
-    const cleanKey = key.trim().toLowerCase().replace(/[\s_\-#]+/g, '');
-    for (const pat of patterns) {
-      if (cleanKey.includes(pat)) {
-        return val !== undefined && val !== null ? val : '';
-      }
+// Headers are compared with everything but letters and digits stripped, so
+// "D.O.B", "DOB (MM/DD/YYYY)" and "Patient's Name" all match.
+const normalizeHeader = (header) => String(header).toLowerCase().replace(/[^a-z0-9]/g, '');
+
+// Patterns in priority order. `exclude` keeps a broad pattern such as `name` or
+// `service` from claiming a neighbouring column ("Client Name", "Service Date").
+const FIELDS = {
+  patientName: {
+    patterns: ['patientname', 'ptname', 'patient', 'membername', 'name'],
+    exclude: ['patientid', 'client', 'provider', 'insurance', 'payer', 'carrier', 'plan', 'clinic', 'facility', 'specialist', 'assign', 'subscriber', 'employer', 'user', 'file']
+  },
+  dob: { patterns: ['dob', 'dateofbirth', 'birthdate', 'birthday', 'birth'], exclude: [] },
+  dos: { patterns: ['dos', 'dateofservice', 'servicedate', 'apptdate', 'appointmentdate'], exclude: [] },
+  insurance: {
+    patterns: ['insurancename', 'insurancecarrier', 'insurance', 'payername', 'payer', 'carrier', 'inscompany', 'plan'],
+    exclude: ['phone', 'fax', 'address', 'payerid', 'insuranceid', 'policyid', 'memberid']
+  },
+  idCard: {
+    patterns: ['memberid', 'memberpolicyid', 'policyid', 'subscriberid', 'idcard', 'idnum', 'policynumber', 'membernumber', 'member'],
+    exclude: ['name']
+  },
+  groupNo: { patterns: ['groupno', 'groupnumber', 'groupid', 'group', 'grp'], exclude: ['name'] },
+  appointmentType: {
+    patterns: ['appointmenttype', 'appttype', 'visittype', 'servicetype', 'service', 'requesttype'],
+    exclude: ['date']
+  },
+  assignee: { patterns: ['assignee', 'assignedto', 'assignedspecialist', 'allocatedspecialist', 'specialist', 'staff', 'user'], exclude: [] }
+};
+
+function findHeader(headers, field) {
+  const { patterns, exclude } = FIELDS[field];
+  const candidates = headers.filter((h) => {
+    const key = normalizeHeader(h);
+    return key && !exclude.some((x) => key.includes(x));
+  });
+  for (const pat of patterns) {
+    const hit = candidates.find((h) => normalizeHeader(h) === pat) ||
+      candidates.find((h) => normalizeHeader(h).includes(pat));
+    if (hit !== undefined) return hit;
+  }
+  return undefined;
+}
+
+function getFieldValue(row, field) {
+  const header = findHeader(Object.keys(row), field);
+  const val = header === undefined ? '' : row[header];
+  return val !== undefined && val !== null ? val : '';
+}
+
+/**
+ * Rows of the first sheet whose header row names both a patient and a DOB column.
+ * Intake sheets often carry a title or blank rows above the header, and some keep
+ * the data on a later sheet. Falls back to the first sheet's first row as header,
+ * so the preview can still show why its rows are rejected.
+ */
+function readIntakeRows(workbook) {
+  const HEADER_SCAN_ROWS = 15;
+  const sheets = workbook.SheetNames.map((name) =>
+    XLSX.utils.sheet_to_json(workbook.Sheets[name], { header: 1, defval: '', blankrows: false })
+  );
+
+  let found = null;
+  for (const grid of sheets) {
+    const headerIdx = grid.slice(0, HEADER_SCAN_ROWS).findIndex((cells) => {
+      const labels = cells.map(String);
+      return findHeader(labels, 'patientName') !== undefined && findHeader(labels, 'dob') !== undefined;
+    });
+    if (headerIdx !== -1) {
+      found = { grid, headerIdx };
+      break;
     }
   }
-  return '';
+  if (!found) found = { grid: sheets[0] || [], headerIdx: 0 };
+
+  const { grid, headerIdx } = found;
+  const seen = {};
+  const headers = (grid[headerIdx] || []).map((cell, i) => {
+    const base = String(cell).trim() || `Column ${i + 1}`;
+    seen[base] = (seen[base] || 0) + 1;
+    return seen[base] > 1 ? `${base} (${seen[base]})` : base;
+  });
+
+  const rows = grid
+    .slice(headerIdx + 1)
+    .filter((cells) => cells.some((c) => String(c).trim() !== ''))
+    .map((cells) => Object.fromEntries(headers.map((h, i) => [h, cells[i] ?? ''])));
+
+  return { headers, rows };
 }
 
 export function UploadAssignView() {
@@ -60,7 +142,7 @@ export function UploadAssignView() {
     role: u.role
   }));
 
-  const parseAndSetRows = async (rawRows, sourceName) => {
+  const parseAndSetRows = async ({ headers, rows: rawRows }, sourceName) => {
     if (!rawRows || rawRows.length === 0) {
       showToast("No data rows found to import.", "warning");
       return;
@@ -70,21 +152,20 @@ export function UploadAssignView() {
     const validIndices = new Set();
 
     const mappedRows = rawRows.map((r, index) => {
-      const patientName = String(getFieldValue(r, ['patientname', 'patient', 'name', 'ptname', 'clientname'])).trim();
-      const rawDob = getFieldValue(r, ['dob', 'dateofbirth', 'birthdate', 'birth']);
-      const dob = formatDateValue(rawDob);
-      const rawDos = getFieldValue(r, ['dos', 'dateofservice', 'servicedate', 'apptdate', 'appointmentdate']);
-      const dos = formatDateValue(rawDos) || new Date().toISOString().split('T')[0];
-      const insurance = String(getFieldValue(r, ['insurance', 'payer', 'carrier', 'inscompany', 'plan'])).trim() || 'General Healthcare';
-      const idCard = String(getFieldValue(r, ['memberid', 'idcard', 'policyid', 'subscriberid', 'idnum', 'member'])).trim() || `ID-${Math.floor(1000 + Math.random() * 9000)}`;
-      const groupNo = String(getFieldValue(r, ['groupno', 'groupnumber', 'groupid', 'group', 'grp'])).trim() || 'GRP-AUTO';
-      const appointmentType = String(getFieldValue(r, ['appointmenttype', 'appttype', 'visittype', 'servicetype', 'service', 'requesttype'])).trim() || 'Physical Therapy';
+      const patientName = String(getFieldValue(r, 'patientName')).trim();
+      const dob = formatDateValue(getFieldValue(r, 'dob'));
+      const dos = formatDateValue(getFieldValue(r, 'dos')) || formatDateValue(new Date());
+      const insurance = String(getFieldValue(r, 'insurance')).trim() || 'General Healthcare';
+      const idCard = String(getFieldValue(r, 'idCard')).trim() || `ID-${Math.floor(1000 + Math.random() * 9000)}`;
+      const groupNo = String(getFieldValue(r, 'groupNo')).trim() || 'GRP-AUTO';
+      const appointmentType = String(getFieldValue(r, 'appointmentType')).trim() || 'Physical Therapy';
 
-      // Look for specific assignee in row, otherwise use default
-      const rowAssignee = String(getFieldValue(r, ['assignee', 'assignedto', 'specialist', 'user', 'staff'])).trim();
-      const matchedUser = specialists.find(s =>
-        s.email.toLowerCase() === rowAssignee.toLowerCase() ||
-        s.name.toLowerCase().includes(rowAssignee.toLowerCase())
+      // Look for specific assignee in row, otherwise use default. An empty cell must
+      // not reach the name match: every name includes ''.
+      const rowAssignee = String(getFieldValue(r, 'assignee')).trim().toLowerCase();
+      const matchedUser = rowAssignee && specialists.find(s =>
+        s.email.toLowerCase() === rowAssignee ||
+        s.name.toLowerCase().includes(rowAssignee)
       );
       const assignedTo = matchedUser ? matchedUser.email : defaultAssignee;
 
@@ -129,6 +210,22 @@ export function UploadAssignView() {
     setRowAssignees(initialAssignees);
     setSelectedRowIndices(validIndices);
     setUploadedFileName(sourceName);
+
+    if (validIndices.size === 0) {
+      const reasonCounts = mappedRows.reduce((acc, r) => {
+        acc[r.reason] = (acc[r.reason] || 0) + 1;
+        return acc;
+      }, {});
+      const reasons = Object.entries(reasonCounts).map(([reason, n]) => `${n} × ${reason}`).join(', ');
+      const columns = headers.filter(Boolean).slice(0, 10).join(', ');
+      showToast(
+        `0 of ${mappedRows.length} rows can be imported (${reasons}). Columns found: ${columns}. ` +
+        `Each row needs a patient name and a DOB column, e.g. "Patient Name" and "DOB".`,
+        "warning"
+      );
+      return;
+    }
+
     showToast(`Imported ${preview.totalRows} records. ${preview.validRows} valid and ready for assignment.`, "info");
   };
 
@@ -152,10 +249,7 @@ export function UploadAssignView() {
         throw new Error("No sheets found in the spreadsheet.");
       }
 
-      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rawRows = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
-
-      await parseAndSetRows(rawRows, file.name);
+      await parseAndSetRows(readIntakeRows(workbook), file.name);
     } catch (err) {
       console.error("Error parsing file:", err);
       showToast(err.message || "Failed to parse intake spreadsheet.", "error");
@@ -174,10 +268,8 @@ export function UploadAssignView() {
     try {
       // Parse CSV or TSV text
       const workbook = XLSX.read(manualText, { type: 'string' });
-      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rawRows = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
 
-      await parseAndSetRows(rawRows, 'Manual_Data_Import.csv');
+      await parseAndSetRows(readIntakeRows(workbook), 'Manual_Data_Import.csv');
       setShowManualPaste(false);
       setManualText('');
     } catch (err) {
@@ -234,36 +326,24 @@ export function UploadAssignView() {
 
   const handleCommitAndAssign = async () => {
     if (!previewData) return;
+
+    // Only the ticked rows, each carrying the assignee chosen for it. Filtering
+    // before the upload keeps rows and created VOBs in step, and the commit copies
+    // each row's assignedTo onto its VOB, so no separate assignment call is needed.
+    const rowsToCommit = previewData.rows
+      .map((r, idx) => ({ ...r, assignedTo: rowAssignees[idx] || defaultAssignee }))
+      .filter((r, idx) => r.valid && selectedRowIndices.has(idx));
+    if (rowsToCommit.length === 0) return;
+
     setIsCommitting(true);
     try {
-      // Attach selected row-level assignees
-      const rowsWithAssignees = previewData.rows.map((r, idx) => ({
-        ...r,
-        assignedTo: rowAssignees[idx] || defaultAssignee
-      }));
-
-      // Update upload batch with assigned users
-      await uploadsApi.uploadFile({
+      const batch = await uploadsApi.uploadFile({
         filename: uploadedFileName || 'Imported_Data.xlsx',
-        rows: rowsWithAssignees
+        rows: rowsToCommit
       }, selectedClient);
 
-      const commitRes = await uploadsApi.commitUpload(previewData.uploadId, currentUser.email);
+      const commitRes = await uploadsApi.commitUpload(batch.uploadId, currentUser.email);
       const createdVobs = commitRes.createdVobs || [];
-
-      // Build assignment mapping for created VOBs
-      const assignmentMap = {};
-      createdVobs.forEach((v, idx) => {
-        assignmentMap[v.id] = rowAssignees[idx] || defaultAssignee;
-      });
-
-      if (createdVobs.length > 0) {
-        await uploadsApi.assignVobs({
-          vobIds: createdVobs.map(v => v.id),
-          assignees: [defaultAssignee],
-          assignmentMap
-        }, currentUser.email);
-      }
 
       showToast(`Successfully created & assigned ${createdVobs.length} VOB tasks! Navigating to Global Tracker...`, "success");
       setPreviewData(null);
@@ -335,19 +415,6 @@ export function UploadAssignView() {
           </div>
         </div>
 
-        {/* Hidden Native File Input */}
-        <input
-          type="file"
-          ref={fileInputRef}
-          accept=".xlsx, .xls, .csv"
-          style={{ display: 'none' }}
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) processRealFile(file);
-            e.target.value = '';
-          }}
-        />
-
         {/* Manual Paste Drawer */}
         {showManualPaste && (
           <div style={{ marginBottom: '20px', padding: '16px', borderRadius: '8px', border: '1px solid var(--rule)', background: 'var(--surface-2)' }}>
@@ -379,6 +446,8 @@ export function UploadAssignView() {
           onChange={(e) => {
             const f = e.target.files?.[0];
             if (f) processFile(f);
+            // Reset so choosing the same file again still fires onChange.
+            e.target.value = '';
           }}
           style={{ display: 'none' }}
         />
@@ -544,7 +613,7 @@ export function UploadAssignView() {
             {/* Commit & Assign Bottom Action Bar */}
             <div style={{ marginTop: '20px', padding: '16px', background: 'var(--surface-2)', border: '1px solid var(--rule)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--ink-soft)' }}>
-                <span>✨ <strong>Auto Pre-Fill:</strong> Valid records will automatically be matched with patient history and client master reference data.</span>
+                <span><strong>Selected rows</strong> are created as VOB tasks and assigned to the specialist chosen for each row.</span>
               </div>
 
               <div style={{ display: 'flex', gap: '10px' }}>

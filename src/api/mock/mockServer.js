@@ -337,7 +337,7 @@ export const mockServer = {
   },
 
   // POST /uploads/:id/commit
-  async commitUpload(uploadId, adminEmail = "saurabh@us24solutions.com") {
+  async commitUpload(uploadId, adminEmail = "saurabh@us24solutions.com", assignedTo) {
     await sleep(250);
     const upl = uploadsState[uploadId];
     if (!upl) throw new Error("Upload batch not found");
