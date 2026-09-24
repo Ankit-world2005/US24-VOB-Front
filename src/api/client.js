@@ -136,10 +136,14 @@ export const apiClient = {
     return refreshInFlight;
   },
 
-  async request({ path, method = 'GET', data = null, params = null, _retried = false }) {
+  /**
+   * `mockParams` reach only the mock server. The real backend scopes lists to the
+   * caller's token and rejects query params it does not know (400).
+   */
+  async request({ path, method = 'GET', data = null, params = null, mockParams = null, _retried = false }) {
     if (this.isMock) {
       // Direct mock server router
-      return this.dispatchMock(path, method, data, params);
+      return this.dispatchMock(path, method, data, { ...params, ...mockParams });
     }
 
     // Live HTTP fetch implementation routing through proxy or direct API
@@ -184,7 +188,8 @@ export const apiClient = {
     }
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2500);
+    // Generous enough for a serverless cold start on the deployed backend.
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
     options.signal = controller.signal;
 
     try {
@@ -201,7 +206,7 @@ export const apiClient = {
       if (res.status === 401 && !isCredentialRoute && !_retried && this.getToken()) {
         const renewed = await this.refreshSession();
         if (renewed) {
-          return this.request({ path, method, data, params, _retried: true });
+          return this.request({ path, method, data, params, mockParams, _retried: true });
         }
         this.clearToken();
         if (typeof window !== 'undefined') {
@@ -270,7 +275,7 @@ export const apiClient = {
             `[API Client] ${path} unavailable (${err.status || 'no response'}) — serving mock data. Further ${route} calls stay quiet.`
           );
         }
-        return this.dispatchMock(path, method, data, params);
+        return this.dispatchMock(path, method, data, { ...params, ...mockParams });
       }
 
       // Nothing will handle this one, so it is a real failure worth the stack trace.

@@ -50,14 +50,11 @@ export const vobsApi = {
     if (query.limit) params.limit = query.limit;
     if (query.cursor) params.cursor = query.cursor;
 
-    // Fallback support for email filter when mock is active
-    if (query.userEmail) {
-      params.userEmail = query.userEmail;
-    }
-
+    // The email filter is for the mock server only; the backend filters by token.
     const res = await apiClient.request({
       path: '/api/v1/vobs',
-      params
+      params,
+      mockParams: query.userEmail ? { userEmail: query.userEmail } : null
     });
 
     // Handle both { data: [...], page: {...} } backend format and legacy array

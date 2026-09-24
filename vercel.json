@@ -8,6 +8,14 @@
       "destination": "https://us-24-vob.vercel.app/api/:path*"
     },
     {
+      "source": "/healthz",
+      "destination": "https://us-24-vob.vercel.app/healthz"
+    },
+    {
+      "source": "/readyz",
+      "destination": "https://us-24-vob.vercel.app/readyz"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
