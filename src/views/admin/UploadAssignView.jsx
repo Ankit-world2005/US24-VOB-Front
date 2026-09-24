@@ -3,84 +3,93 @@ import * as XLSX from 'xlsx';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { uploadsApi } from '../../api/uploads';
 import { CLIENTS } from '../../data/clients';
-import { MOCK_USERS } from '../../DB';
+import { MOCK_USERS } from '../../api/mock/mockUsersData';
+
+function formatDateValue(val) {
+  if (!val) return '';
+  if (val instanceof Date) {
+    if (isNaN(val.getTime())) return '';
+    return val.toISOString().split('T')[0];
+  }
+  if (typeof val === 'number') {
+    try {
+      const parsedDate = XLSX.SSF.parse_date_code(val);
+      if (parsedDate) {
+        const y = String(parsedDate.y).padStart(4, '0');
+        const m = String(parsedDate.m).padStart(2, '0');
+        const d = String(parsedDate.d).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      }
+    } catch { }
+  }
+  return String(val).trim();
+}
+
+function getFieldValue(row, patterns) {
+  for (const [key, val] of Object.entries(row)) {
+    const cleanKey = key.trim().toLowerCase().replace(/[\s_\-#]+/g, '');
+    for (const pat of patterns) {
+      if (cleanKey.includes(pat)) {
+        return val !== undefined && val !== null ? val : '';
+      }
+    }
+  }
+  return '';
+}
 
 export function UploadAssignView() {
   const { showToast, setActiveTab, currentUser } = useWorkspace();
   const [selectedClient, setSelectedClient] = useState('arra');
+  const [defaultAssignee, setDefaultAssignee] = useState('rohit.k@us24solutions.com');
   const [isUploading, setIsUploading] = useState(false);
   const [previewData, setPreviewData] = useState(null);
-  const [selectedAssignee, setSelectedAssignee] = useState('rohit.k@us24solutions.com');
+  const [rowAssignees, setRowAssignees] = useState({});
+  const [selectedRowIndices, setSelectedRowIndices] = useState(new Set());
   const [isCommitting, setIsCommitting] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFileName, setUploadedFileName] = useState('');
+  const [showManualPaste, setShowManualPaste] = useState(false);
+  const [manualText, setManualText] = useState('');
 
   const fileInputRef = useRef(null);
 
-  // Filter available specialists from user list
-  const specialists = (MOCK_USERS || []).filter(u => u.role === 'user');
+  // Available specialists
+  const specialists = MOCK_USERS.map(u => ({
+    email: u.email,
+    name: u.name,
+    role: u.role
+  }));
 
-  // Convert Excel serial dates or Date objects to YYYY-MM-DD
-  const formatFieldDate = (val) => {
-    if (!val) return '';
-    if (typeof val === 'number') {
-      const d = new Date(Math.round((val - 25569) * 86400 * 1000));
-      return isNaN(d.getTime()) ? '' : d.toISOString().split('T')[0];
+  const parseAndSetRows = async (rawRows, sourceName) => {
+    if (!rawRows || rawRows.length === 0) {
+      showToast("No data rows found to import.", "warning");
+      return;
     }
-    if (val instanceof Date) {
-      return isNaN(val.getTime()) ? '' : val.toISOString().split('T')[0];
-    }
-    const s = String(val).trim();
-    // YYYY-MM-DD
-    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-    // MM/DD/YYYY
-    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) {
-      const parts = s.split('/');
-      const mm = parts[0].padStart(2, '0');
-      const dd = parts[1].padStart(2, '0');
-      return `${parts[2]}-${mm}-${dd}`;
-    }
-    return s;
-  };
 
-  // Parse raw sheet rows into normalized VOB intake rows
-  const parseSheetRows = (rawRows, fileName) => {
-    return rawRows.map((row, idx) => {
-      const rowKeys = Object.keys(row);
+    const initialAssignees = {};
+    const validIndices = new Set();
 
-      const findVal = (possibleKeys) => {
-        // Direct match
-        for (const k of possibleKeys) {
-          if (row[k] !== undefined && row[k] !== null && String(row[k]).trim() !== '') {
-            return row[k];
-          }
-        }
-        // Case-insensitive and punctuation-agnostic match
-        for (const p of possibleKeys) {
-          const pClean = p.toLowerCase().replace(/[^a-z0-9]/g, '');
-          const match = rowKeys.find(k => k.toLowerCase().replace(/[^a-z0-9]/g, '') === pClean);
-          if (match && row[match] !== undefined && String(row[match]).trim() !== '') {
-            return row[match];
-          }
-        }
-        return '';
-      };
+    const mappedRows = rawRows.map((r, index) => {
+      const patientName = String(getFieldValue(r, ['patientname', 'patient', 'name', 'ptname', 'clientname'])).trim();
+      const rawDob = getFieldValue(r, ['dob', 'dateofbirth', 'birthdate', 'birth']);
+      const dob = formatDateValue(rawDob);
+      const rawDos = getFieldValue(r, ['dos', 'dateofservice', 'servicedate', 'apptdate', 'appointmentdate']);
+      const dos = formatDateValue(rawDos) || new Date().toISOString().split('T')[0];
+      const insurance = String(getFieldValue(r, ['insurance', 'payer', 'carrier', 'inscompany', 'plan'])).trim() || 'General Healthcare';
+      const idCard = String(getFieldValue(r, ['memberid', 'idcard', 'policyid', 'subscriberid', 'idnum', 'member'])).trim() || `ID-${Math.floor(1000 + Math.random() * 9000)}`;
+      const groupNo = String(getFieldValue(r, ['groupno', 'groupnumber', 'groupid', 'group', 'grp'])).trim() || 'GRP-AUTO';
+      const appointmentType = String(getFieldValue(r, ['appointmenttype', 'appttype', 'visittype', 'servicetype', 'service', 'requesttype'])).trim() || 'Physical Therapy';
 
-      const patientName = String(findVal(['Patient Name', 'patient_name', 'Patient', 'Name', 'PATIENT NAME', 'PATIENT'])).trim();
-      const dobRaw = findVal(['DOB', 'Date of Birth', 'dob', 'Birth Date', 'DOB (YYYY-MM-DD)']);
-      const dob = formatFieldDate(dobRaw);
-      const dosRaw = findVal(['DOS', 'Date of Service', 'dos', 'Initial DOS', 'Service Date']);
-      const dos = formatFieldDate(dosRaw) || new Date().toISOString().split('T')[0];
-      const appointmentType = String(findVal(['Appointment Type', 'Appt Type', 'Service Type', 'Visit Type']) || 'General Consult').trim();
-      const insurance = String(findVal(['Insurance Carrier', 'Insurance Name', 'Insurance', 'Carrier', 'Payer']) || 'Commercial Payer').trim();
-      const idCard = String(findVal(['Member Policy ID', 'Member ID', 'Policy ID', 'idCard', 'ID Card', 'Member ID / Policy #']) || `MEM-${Math.floor(100000 + Math.random() * 900000)}`).trim();
-      const groupNo = String(findVal(['Group Number', 'Group No', 'Group ID', 'Group #', 'groupNo']) || 'GRP-AUTO').trim();
-      const payerId = String(findVal(['Payer ID', 'payerId', 'Payer']) || '00020').trim();
-      const insurancePhone = String(findVal(['Insurance Phone', 'Phone', 'Contact Number']) || '1-800-555-0199').trim();
-      const copay = String(findVal(['PAT / Copay', 'PAT Expected', 'Copay', 'PAT', 'Co-pay']) || '$25.00 Copay').trim();
-      const clientOrg = String(findVal(['Client Organization', 'Client', 'Target Client']) || selectedClient).trim();
+      // Look for specific assignee in row, otherwise use default
+      const rowAssignee = String(getFieldValue(r, ['assignee', 'assignedto', 'specialist', 'user', 'staff'])).trim();
+      const matchedUser = specialists.find(s =>
+        s.email.toLowerCase() === rowAssignee.toLowerCase() ||
+        s.name.toLowerCase().includes(rowAssignee.toLowerCase())
+      );
+      const assignedTo = matchedUser ? matchedUser.email : defaultAssignee;
 
-      // Row validation checks (Patient Name & DOB required)
+      initialAssignees[index] = assignedTo;
+
       let valid = true;
       let reason = '';
       if (!patientName) {
@@ -91,119 +100,154 @@ export function UploadAssignView() {
         reason = 'Missing Date of Birth (DOB)';
       }
 
+      if (valid) {
+        validIndices.add(index);
+      }
+
       return {
-        row: idx + 1,
-        patientName,
+        row: index + 1,
+        patientName: patientName || 'Unknown Patient',
         dob,
         dos,
         appointmentType,
         insurance,
         idCard,
         groupNo,
-        payerId,
-        insurancePhone,
-        copay,
-        client: clientOrg,
+        assignedTo,
         valid,
         reason
       };
     });
+
+    const res = await uploadsApi.uploadFile({
+      filename: sourceName,
+      rows: mappedRows
+    }, selectedClient);
+
+    const preview = await uploadsApi.getPreview(res.uploadId);
+    setPreviewData(preview);
+    setRowAssignees(initialAssignees);
+    setSelectedRowIndices(validIndices);
+    setUploadedFileName(sourceName);
+    showToast(`Imported ${preview.totalRows} records. ${preview.validRows} valid and ready for assignment.`, "info");
   };
 
-  // Ingest and validate actual spreadsheet file
-  const processRealFile = async (file) => {
+  const processFile = async (file) => {
     if (!file) return;
-    const fileName = file.name;
-    const ext = fileName.split('.').pop()?.toLowerCase();
-    if (!['xlsx', 'xls', 'csv'].includes(ext)) {
-      showToast('Unsupported format. Please upload an Excel (.xlsx, .xls) or CSV file.', 'error');
+
+    const validExtensions = ['.xlsx', '.xls', '.csv'];
+    const hasValidExt = validExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
+    if (!hasValidExt) {
+      showToast("Please upload a valid Excel (.xlsx, .xls) or CSV (.csv) file.", "error");
+      return;
+    }
+
+    setIsUploading(true);
+
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: true });
+
+      if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+        throw new Error("No sheets found in the spreadsheet.");
+      }
+
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rawRows = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
+
+      await parseAndSetRows(rawRows, file.name);
+    } catch (err) {
+      console.error("Error parsing file:", err);
+      showToast(err.message || "Failed to parse intake spreadsheet.", "error");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleManualImport = async () => {
+    if (!manualText.trim()) {
+      showToast("Please paste CSV or tab-separated data into the box.", "warning");
       return;
     }
 
     setIsUploading(true);
     try {
-      const buffer = await file.arrayBuffer();
-      const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
-      const sheetName = wb.SheetNames[0];
-      if (!sheetName) throw new Error('No worksheets found in file');
+      // Parse CSV or TSV text
+      const workbook = XLSX.read(manualText, { type: 'string' });
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rawRows = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
 
-      const ws = wb.Sheets[sheetName];
-      const rawRows = XLSX.utils.sheet_to_json(ws, { defval: '' });
-
-      if (!rawRows || rawRows.length === 0) {
-        showToast('The uploaded sheet contains no data rows.', 'warning');
-        setIsUploading(false);
-        return;
-      }
-
-      const parsedRows = parseSheetRows(rawRows, fileName);
-      const totalRows = parsedRows.length;
-      const validRows = parsedRows.filter(r => r.valid).length;
-      const rejectedRows = parsedRows.filter(r => !r.valid).length;
-
-      const payload = {
-        filename: fileName,
-        rows: parsedRows,
-        totalRows,
-        validRows,
-        rejectedRows,
-        assignedTo: selectedAssignee
-      };
-
-      const res = await uploadsApi.uploadFile(payload, selectedClient);
-      const uploadId = res?.uploadId || `upl_${Date.now()}`;
-
-      setUploadedFileName(fileName);
-      setPreviewData({
-        uploadId,
-        ...payload
-      });
-
-      showToast(`Ingested ${totalRows} rows from "${fileName}". ${validRows} valid rows ready for assignment.`, 'success');
+      await parseAndSetRows(rawRows, 'Manual_Data_Import.csv');
+      setShowManualPaste(false);
+      setManualText('');
     } catch (err) {
-      console.error('File parsing error:', err);
-      showToast(`Failed to parse file: ${err.message}`, 'error');
+      console.error("Manual parse error:", err);
+      showToast("Failed to parse input data. Ensure headers are present.", "error");
     } finally {
       setIsUploading(false);
     }
   };
 
-  // Fallback demo sample loader if user does not have an Excel file on hand
-  const handleLoadDemoFile = async () => {
-    setIsUploading(true);
-    try {
-      const sampleRows = [
-        { row: 1, patientName: "Arthur Dent", dob: "1978-05-11", dos: "2026-10-04", appointmentType: "Initial Evaluation - PT", insurance: "Blue Cross Blue Shield", idCard: "BCBS-91823719", groupNo: "GRP-77291", payerId: "00020", copay: "$25.00 Copay", valid: true },
-        { row: 2, patientName: "Trillian Astra", dob: "1983-09-22", dos: "2026-10-05", appointmentType: "Physical Therapy", insurance: "Aetna Choice", idCard: "AET-9920194", groupNo: "AET-102", payerId: "60054", copay: "$30.00 Copay", valid: true },
-        { row: 3, patientName: "Ford Prefect", dob: "", dos: "2026-10-06", appointmentType: "Initial Eval", insurance: "Cigna Open Access", idCard: "CIG-8821941", groupNo: "009827", payerId: "62308", copay: "$25.00 Copay", valid: false, reason: "Missing Date of Birth (DOB)" },
-        { row: 4, patientName: "Zaphod Beeblebrox", dob: "1965-03-15", dos: "2026-10-07", appointmentType: "Specialist Spine", insurance: "UnitedHealthcare (UHC)", idCard: "UHC-992817263", groupNo: "904128", payerId: "87726", copay: "$20.00 Copay", valid: true },
-        { row: 5, patientName: "Eleanor Vance", dob: "1984-04-12", dos: "2026-10-08", appointmentType: "Sports Rehabilitation", insurance: "UnitedHealthcare (UHC)", idCard: "UHC-55102938", groupNo: "904128", payerId: "87726", copay: "$25.00 Copay", valid: true }
-      ];
+  const downloadSampleTemplate = () => {
+    const headers = ['Patient Name', 'DOB', 'Date of Service', 'Insurance', 'Member ID', 'Group #', 'Appointment Type', 'Assignee Email'];
+    const sampleData = [
+      ['Eleanor Vance', '1982-04-14', '2026-09-25', 'Blue Cross Blue Shield', 'BCBS-882910', 'GRP-1049', 'Physical Therapy', 'rohit.k@us24solutions.com'],
+      ['Marcus Thorne', '1975-11-20', '2026-09-26', 'UnitedHealthcare', 'UHC-449102', 'GRP-2201', 'MRI Lumbar Spine', 'manish.v@us24solutions.com'],
+      ['Clara Oswald', '1989-08-05', '2026-09-28', 'Aetna', 'AET-993810', 'GRP-9944', 'Initial Orthopedic Eval', 'jitender.s@us24solutions.com']
+    ];
 
-      const demoFileName = `${selectedClient.toUpperCase()}_Daily_Requests.xlsx`;
-      const payload = {
-        filename: demoFileName,
-        rows: sampleRows,
-        totalRows: 5,
-        validRows: 4,
-        rejectedRows: 1,
-        assignedTo: selectedAssignee
-      };
+    const csvContent = [headers.join(','), ...sampleData.map(r => r.map(c => `"${c}"`).join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `US24_VOB_Intake_Template_${selectedClient.toUpperCase()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast("Downloaded sample intake template (.csv)", "info");
+  };
 
-      const res = await uploadsApi.uploadFile(payload, selectedClient);
-      const uploadId = res?.uploadId || `upl_${Date.now()}`;
+  const handleRowAssigneeChange = (rowIndex, assigneeEmail) => {
+    setRowAssignees(prev => ({
+      ...prev,
+      [rowIndex]: assigneeEmail
+    }));
+  };
 
-      setUploadedFileName(demoFileName);
-      setPreviewData({
-        uploadId,
-        ...payload
+  const handleBulkAssigneeChange = (assigneeEmail) => {
+    setDefaultAssignee(assigneeEmail);
+    if (previewData && previewData.rows) {
+      const updated = {};
+      previewData.rows.forEach((_, idx) => {
+        updated[idx] = assigneeEmail;
       });
+      setRowAssignees(updated);
+    }
+  };
 
-      showToast(`Loaded sample template with ${payload.validRows} valid requests.`, 'info');
-    } catch (err) {
-      showToast('Failed to load sample intake file', 'error');
-    } finally {
-      setIsUploading(false);
+  const toggleRowSelect = (index) => {
+    setSelectedRowIndices(prev => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (!previewData) return;
+    if (selectedRowIndices.size === previewData.validRows) {
+      setSelectedRowIndices(new Set());
+    } else {
+      const allValid = new Set();
+      previewData.rows.forEach((r, idx) => {
+        if (r.valid) allValid.add(idx);
+      });
+      setSelectedRowIndices(allValid);
     }
   };
 
@@ -211,89 +255,107 @@ export function UploadAssignView() {
     if (!previewData) return;
     setIsCommitting(true);
     try {
-      const commitRes = await uploadsApi.commitUpload(
-        previewData.uploadId,
-        currentUser.email,
-        selectedAssignee
-      );
+      // Attach selected row-level assignees
+      const rowsWithAssignees = previewData.rows.map((r, idx) => ({
+        ...r,
+        assignedTo: rowAssignees[idx] || defaultAssignee
+      }));
 
-      const createdIds = commitRes.createdVobs?.map(v => v.id) || [];
+      // Update upload batch with assigned users
+      await uploadsApi.uploadFile({
+        filename: uploadedFileName || 'Imported_Data.xlsx',
+        rows: rowsWithAssignees
+      }, selectedClient);
 
-      if (createdIds.length > 0) {
+      const commitRes = await uploadsApi.commitUpload(previewData.uploadId, currentUser.email);
+      const createdVobs = commitRes.createdVobs || [];
+
+      // Build assignment mapping for created VOBs
+      const assignmentMap = {};
+      createdVobs.forEach((v, idx) => {
+        assignmentMap[v.id] = rowAssignees[idx] || defaultAssignee;
+      });
+
+      if (createdVobs.length > 0) {
         await uploadsApi.assignVobs({
-          vobIds: createdIds,
-          assignees: [selectedAssignee],
-          adminEmail: currentUser.email
-        });
+          vobIds: createdVobs.map(v => v.id),
+          assignees: [defaultAssignee],
+          assignmentMap
+        }, currentUser.email);
       }
 
-      const specialistName = selectedAssignee.split('@')[0];
-      showToast(`Successfully created & assigned ${commitRes.count} VOBs to ${specialistName}! Records are now active in their queue.`, 'success');
+      showToast(`Successfully created & assigned ${createdVobs.length} VOB tasks! Navigating to Global Tracker...`, "success");
       setPreviewData(null);
       setUploadedFileName('');
       setActiveTab('records');
     } catch (err) {
-      console.error('Commit and assign error:', err);
-      showToast('Error committing and assigning intake batch', 'error');
+      console.error(err);
+      showToast("Error committing intake batch", "error");
     } finally {
       setIsCommitting(false);
     }
   };
 
-  // Drag and drop handlers
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = () => {
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const file = e.dataTransfer?.files?.[0];
-    if (file) {
-      processRealFile(file);
-    }
-  };
+  const clientName = CLIENTS.find(c => c.id === selectedClient)?.name || 'Client';
 
   return (
     <div className="upload-assign-view">
       <div className="panel-card">
-        <div className="panel-header">
+        {/* Panel Header */}
+        <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
           <div>
-            <h3>Upload & Assign Client VOB Requests (FR-3 & FR-4)</h3>
-            <span className="panel-sub">Ingest intake spreadsheets, validate canonical columns, and allocate tasks directly to specialists</span>
+            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>Import Data & Assign VOB Tasks</h3>
+            <span className="panel-sub" style={{ display: 'block', marginTop: '4px', color: 'var(--ink-soft)' }}>
+              Import intake spreadsheets (.xlsx, .csv) to auto-generate patient VOB requests and allocate tasks directly to specialists.
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button
+              type="button"
+              className="btn btn-sm ghost"
+              onClick={downloadSampleTemplate}
+              title="Download formatted CSV intake template"
+            >
+              📄 Download Sample Template (.csv)
+            </button>
+            <button
+              type="button"
+              className="btn btn-sm ghost"
+              onClick={() => setShowManualPaste(!showManualPaste)}
+            >
+              {showManualPaste ? '✕ Hide Manual Input' : '📋 Quick Paste Input'}
+            </button>
           </div>
         </div>
 
-        {/* Upload Configuration Form */}
-        <div className="upload-form-grid">
+        {/* Global Configuration Controls */}
+        <div className="upload-form-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px', margin: '20px 0' }}>
           <div className="field">
-            <label>Target Healthcare Client</label>
+            <label style={{ display: 'block', marginBottom: '6px', fontWeight: 500, fontSize: '13px' }}>Target Healthcare Client Organization</label>
             <select
               className="select-input"
               value={selectedClient}
               onChange={(e) => setSelectedClient(e.target.value)}
+              style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid var(--rule)', background: 'var(--surface)', color: 'var(--ink)' }}
             >
               {CLIENTS.map(c => (
-                <option key={c.id} value={c.id}>{c.name} ({c.description})</option>
+                <option key={c.id} value={c.id}>{c.name} — {c.description}</option>
               ))}
             </select>
           </div>
 
           <div className="field">
-            <label>Assign Directly To Specialist</label>
+            <label style={{ display: 'block', marginBottom: '6px', fontWeight: 500, fontSize: '13px' }}>Default Specialist Assignee</label>
             <select
               className="select-input"
-              value={selectedAssignee}
-              onChange={(e) => setSelectedAssignee(e.target.value)}
+              value={defaultAssignee}
+              onChange={(e) => handleBulkAssigneeChange(e.target.value)}
+              style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid var(--rule)', background: 'var(--surface)', color: 'var(--ink)' }}
             >
-              {specialists.map(u => (
-                <option key={u.id} value={u.email}>
-                  {u.name} ({u.email}) · Assigned: {u.assignedClients?.join(', ')}
+              {specialists.map(s => (
+                <option key={s.email} value={s.email}>
+                  {s.name} ({s.email}) · {s.role.toUpperCase()}
                 </option>
               ))}
             </select>
@@ -313,116 +375,227 @@ export function UploadAssignView() {
           }}
         />
 
-        {/* Drag and Drop Zone */}
-        <div
-          className={`dropzone-box ${isDragging ? 'dragging' : ''}`}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <div className="dropzone-icon">📥</div>
-          <h4>
-            {uploadedFileName
-              ? `Loaded: ${uploadedFileName}`
-              : `Click to browse or drop ${CLIENTS.find(c => c.id === selectedClient)?.name} request file`}
-          </h4>
-          <p>
-            Supports .xlsx and .csv files (e.g. VOB_Requests_Intake_Batch.xlsx, ARRA_Daily_Requests.xlsx).
-            Automatically validates Patient Name, DOB, Insurance, and DOS.
-          </p>
-
-          <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }} onClick={(e) => e.stopPropagation()}>
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={isUploading}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              {isUploading ? 'Parsing Spreadsheet…' : '📁 Browse Computer (.xlsx / .csv)'}
-            </button>
-
-            <button
-              type="button"
-              className="btn btn-secondary"
-              disabled={isUploading}
-              onClick={handleLoadDemoFile}
-            >
-              ⚡ Load Sample Template
-            </button>
+        {/* Manual Paste Drawer */}
+        {showManualPaste && (
+          <div style={{ marginBottom: '20px', padding: '16px', borderRadius: '8px', border: '1px solid var(--rule)', background: 'var(--surface-2)' }}>
+            <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: 600 }}>Paste Tabular or CSV Intake Data</h4>
+            <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: 'var(--ink-soft)' }}>
+              Copy rows from Excel or a text file and paste them directly below (Header row included):
+            </p>
+            <textarea
+              rows={4}
+              value={manualText}
+              onChange={(e) => setManualText(e.target.value)}
+              placeholder="Patient Name, DOB, Date of Service, Insurance, Member ID&#10;Alice Smith, 1985-05-12, 2026-09-25, Blue Cross, BC12345&#10;David Jones, 1990-10-21, 2026-09-26, Aetna, AET9981"
+              style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid var(--rule)', fontFamily: 'var(--mono)', fontSize: '12px', background: 'var(--surface)', color: 'var(--ink)' }}
+            />
+            <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <button type="button" className="btn btn-sm ghost" onClick={() => setShowManualPaste(false)}>Cancel</button>
+              <button type="button" className="btn btn-sm" onClick={handleManualImport} disabled={isUploading}>
+                {isUploading ? 'Parsing…' : 'Parse & Preview Pasted Data'}
+              </button>
+            </div>
           </div>
+        )}
+
+        {/* Hidden Native File Input */}
+        <input
+          type="file"
+          ref={fileInputRef}
+          accept=".xlsx, .xls, .csv"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) processFile(f);
+          }}
+          style={{ display: 'none' }}
+        />
+
+        {/* Drag & Drop Import Box */}
+        <div
+          className={`dropzone-box ${isDragging ? 'drag-active' : ''}`}
+          onClick={() => fileInputRef.current?.click()}
+          onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
+          onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
+          onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); }}
+          onDrop={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsDragging(false);
+            const f = e.dataTransfer.files?.[0];
+            if (f) processFile(f);
+          }}
+          style={{
+            border: isDragging ? '2px dashed var(--cobalt)' : '2px dashed var(--rule)',
+            borderRadius: '10px',
+            padding: '36px 20px',
+            textAlign: 'center',
+            cursor: 'pointer',
+            backgroundColor: isDragging ? 'var(--focus)' : 'var(--surface-2)',
+            transition: 'all 0.2s ease',
+            marginBottom: '24px'
+          }}
+        >
+          <div style={{ fontSize: '38px', marginBottom: '12px' }}>📂</div>
+          <h4 style={{ margin: '0 0 6px 0', fontSize: '16px', fontWeight: 600 }}>
+            {uploadedFileName ? `Active File: ${uploadedFileName}` : `Import Intake Spreadsheet for ${clientName}`}
+          </h4>
+          <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: 'var(--ink-soft)' }}>
+            Drag and drop your <strong>.xlsx</strong> or <strong>.csv</strong> file here, or click the button below to browse.
+          </p>
+          <button
+            type="button"
+            className="btn"
+            disabled={isUploading}
+            onClick={(e) => {
+              e.stopPropagation();
+              fileInputRef.current?.click();
+            }}
+            style={{ padding: '10px 24px', fontSize: '14px', fontWeight: 600 }}
+          >
+            {isUploading ? 'Parsing spreadsheet rows…' : (uploadedFileName ? '↻ Choose Another Spreadsheet' : '📥 Import Data File (.xlsx, .csv)')}
+          </button>
         </div>
 
-        {/* Pre-Import Validation Preview (FR-3) */}
+        {/* Validation & Assignment Preview */}
         {previewData && (
-          <div className="preview-results-wrap">
-            <div className="preview-summary-bar">
-              <div className="preview-stat">
-                <span>File:</span> <strong>{previewData.filename}</strong>
+          <div className="preview-results-wrap" style={{ marginTop: '24px' }}>
+            {/* KPI Summary Bar */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '20px' }}>
+              <div style={{ padding: '12px 16px', background: 'var(--surface-2)', border: '1px solid var(--rule)', borderRadius: '8px' }}>
+                <span style={{ fontSize: '12px', color: 'var(--ink-soft)', display: 'block' }}>Total Records</span>
+                <strong style={{ fontSize: '18px', fontWeight: 700 }}>{previewData.totalRows} rows</strong>
               </div>
-              <div className="preview-stat">
-                <span>Total Ingested:</span> <strong>{previewData.totalRows} rows</strong>
+              <div style={{ padding: '12px 16px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '8px' }}>
+                <span style={{ fontSize: '12px', color: '#059669', display: 'block' }}>Valid (Ready to Assign)</span>
+                <strong style={{ fontSize: '18px', fontWeight: 700, color: '#059669' }}>{previewData.validRows} rows</strong>
               </div>
-              <div className="preview-stat green">
-                <span>Valid (Accepted):</span> <strong>{previewData.validRows} rows</strong>
+              <div style={{ padding: '12px 16px', background: previewData.rejectedRows > 0 ? 'rgba(239, 68, 68, 0.08)' : 'var(--surface-2)', border: '1px solid var(--rule)', borderRadius: '8px' }}>
+                <span style={{ fontSize: '12px', color: previewData.rejectedRows > 0 ? '#dc2626' : 'var(--ink-soft)', display: 'block' }}>Incomplete (Rejected)</span>
+                <strong style={{ fontSize: '18px', fontWeight: 700, color: previewData.rejectedRows > 0 ? '#dc2626' : 'var(--ink-soft)' }}>
+                  {previewData.rejectedRows} {previewData.rejectedRows === 1 ? 'row' : 'rows'}
+                </strong>
               </div>
-              <div className="preview-stat red">
-                <span>Malformed (Rejected):</span> <strong>{previewData.rejectedRows} row{previewData.rejectedRows === 1 ? '' : 's'}</strong>
-              </div>
-              <div className="preview-stat" style={{ marginLeft: 'auto' }}>
-                <span>Assignee:</span> <strong style={{ color: 'var(--navy)' }}>{selectedAssignee}</strong>
+              <div style={{ padding: '12px 16px', background: 'var(--surface-2)', border: '1px solid var(--rule)', borderRadius: '8px' }}>
+                <span style={{ fontSize: '12px', color: 'var(--ink-soft)', display: 'block' }}>Selected for Assignment</span>
+                <strong style={{ fontSize: '18px', fontWeight: 700, color: 'var(--cobalt)' }}>{selectedRowIndices.size} rows</strong>
               </div>
             </div>
 
-            <div className="table-responsive">
-              <table className="data-table">
+            {/* Interactive Records Table */}
+            <div className="table-responsive" style={{ maxHeight: '420px', overflowY: 'auto', border: '1px solid var(--rule)', borderRadius: '8px' }}>
+              <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                 <thead>
-                  <tr>
-                    <th>Row #</th>
-                    <th>Patient Name</th>
-                    <th>DOB</th>
-                    <th>Date of Service</th>
-                    <th>Insurance</th>
-                    <th>Member ID</th>
-                    <th>Validation Check</th>
+                  <tr style={{ background: 'var(--surface-2)', borderBottom: '1px solid var(--rule)', textAlign: 'left' }}>
+                    <th style={{ padding: '10px 12px', width: '38px', textAlign: 'center' }}>
+                      <input
+                        type="checkbox"
+                        checked={previewData.validRows > 0 && selectedRowIndices.size === previewData.validRows}
+                        onChange={toggleSelectAll}
+                        title="Select / Unselect all valid rows"
+                      />
+                    </th>
+                    <th style={{ padding: '10px 12px' }}>Row #</th>
+                    <th style={{ padding: '10px 12px' }}>Patient Name</th>
+                    <th style={{ padding: '10px 12px' }}>DOB</th>
+                    <th style={{ padding: '10px 12px' }}>Date of Service</th>
+                    <th style={{ padding: '10px 12px' }}>Insurance / Payer</th>
+                    <th style={{ padding: '10px 12px' }}>Member ID</th>
+                    <th style={{ padding: '10px 12px' }}>Assigned Specialist</th>
+                    <th style={{ padding: '10px 12px' }}>Validation</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {previewData.rows.map(r => (
-                    <tr key={r.row} className={r.valid ? '' : 'row-rejected'}>
-                      <td className="mono">{r.row}</td>
-                      <td className="bold">{r.patientName || <span className="red">Missing</span>}</td>
-                      <td>{r.dob || <span className="red">Missing</span>}</td>
-                      <td>{r.dos}</td>
-                      <td>{r.insurance}</td>
-                      <td>{r.idCard}</td>
-                      <td>
-                        {r.valid ? (
-                          <span className="badge-valid">✓ Ready to Assign</span>
-                        ) : (
-                          <span className="badge-rejected">✕ Rejected: {r.reason}</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                  {previewData.rows.map((r, idx) => {
+                    const isSelected = selectedRowIndices.has(idx);
+                    const currentAssignee = rowAssignees[idx] || defaultAssignee;
+
+                    return (
+                      <tr
+                        key={r.row}
+                        style={{
+                          borderBottom: '1px solid var(--rule-soft)',
+                          background: !r.valid ? 'rgba(239, 68, 68, 0.04)' : (isSelected ? 'rgba(37, 99, 235, 0.03)' : undefined)
+                        }}
+                      >
+                        <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                          <input
+                            type="checkbox"
+                            disabled={!r.valid}
+                            checked={isSelected}
+                            onChange={() => toggleRowSelect(idx)}
+                          />
+                        </td>
+                        <td style={{ padding: '10px 12px', fontFamily: 'var(--mono)', color: 'var(--ink-soft)' }}>#{r.row}</td>
+                        <td style={{ padding: '10px 12px', fontWeight: 600 }}>{r.patientName}</td>
+                        <td style={{ padding: '10px 12px' }}>{r.dob || <span style={{ color: 'var(--danger)', fontWeight: 600 }}>Missing</span>}</td>
+                        <td style={{ padding: '10px 12px' }}>{r.dos}</td>
+                        <td style={{ padding: '10px 12px' }}>{r.insurance}</td>
+                        <td style={{ padding: '10px 12px', fontFamily: 'var(--mono)', fontSize: '12px' }}>{r.idCard}</td>
+                        <td style={{ padding: '8px 12px' }}>
+                          <select
+                            disabled={!r.valid}
+                            value={currentAssignee}
+                            onChange={(e) => handleRowAssigneeChange(idx, e.target.value)}
+                            style={{
+                              padding: '5px 8px',
+                              borderRadius: '4px',
+                              border: '1px solid var(--rule)',
+                              background: 'var(--surface)',
+                              fontSize: '12px',
+                              color: 'var(--ink)'
+                            }}
+                          >
+                            {specialists.map(s => (
+                              <option key={s.email} value={s.email}>{s.name} ({s.role})</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td style={{ padding: '10px 12px' }}>
+                          {r.valid ? (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.12)', color: '#059669', fontSize: '11.5px', fontWeight: 600 }}>
+                              ✓ Ready
+                            </span>
+                          ) : (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', borderRadius: '12px', background: 'rgba(239, 68, 68, 0.12)', color: '#dc2626', fontSize: '11.5px', fontWeight: 600 }}>
+                              ✕ {r.reason}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
 
-            <div className="commit-action-bar">
-              <div className="prefill-notice">
-                <span>ℹ️ Assignment Target:</span> All {previewData.validRows} valid VOB requests will be created and assigned immediately to <strong>{selectedAssignee}</strong>.
+            {/* Commit & Assign Bottom Action Bar */}
+            <div style={{ marginTop: '20px', padding: '16px', background: 'var(--surface-2)', border: '1px solid var(--rule)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--ink-soft)' }}>
+                <span>✨ <strong>Auto Pre-Fill:</strong> Valid records will automatically be matched with patient history and client master reference data.</span>
               </div>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={handleCommitAndAssign}
-                disabled={isCommitting || previewData.validRows === 0}
-              >
-                {isCommitting
-                  ? 'Committing & Assigning…'
-                  : `Commit & Assign ${previewData.validRows} VOBs to ${selectedAssignee.split('@')[0]}`}
-              </button>
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  type="button"
+                  className="btn ghost"
+                  onClick={() => {
+                    setPreviewData(null);
+                    setUploadedFileName('');
+                  }}
+                  disabled={isCommitting}
+                >
+                  Clear & Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={handleCommitAndAssign}
+                  disabled={isCommitting || selectedRowIndices.size === 0}
+                  style={{ minWidth: '220px' }}
+                >
+                  {isCommitting ? 'Importing & Allocating Tasks…' : `Import & Assign ${selectedRowIndices.size} VOB Tasks`}
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -430,3 +603,5 @@ export function UploadAssignView() {
     </div>
   );
 }
+
+export default UploadAssignView;
