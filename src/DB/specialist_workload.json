@@ -1,0 +1,30 @@
+{
+  "section": "Specialist Allocation & Velocity",
+  "description": "Active specialist staff workload, task assignment count, and capacity metrics",
+  "specialists": [
+    {
+      "name": "Rohit K",
+      "email": "rohit.k@us24solutions.com",
+      "specialty": "Specialist · PT & Spine",
+      "count": 4,
+      "complete": 2,
+      "capacity": "80%"
+    },
+    {
+      "name": "Manish V",
+      "email": "manish.v@us24solutions.com",
+      "specialty": "Specialist · Imaging & Consults",
+      "count": 2,
+      "complete": 1,
+      "capacity": "65%"
+    },
+    {
+      "name": "Jitender S",
+      "email": "jitender.s@us24solutions.com",
+      "specialty": "Specialist · Wellness & Primary",
+      "count": 2,
+      "complete": 2,
+      "capacity": "50%"
+    }
+  ]
+}

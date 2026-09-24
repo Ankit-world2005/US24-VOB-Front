@@ -175,8 +175,13 @@ export const apiClient = {
       }
     }
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2500);
+    options.signal = controller.signal;
+
     try {
       const res = await fetch(url, options);
+      clearTimeout(timeoutId);
 
       // An access token lives 15 minutes. Rather than making every caller handle
       // that, rotate once and replay the request.
@@ -231,6 +236,7 @@ export const apiClient = {
 
       return res.json();
     } catch (err) {
+      clearTimeout(timeoutId);
       // Never fall back for authentication. A 401/403 is a real answer from the
       // server, and quietly substituting a mock session would hide an expired
       // token or a revoked account behind a working-looking UI.
@@ -314,7 +320,7 @@ export const apiClient = {
     }
     if (path.startsWith('/uploads/') && path.endsWith('/commit')) {
       const id = path.split('/')[2];
-      return mockServer.commitUpload(id, data?.adminEmail);
+      return mockServer.commitUpload(id, data?.adminEmail, data?.assignedTo);
     }
     if (path === '/assignments' && method === 'POST') return mockServer.assignVobs(data, params?.adminEmail);
     if (path === '/users' && method === 'GET') return mockServer.getUsers();

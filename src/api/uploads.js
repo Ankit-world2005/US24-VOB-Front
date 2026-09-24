@@ -19,11 +19,11 @@ export const uploadsApi = {
   },
 
   // POST /uploads/:id/commit
-  commitUpload(uploadId, adminEmail) {
+  commitUpload(uploadId, adminEmail, assignedTo) {
     return apiClient.request({
       path: `/api/v1/uploads/${uploadId}/commit`,
       method: 'POST',
-      data: { adminEmail }
+      data: { adminEmail, assignedTo }
     });
   },
 

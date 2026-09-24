@@ -1,0 +1,20 @@
+{
+  "section": "AI Audio & Portal Transcripts",
+  "description": "Pre-configured sample call recordings and portal inquiry text used for AI benefit extraction demonstration",
+  "samples": [
+    {
+      "id": "uhc_call",
+      "title": "UHC Phone Call",
+      "source": "call",
+      "payer": "UnitedHealthcare",
+      "transcript": "AGENT: Thank you for calling UnitedHealthcare Provider Services. My name is Denise, ID #84920. Who do I have the pleasure of speaking with?\nSPECIALIST: Hi Denise, this is Rohit from US24 on behalf of Arra Clinic. Verifying active eligibility and physical therapy benefits for patient Eleanor Vance, DOB 04/12/1984, Member ID UHC-992817263.\nAGENT: Thank you Rohit. Coverage is active under UHC Choice Plus PPO. The network status is In-Network for both group and individual provider contracts. Payer ID is 87726.\nSPECIALIST: Does the patient have a deductible, and what is the copay for outpatient physical therapy?\nAGENT: Yes, annual individual deductible is $500 which is already fully met. Physical therapy copay is $20.00 per visit, followed by 10% coinsurance.\nSPECIALIST: Is prior authorization or referral required?\nAGENT: No authorization required for the first 24 visits per calendar year. No referral required.\nSPECIALIST: Thank you Denise. Reference number for this call?\nAGENT: Call reference is UHC-REF-99201. Have a wonderful day!"
+    },
+    {
+      "id": "cigna_portal",
+      "title": "Cigna Availity Portal",
+      "source": "portal",
+      "payer": "Cigna Healthcare",
+      "transcript": "[AVAILITY ELIGIBILITY INQUIRY RESULT]\nPayer: Cigna Healthcare (62308) | Date: 09/21/2026 09:30 AM\nPatient: David O'Connor | DOB: 09/15/1968 | Member ID: U819203910\nPlan: Cigna Open Access Plus | Group: 009827\nCoverage Status: ACTIVE | Policy Effective: 01/01/2026 - Current\nBenefit Category: Physical Therapy / Occupational Therapy\nNetwork: IN-NETWORK (Group & Individual)\nCopay: $30.00 Specialist Copay per DOS\nDeductible: $1,000 Individual (Met: $1,000. Remaining: $0.00)\nAuthorization: NO PRIOR AUTH REQUIRED FOR IN-NETWORK INITIAL EVALUATION\nLimitation: 30 Visits per Calendar Year\nContact: 1-800-244-6224 | Rep Ref: AV-881928"
+    }
+  ]
+}

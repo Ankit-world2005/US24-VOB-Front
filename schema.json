@@ -1,0 +1,633 @@
+{
+  "title": "New Verification Form Input Schema",
+  "section": "New Verification (Specialist Workspace)",
+  "description": "Comprehensive schema of all input fields in the New Verification section, organized section-wise according to the canonical VOB form and Parker document structure",
+  "totalSections": 10,
+  "totalFields": 51,
+  "fieldNamesBySection": {
+    "patient": [
+      "pat",
+      "patientName",
+      "dob",
+      "todayDate",
+      "additionalInfo"
+    ],
+    "insurance": [
+      "insurance",
+      "insurancePhone",
+      "idCard",
+      "groupNo"
+    ],
+    "coverage": [
+      "serviceType",
+      "planType",
+      "networkStatus",
+      "coverageStatus",
+      "effectiveDate",
+      "terminationDate",
+      "hsaHraAmt"
+    ],
+    "costshare": [
+      "copay",
+      "copayAmount",
+      "deductibleApplicable",
+      "deductibleIndividual",
+      "deductibleMet",
+      "deductibleRemaining"
+    ],
+    "oop": [
+      "copayCoinsurance",
+      "coinsuranceCovered",
+      "outOfPocket",
+      "oopMet",
+      "oopRemaining"
+    ],
+    "visits": [
+      "visitsLimitation",
+      "visitsUsed"
+    ],
+    "auth": [
+      "authInitialEval",
+      "authTreatment",
+      "referral",
+      "pcpReferral",
+      "howToObtainAuth",
+      "authRequestTat",
+      "authNumber",
+      "authCoverageDates"
+    ],
+    "rep": [
+      "primary",
+      "secondary",
+      "insuranceRep",
+      "callReference"
+    ],
+    "claims": [
+      "claimMailingAddress",
+      "payerId",
+      "tflDaysClaims",
+      "tflCorrectedClaims"
+    ],
+    "secondary": [
+      "secondaryYesNo",
+      "secondaryInsName",
+      "secondaryPlanName",
+      "secondaryPolicyId",
+      "secondaryEffectiveDate",
+      "secondaryDeductible",
+      "secondaryVisitLimit",
+      "secondaryUsedLimit"
+    ]
+  },
+  "sections": [
+    {
+      "sectionId": "patient",
+      "sectionTitle": "I. Patient (rows 1–2)",
+      "documentRows": [0, 1, 2],
+      "fields": [
+        {
+          "name": "pat",
+          "label": "PAT",
+          "type": "text",
+          "required": false,
+          "placeholder": "100%(RESP)",
+          "documentRow": 0
+        },
+        {
+          "name": "patientName",
+          "label": "Name",
+          "type": "text",
+          "required": true,
+          "placeholder": "Enter name…",
+          "documentRow": 1
+        },
+        {
+          "name": "dob",
+          "label": "DOB",
+          "type": "text",
+          "required": true,
+          "placeholder": "00/00/0000",
+          "documentRow": 1
+        },
+        {
+          "name": "todayDate",
+          "label": "Today's Date",
+          "type": "text",
+          "required": true,
+          "placeholder": "00/00/0000_xx",
+          "documentRow": 2
+        },
+        {
+          "name": "additionalInfo",
+          "label": "Additional Info",
+          "type": "text",
+          "required": false,
+          "placeholder": "Enter additional info…",
+          "documentRow": 2
+        }
+      ]
+    },
+    {
+      "sectionId": "insurance",
+      "sectionTitle": "II. Insurance & Policy (row 3)",
+      "documentRows": [3],
+      "fields": [
+        {
+          "name": "insurance",
+          "label": "Insurance Name",
+          "type": "text",
+          "required": true,
+          "placeholder": "Enter insurance name…",
+          "documentRow": 3
+        },
+        {
+          "name": "insurancePhone",
+          "label": "Insurance Contact Number",
+          "type": "text",
+          "required": true,
+          "placeholder": "(000) 000-0000",
+          "documentRow": 3
+        },
+        {
+          "name": "idCard",
+          "label": "Policy ID",
+          "type": "text",
+          "required": true,
+          "placeholder": "XXX0000000",
+          "documentRow": 3
+        },
+        {
+          "name": "groupNo",
+          "label": "GROUP ID",
+          "type": "text",
+          "required": false,
+          "placeholder": "000000",
+          "documentRow": 3
+        }
+      ]
+    },
+    {
+      "sectionId": "coverage",
+      "sectionTitle": "III. Plan, Network & Dates (row 4)",
+      "documentRows": [4],
+      "fields": [
+        {
+          "name": "serviceType",
+          "label": "Service Type",
+          "type": "select",
+          "required": true,
+          "options": ["PT", "OT", "ST", "Chiropractic", "Acupuncture"],
+          "documentRow": 4
+        },
+        {
+          "name": "planType",
+          "label": "Plan Type",
+          "type": "select",
+          "required": true,
+          "options": ["PPO", "HMO", "EPO", "POS", "Indemnity", "Medicare", "Medicaid"],
+          "documentRow": 4
+        },
+        {
+          "name": "networkStatus",
+          "label": "Network Status",
+          "type": "select",
+          "required": true,
+          "options": ["IN-NETWORK", "OUT-OF-NETWORK"],
+          "documentRow": 4
+        },
+        {
+          "name": "coverageStatus",
+          "label": "Coverage",
+          "type": "text",
+          "required": true,
+          "placeholder": "Enter coverage…",
+          "documentRow": 4
+        },
+        {
+          "name": "effectiveDate",
+          "label": "Effective Date",
+          "type": "text",
+          "required": true,
+          "placeholder": "00/00/0000",
+          "documentRow": 4
+        },
+        {
+          "name": "terminationDate",
+          "label": "Termination Date",
+          "type": "text",
+          "required": false,
+          "placeholder": "NA",
+          "documentRow": 4
+        },
+        {
+          "name": "hsaHraAmt",
+          "label": "HCA/HRA AMT",
+          "type": "text",
+          "required": false,
+          "placeholder": "NA",
+          "documentRow": 4
+        }
+      ]
+    },
+    {
+      "sectionId": "costshare",
+      "sectionTitle": "IV. Co-pay & Deductible (row 5)",
+      "documentRows": [5],
+      "fields": [
+        {
+          "name": "copay",
+          "label": "Co-pay",
+          "type": "select",
+          "required": false,
+          "options": ["NO", "YES"],
+          "documentRow": 5
+        },
+        {
+          "name": "copayAmount",
+          "label": "Amount",
+          "type": "text",
+          "required": false,
+          "placeholder": "$0000.00",
+          "documentRow": 5
+        },
+        {
+          "name": "deductibleApplicable",
+          "label": "Is Deductible Applied for PT Services",
+          "type": "select",
+          "required": true,
+          "options": ["YES", "NO"],
+          "documentRow": 5
+        },
+        {
+          "name": "deductibleIndividual",
+          "label": "Deductible Individual",
+          "type": "text",
+          "required": false,
+          "placeholder": "$0000.00",
+          "documentRow": 5
+        },
+        {
+          "name": "deductibleMet",
+          "label": "Met Amount",
+          "type": "text",
+          "required": false,
+          "placeholder": "$0000.00",
+          "documentRow": 5
+        },
+        {
+          "name": "deductibleRemaining",
+          "label": "Remaining Amount",
+          "type": "text",
+          "required": false,
+          "placeholder": "$0000.00",
+          "documentRow": 5
+        }
+      ]
+    },
+    {
+      "sectionId": "oop",
+      "sectionTitle": "V. Co-insurance & Out of Pocket (row 6)",
+      "documentRows": [6],
+      "fields": [
+        {
+          "name": "copayCoinsurance",
+          "label": "Co-insurance",
+          "type": "select",
+          "required": true,
+          "options": ["YES", "NO"],
+          "documentRow": 6
+        },
+        {
+          "name": "coinsuranceCovered",
+          "label": "Covered",
+          "type": "text",
+          "required": false,
+          "placeholder": "0%",
+          "documentRow": 6
+        },
+        {
+          "name": "outOfPocket",
+          "label": "Out of Pocket",
+          "type": "text",
+          "required": false,
+          "placeholder": "$0000.00",
+          "documentRow": 6
+        },
+        {
+          "name": "oopMet",
+          "label": "Met Amount",
+          "type": "text",
+          "required": false,
+          "placeholder": "$0000.00",
+          "documentRow": 6
+        },
+        {
+          "name": "oopRemaining",
+          "label": "Amount Remaining",
+          "type": "text",
+          "required": false,
+          "placeholder": "$0000.00",
+          "documentRow": 6
+        }
+      ]
+    },
+    {
+      "sectionId": "visits",
+      "sectionTitle": "VI. Visits (row 7)",
+      "documentRows": [7],
+      "fields": [
+        {
+          "name": "visitsLimitation",
+          "label": "Visit Limitations",
+          "type": "text",
+          "required": false,
+          "placeholder": "0",
+          "documentRow": 7
+        },
+        {
+          "name": "visitsUsed",
+          "label": "Used Visit",
+          "type": "text",
+          "required": false,
+          "placeholder": "NO",
+          "documentRow": 7
+        }
+      ]
+    },
+    {
+      "sectionId": "auth",
+      "sectionTitle": "VII. Authorization & Referral (rows 8–9)",
+      "documentRows": [8, 9],
+      "fields": [
+        {
+          "name": "authInitialEval",
+          "label": "Is Authorization Required for Initial Eval",
+          "type": "select",
+          "required": true,
+          "options": ["NO", "YES"],
+          "documentRow": 8
+        },
+        {
+          "name": "authTreatment",
+          "label": "Is Authorization Required for Treatment",
+          "type": "select",
+          "required": true,
+          "options": ["NO", "YES"],
+          "documentRow": 8
+        },
+        {
+          "name": "referral",
+          "label": "Referral Required",
+          "type": "select",
+          "required": false,
+          "options": ["NO", "YES"],
+          "documentRow": 8
+        },
+        {
+          "name": "pcpReferral",
+          "label": "Is Referral Required from PCP for Approval",
+          "type": "select",
+          "required": false,
+          "options": ["NO", "YES"],
+          "documentRow": 8
+        },
+        {
+          "name": "howToObtainAuth",
+          "label": "How to obtain Authorization?",
+          "type": "text",
+          "required": false,
+          "placeholder": "Portal / Phone / Fax",
+          "documentRow": 8
+        },
+        {
+          "name": "authRequestTat",
+          "label": "With In How many days we can request for Auth from DOS?",
+          "type": "text",
+          "required": false,
+          "placeholder": "Enter TAT…",
+          "documentRow": 8
+        },
+        {
+          "name": "authNumber",
+          "label": "Authorization #",
+          "type": "text",
+          "required": false,
+          "placeholder": "Enter auth number…",
+          "documentRow": 9
+        },
+        {
+          "name": "authCoverageDates",
+          "label": "Auth Coverage Dates",
+          "type": "text",
+          "required": false,
+          "placeholder": "MM/DD/YYYY - MM/DD/YYYY",
+          "documentRow": 9
+        }
+      ]
+    },
+    {
+      "sectionId": "rep",
+      "sectionTitle": "VIII. Coordination & Rep (row 10)",
+      "documentRows": [10],
+      "fields": [
+        {
+          "name": "primary",
+          "label": "PRIMARY",
+          "type": "text",
+          "required": false,
+          "placeholder": "Enter primary…",
+          "documentRow": 10
+        },
+        {
+          "name": "secondary",
+          "label": "SECONDARY",
+          "type": "select",
+          "required": false,
+          "options": ["NO", "YES"],
+          "documentRow": 10
+        },
+        {
+          "name": "insuranceRep",
+          "label": "Insurance Rep Name",
+          "type": "text",
+          "required": false,
+          "placeholder": "Enter rep name…",
+          "documentRow": 10
+        },
+        {
+          "name": "callReference",
+          "label": "Call Reference",
+          "type": "text",
+          "required": false,
+          "placeholder": "00000000",
+          "documentRow": 10
+        }
+      ]
+    },
+    {
+      "sectionId": "claims",
+      "sectionTitle": "IX. Claim Filing (row 11)",
+      "documentRows": [11],
+      "fields": [
+        {
+          "name": "claimMailingAddress",
+          "label": "Claim Mailing Address",
+          "type": "text",
+          "required": false,
+          "placeholder": "Enter claim mailing address…",
+          "documentRow": 11
+        },
+        {
+          "name": "payerId",
+          "label": "Payer ID",
+          "type": "text",
+          "required": true,
+          "placeholder": "Enter payer id…",
+          "documentRow": 11
+        },
+        {
+          "name": "tflDaysClaims",
+          "label": "TFL days for claims",
+          "type": "text",
+          "required": false,
+          "placeholder": "Enter TFL days…",
+          "documentRow": 11
+        },
+        {
+          "name": "tflCorrectedClaims",
+          "label": "TFL for corrected claims",
+          "type": "text",
+          "required": false,
+          "placeholder": "Enter TFL for corrected claims…",
+          "documentRow": 11
+        }
+      ]
+    },
+    {
+      "sectionId": "secondary",
+      "sectionTitle": "X. Secondary Insurance (rows 12–15)",
+      "documentRows": [12, 13, 14, 15],
+      "fields": [
+        {
+          "name": "secondaryYesNo",
+          "label": "SECONDARY (YES/NO)",
+          "type": "select",
+          "required": false,
+          "options": ["NO", "YES"],
+          "documentRow": 12
+        },
+        {
+          "name": "secondaryInsName",
+          "label": "SECONDARY INS NAME",
+          "type": "text",
+          "required": false,
+          "placeholder": "Enter secondary insurance name…",
+          "documentRow": 12
+        },
+        {
+          "name": "secondaryPlanName",
+          "label": "PLAN NAME",
+          "type": "text",
+          "required": false,
+          "placeholder": "Enter plan name…",
+          "documentRow": 13
+        },
+        {
+          "name": "secondaryPolicyId",
+          "label": "POLICY ID",
+          "type": "text",
+          "required": false,
+          "placeholder": "Enter policy id…",
+          "documentRow": 13
+        },
+        {
+          "name": "secondaryEffectiveDate",
+          "label": "EFFECTIVE DATE",
+          "type": "text",
+          "required": false,
+          "placeholder": "00/00/0000",
+          "documentRow": 14
+        },
+        {
+          "name": "secondaryDeductible",
+          "label": "DEDUCTIBLE",
+          "type": "text",
+          "required": false,
+          "placeholder": "NA",
+          "documentRow": 14
+        },
+        {
+          "name": "secondaryVisitLimit",
+          "label": "VISIT LIMIT",
+          "type": "text",
+          "required": false,
+          "placeholder": "MN",
+          "documentRow": 15
+        },
+        {
+          "name": "secondaryUsedLimit",
+          "label": "USED LIMIT",
+          "type": "text",
+          "required": false,
+          "placeholder": "Enter used limit…",
+          "documentRow": 15
+        }
+      ]
+    }
+  ],
+  "allFieldNames": [
+    "pat",
+    "patientName",
+    "dob",
+    "todayDate",
+    "additionalInfo",
+    "insurance",
+    "insurancePhone",
+    "idCard",
+    "groupNo",
+    "serviceType",
+    "planType",
+    "networkStatus",
+    "coverageStatus",
+    "effectiveDate",
+    "terminationDate",
+    "hsaHraAmt",
+    "copay",
+    "copayAmount",
+    "deductibleApplicable",
+    "deductibleIndividual",
+    "deductibleMet",
+    "deductibleRemaining",
+    "copayCoinsurance",
+    "coinsuranceCovered",
+    "outOfPocket",
+    "oopMet",
+    "oopRemaining",
+    "visitsLimitation",
+    "visitsUsed",
+    "authInitialEval",
+    "authTreatment",
+    "referral",
+    "pcpReferral",
+    "howToObtainAuth",
+    "authRequestTat",
+    "authNumber",
+    "authCoverageDates",
+    "primary",
+    "secondary",
+    "insuranceRep",
+    "callReference",
+    "claimMailingAddress",
+    "payerId",
+    "tflDaysClaims",
+    "tflCorrectedClaims",
+    "secondaryYesNo",
+    "secondaryInsName",
+    "secondaryPlanName",
+    "secondaryPolicyId",
+    "secondaryEffectiveDate",
+    "secondaryDeductible",
+    "secondaryVisitLimit",
+    "secondaryUsedLimit"
+  ]
+}

@@ -1,10 +1,39 @@
-import { INITIAL_MOCK_VOBS } from './mockVobsData';
-import { MOCK_USERS } from './mockUsersData';
-import { MOCK_AUDIT_LOGS } from './mockAuditData';
-import { CLIENTS, CANONICAL_FIELDS } from '../../data/clients';
+import { INITIAL_MOCK_VOBS } from './mockVobsData.js';
+import { MOCK_USERS } from './mockUsersData.js';
+import { MOCK_AUDIT_LOGS } from './mockAuditData.js';
+import { CLIENTS, CANONICAL_FIELDS } from '../../data/clients.js';
 
-// In-memory state for mock backend
-let vobsState = JSON.parse(JSON.stringify(INITIAL_MOCK_VOBS));
+// Persistent in-browser state with fallback
+const STORAGE_KEY = 'us24_vobs_state';
+
+function loadStoredVobs() {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      const stored = window.localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.warn('[mockServer] Could not load vobs from localStorage', e);
+    }
+  }
+  return JSON.parse(JSON.stringify(INITIAL_MOCK_VOBS));
+}
+
+function saveVobsToStorage(state) {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (e) {
+      console.warn('[mockServer] Could not save vobs to localStorage', e);
+    }
+  }
+}
+
+let vobsState = loadStoredVobs();
 let usersState = JSON.parse(JSON.stringify(MOCK_USERS));
 let auditState = JSON.parse(JSON.stringify(MOCK_AUDIT_LOGS));
 let uploadsState = {};
@@ -125,6 +154,7 @@ export const mockServer = {
     };
 
     vobsState[idx] = updated;
+    saveVobsToStorage(vobsState);
     return updated;
   },
 
@@ -164,6 +194,7 @@ export const mockServer = {
     };
 
     vobsState[idx] = updated;
+    saveVobsToStorage(vobsState);
 
     // Audit log
     auditState.unshift({
@@ -265,22 +296,30 @@ export const mockServer = {
 
   // POST /uploads
   async uploadFile(formData, client = "arra") {
-    await sleep(400);
+    await sleep(250);
     const uploadId = `upl_${Date.now()}`;
-    const previewRows = [
-      { row: 1, patientName: "Arthur Dent", dob: "1978-05-11", dos: "2026-10-04", appointmentType: "General Consult", insurance: "BCBS", idCard: "XYZ-1234", valid: true },
-      { row: 2, patientName: "Trillian Astra", dob: "1983-09-22", dos: "2026-10-05", appointmentType: "Physical Therapy", insurance: "Aetna", idCard: "AET-9921", valid: true },
-      { row: 3, patientName: "Ford Prefect", dob: "", dos: "2026-10-06", appointmentType: "Initial Eval", insurance: "Cigna", idCard: "CIG-8821", valid: false, reason: "Missing Date of Birth (DOB)" },
-      { row: 4, patientName: "Zaphod Beeblebrox", dob: "1965-03-15", dos: "2026-10-07", appointmentType: "Specialist Spine", insurance: "UHC", idCard: "UHC-7731", valid: true }
-    ];
+    let previewRows = formData?.rows;
+    if (!previewRows || !Array.isArray(previewRows) || previewRows.length === 0) {
+      previewRows = [
+        { row: 1, patientName: "Arthur Dent", dob: "1978-05-11", dos: "2026-10-04", appointmentType: "General Consult", insurance: "BCBS", idCard: "XYZ-1234", valid: true },
+        { row: 2, patientName: "Trillian Astra", dob: "1983-09-22", dos: "2026-10-05", appointmentType: "Physical Therapy", insurance: "Aetna", idCard: "AET-9921", valid: true },
+        { row: 3, patientName: "Ford Prefect", dob: "", dos: "2026-10-06", appointmentType: "Initial Eval", insurance: "Cigna", idCard: "CIG-8821", valid: false, reason: "Missing Date of Birth (DOB)" },
+        { row: 4, patientName: "Zaphod Beeblebrox", dob: "1965-03-15", dos: "2026-10-07", appointmentType: "Specialist Spine", insurance: "UHC", idCard: "UHC-7731", valid: true }
+      ];
+    }
+
+    const totalRows = formData?.totalRows ?? previewRows.length;
+    const validRows = formData?.validRows ?? previewRows.filter(r => r.valid).length;
+    const rejectedRows = formData?.rejectedRows ?? previewRows.filter(r => !r.valid).length;
 
     uploadsState[uploadId] = {
       uploadId,
       client,
       filename: formData?.filename || "Client_VOB_Batch_Intake.xlsx",
-      totalRows: 4,
-      validRows: 3,
-      rejectedRows: 1,
+      assignedTo: formData?.assignedTo || "rohit.k@us24solutions.com",
+      totalRows,
+      validRows,
+      rejectedRows,
       rows: previewRows,
       status: "preview"
     };
@@ -295,23 +334,25 @@ export const mockServer = {
   },
 
   // POST /uploads/:id/commit
-  async commitUpload(uploadId, adminEmail = "saurabh@us24solutions.com") {
+  async commitUpload(uploadId, adminEmail = "saurabh@us24solutions.com", assignedTo) {
     await sleep(300);
     const upl = uploadsState[uploadId];
     if (!upl) throw new Error("Upload batch not found");
 
     const validItems = upl.rows.filter(r => r.valid);
+    const targetAssignee = assignedTo || upl.assignedTo || "rohit.k@us24solutions.com";
+
     const createdVobs = validItems.map((r, i) => ({
       id: `vob_${Date.now()}_${i}`,
-      client: upl.client,
+      client: upl.client || r.client || "arra",
       patientName: r.patientName,
       dob: r.dob,
       dos: r.dos,
-      appointmentType: r.appointmentType,
-      insurance: r.insurance,
-      planTypeAndName: `${r.insurance} Choice`,
-      groupNo: "GRP-AUTO",
-      primarySecondary: "Primary",
+      appointmentType: r.appointmentType || "General Consult",
+      insurance: r.insurance || "Commercial Payer",
+      planTypeAndName: `${r.insurance || 'Commercial'} Choice`,
+      groupNo: r.groupNo || "GRP-AUTO",
+      primarySecondary: r.primarySecondary || "Primary",
       coverageStatus: "Active",
       networkStatus: "In-Network",
       inNetworkGroup: "Yes",
@@ -321,27 +362,28 @@ export const mockServer = {
       referral: "Not Required",
       authRequestTat: "N/A",
       deductibleApplicable: "Yes",
-      copayCoinsurance: "$30 Copay",
+      copayCoinsurance: r.copay || "$30 Copay",
       visitsLimitation: "20 visits",
       initialDos: r.dos,
       vobCompletionDate: "",
       vobStatus: "Assigned",
       dosMoreThan15Days: "No",
-      payerId: "99102",
-      insurancePhone: "1-800-555-0199",
+      payerId: r.payerId || "99102",
+      insurancePhone: r.insurancePhone || "1-800-555-0199",
       callWebsite: "Payer Website",
-      idCard: r.idCard,
+      idCard: r.idCard || `MEM-${Date.now().toString().slice(-6)}`,
       dialedTime: "",
-      assignedTo: "rohit.k@us24solutions.com",
+      assignedTo: targetAssignee,
       version: 1,
       provenance: {
-        patientName: { source: "master_data" },
-        dob: { source: "master_data" }
+        patientName: { source: "uploaded_intake" },
+        dob: { source: "uploaded_intake" }
       }
     }));
 
     vobsState.unshift(...createdVobs);
     upl.status = "committed";
+    saveVobsToStorage(vobsState);
 
     auditState.unshift({
       id: `aud_${Date.now()}`,
@@ -353,29 +395,31 @@ export const mockServer = {
       client: upl.client,
       field: "vobBatch",
       oldValue: null,
-      newValue: `${createdVobs.length} VOB records created`,
-      notes: `Batch intake from ${upl.filename}`
+      newValue: `${createdVobs.length} VOB records created & assigned to ${targetAssignee}`,
+      notes: `Batch intake from ${upl.filename} assigned to ${targetAssignee}`
     });
 
     return { success: true, count: createdVobs.length, createdVobs };
   },
 
   // POST /assignments
-  async assignVobs({ vobIds, assignees }, adminEmail = "saurabh@us24solutions.com") {
+  async assignVobs({ vobIds = [], assignees = [] } = {}, adminEmail = "saurabh@us24solutions.com") {
     await sleep(250);
-    const targetAssignee = assignees[0];
+    const targetAssignee = assignees[0] || "rohit.k@us24solutions.com";
 
     vobsState = vobsState.map(v => {
       if (vobIds.includes(v.id)) {
         return {
           ...v,
           assignedTo: targetAssignee,
-          vobStatus: v.vobStatus === "Assigned" ? "Assigned" : v.vobStatus,
-          version: v.version + 1
+          vobStatus: v.vobStatus === "Approved" ? "Approved" : "Assigned",
+          version: (v.version || 1) + 1
         };
       }
       return v;
     });
+
+    saveVobsToStorage(vobsState);
 
     auditState.unshift({
       id: `aud_${Date.now()}`,

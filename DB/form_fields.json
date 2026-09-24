@@ -1,0 +1,214 @@
+{
+  "section": "Verification Form Schema",
+  "description": "Canonical fields organized section-by-section according to VOB_PARKER document rows, plus tracked field groups",
+  "sections": [
+    {
+      "id": "patient",
+      "title": "Patient Identity",
+      "rows": [0, 1, 2],
+      "fields": [
+        { "key": "pat", "label": "PAT", "group": "patient", "row": 0, "required": false, "placeholder": "100%(RESP)" },
+        { "key": "patientName", "label": "Name", "group": "patient", "row": 1, "required": true },
+        { "key": "dob", "label": "DOB", "group": "patient", "row": 1, "required": true, "placeholder": "00/00/0000" },
+        { "key": "todayDate", "label": "Today's Date", "group": "patient", "row": 2, "required": true, "placeholder": "00/00/0000_xx" },
+        { "key": "additionalInfo", "label": "Additional Info", "group": "patient", "row": 2, "required": false }
+      ]
+    },
+    {
+      "id": "insurance",
+      "title": "Insurance Carrier & Policy Identifiers",
+      "rows": [3],
+      "fields": [
+        { "key": "insurance", "label": "Insurance Name", "group": "insurance", "row": 3, "required": true },
+        { "key": "insurancePhone", "label": "Insurance Contact Number", "group": "insurance", "row": 3, "required": true, "placeholder": "(000) 000-0000" },
+        { "key": "idCard", "label": "Policy ID", "group": "insurance", "row": 3, "required": true, "placeholder": "XXX0000000" },
+        { "key": "groupNo", "label": "GROUP ID", "group": "insurance", "row": 3, "required": false, "placeholder": "000000" }
+      ]
+    },
+    {
+      "id": "coverage",
+      "title": "Plan Type, Network & Effective Dates",
+      "rows": [4],
+      "fields": [
+        { "key": "serviceType", "label": "Service Type", "group": "coverage", "row": 4, "required": true, "options": ["PT", "OT", "ST", "Chiropractic", "Acupuncture"] },
+        { "key": "planType", "label": "Plan Type", "group": "coverage", "row": 4, "required": true, "options": ["PPO", "HMO", "EPO", "POS", "Indemnity", "Medicare", "Medicaid"] },
+        { "key": "networkStatus", "label": "Network Status", "group": "coverage", "row": 4, "required": true, "options": ["IN-NETWORK", "OUT-OF-NETWORK"] },
+        { "key": "coverageStatus", "label": "Coverage", "group": "coverage", "row": 4, "required": true },
+        { "key": "effectiveDate", "label": "Effective Date", "group": "coverage", "row": 4, "required": true, "placeholder": "00/00/0000" },
+        { "key": "terminationDate", "label": "Termination Date", "group": "coverage", "row": 4, "required": false, "placeholder": "NA" },
+        { "key": "hsaHraAmt", "label": "HCA/HRA AMT", "group": "coverage", "row": 4, "required": false, "placeholder": "NA" }
+      ]
+    },
+    {
+      "id": "costshare",
+      "title": "Co-pay & Deductibles",
+      "rows": [5],
+      "fields": [
+        { "key": "copay", "label": "Co-pay", "group": "costshare", "row": 5, "required": false, "options": ["NO", "YES"] },
+        { "key": "copayAmount", "label": "Amount", "group": "costshare", "row": 5, "required": false, "placeholder": "$0000.00" },
+        { "key": "deductibleApplicable", "label": "Is Deductible Applied for PT Services", "group": "costshare", "row": 5, "required": true, "options": ["YES", "NO"] },
+        { "key": "deductibleIndividual", "label": "Deductible Individual", "group": "costshare", "row": 5, "required": false, "placeholder": "$0000.00" },
+        { "key": "deductibleMet", "label": "Met Amount", "group": "costshare", "row": 5, "required": false, "placeholder": "$0000.00" },
+        { "key": "deductibleRemaining", "label": "Remaining Amount", "group": "costshare", "row": 5, "required": false, "placeholder": "$0000.00" }
+      ]
+    },
+    {
+      "id": "oop",
+      "title": "Co-insurance & Out-of-Pocket Maximum",
+      "rows": [6],
+      "fields": [
+        { "key": "copayCoinsurance", "label": "Co-insurance", "group": "oop", "row": 6, "required": true, "options": ["YES", "NO"] },
+        { "key": "coinsuranceCovered", "label": "Covered", "group": "oop", "row": 6, "required": false, "placeholder": "0%" },
+        { "key": "outOfPocket", "label": "Out of Pocket", "group": "oop", "row": 6, "required": false, "placeholder": "$0000.00" },
+        { "key": "oopMet", "label": "Met Amount", "group": "oop", "row": 6, "required": false, "placeholder": "$0000.00" },
+        { "key": "oopRemaining", "label": "Amount Remaining", "group": "oop", "row": 6, "required": false, "placeholder": "$0000.00" }
+      ]
+    },
+    {
+      "id": "visits",
+      "title": "Visit Limitations",
+      "rows": [7],
+      "fields": [
+        { "key": "visitsLimitation", "label": "Visit Limitations", "group": "visits", "row": 7, "required": false, "placeholder": "0" },
+        { "key": "visitsUsed", "label": "Used Visit", "group": "visits", "row": 7, "required": false, "placeholder": "NO" }
+      ]
+    },
+    {
+      "id": "auth",
+      "title": "Prior Authorization & Referral Rules",
+      "rows": [8, 9],
+      "fields": [
+        { "key": "authInitialEval", "label": "Is Authorization Required for Initial Eval", "group": "auth", "row": 8, "required": true, "options": ["NO", "YES"] },
+        { "key": "authTreatment", "label": "Is Authorization Required for Treatment", "group": "auth", "row": 8, "required": true, "options": ["NO", "YES"] },
+        { "key": "referral", "label": "Referral Required", "group": "auth", "row": 8, "required": false, "options": ["NO", "YES"] },
+        { "key": "pcpReferral", "label": "Is Referral Required from PCP for Approval", "group": "auth", "row": 8, "required": false, "options": ["NO", "YES"] },
+        { "key": "howToObtainAuth", "label": "How to obtain Authorization?", "group": "auth", "row": 8, "required": false, "placeholder": "Portal / Phone / Fax" },
+        { "key": "authRequestTat", "label": "With In How many days we can request for Auth from DOS?", "group": "auth", "row": 8, "required": false },
+        { "key": "authNumber", "label": "Authorization #", "group": "auth", "row": 9, "required": false },
+        { "key": "authCoverageDates", "label": "Auth Coverage Dates", "group": "auth", "row": 9, "required": false, "placeholder": "MM/DD/YYYY - MM/DD/YYYY" }
+      ]
+    },
+    {
+      "id": "rep",
+      "title": "Coordination of Benefits & Payer Representative",
+      "rows": [10],
+      "fields": [
+        { "key": "primary", "label": "PRIMARY", "group": "rep", "row": 10, "required": false },
+        { "key": "secondary", "label": "SECONDARY", "group": "rep", "row": 10, "required": false, "options": ["NO", "YES"] },
+        { "key": "insuranceRep", "label": "Insurance Rep Name", "group": "rep", "row": 10, "required": false },
+        { "key": "callReference", "label": "Call Reference", "group": "rep", "row": 10, "required": false, "placeholder": "00000000" }
+      ]
+    },
+    {
+      "id": "claims",
+      "title": "Claims Filing & Timely Filing Limits",
+      "rows": [11],
+      "fields": [
+        { "key": "claimMailingAddress", "label": "Claim Mailing Address", "group": "claims", "row": 11, "required": false },
+        { "key": "payerId", "label": "Payer ID", "group": "claims", "row": 11, "required": true },
+        { "key": "tflDaysClaims", "label": "TFL days for claims", "group": "claims", "row": 11, "required": false },
+        { "key": "tflCorrectedClaims", "label": "TFL for corrected claims", "group": "claims", "row": 11, "required": false }
+      ]
+    },
+    {
+      "id": "secondary",
+      "title": "Secondary Payer Insurance",
+      "rows": [12, 13, 14, 15],
+      "fields": [
+        { "key": "secondaryYesNo", "label": "SECONDARY (YES/NO)", "group": "secondary", "row": 12, "required": false, "options": ["NO", "YES"] },
+        { "key": "secondaryInsName", "label": "SECONDARY INS NAME", "group": "secondary", "row": 12, "required": false },
+        { "key": "secondaryPlanName", "label": "PLAN NAME", "group": "secondary", "row": 13, "required": false },
+        { "key": "secondaryPolicyId", "label": "POLICY ID", "group": "secondary", "row": 13, "required": false },
+        { "key": "secondaryEffectiveDate", "label": "EFFECTIVE DATE", "group": "secondary", "row": 14, "required": false },
+        { "key": "secondaryDeductible", "label": "DEDUCTIBLE", "group": "secondary", "row": 14, "required": false, "placeholder": "NA" },
+        { "key": "secondaryVisitLimit", "label": "VISIT LIMIT", "group": "secondary", "row": 15, "required": false, "placeholder": "MN" },
+        { "key": "secondaryUsedLimit", "label": "USED LIMIT", "group": "secondary", "row": 15, "required": false }
+      ]
+    }
+  ],
+  "canonicalFields": [
+    { "key": "pat", "label": "PAT", "group": "patient", "row": 0, "required": false, "placeholder": "100%(RESP)" },
+    { "key": "patientName", "label": "Name", "group": "patient", "row": 1, "required": true },
+    { "key": "dob", "label": "DOB", "group": "patient", "row": 1, "required": true, "placeholder": "00/00/0000" },
+    { "key": "todayDate", "label": "Today's Date", "group": "patient", "row": 2, "required": true, "placeholder": "00/00/0000_xx" },
+    { "key": "additionalInfo", "label": "Additional Info", "group": "patient", "row": 2, "required": false },
+    { "key": "insurance", "label": "Insurance Name", "group": "insurance", "row": 3, "required": true },
+    { "key": "insurancePhone", "label": "Insurance Contact Number", "group": "insurance", "row": 3, "required": true, "placeholder": "(000) 000-0000" },
+    { "key": "idCard", "label": "Policy ID", "group": "insurance", "row": 3, "required": true, "placeholder": "XXX0000000" },
+    { "key": "groupNo", "label": "GROUP ID", "group": "insurance", "row": 3, "required": false, "placeholder": "000000" },
+    { "key": "serviceType", "label": "Service Type", "group": "coverage", "row": 4, "required": true, "options": ["PT", "OT", "ST", "Chiropractic", "Acupuncture"] },
+    { "key": "planType", "label": "Plan Type", "group": "coverage", "row": 4, "required": true, "options": ["PPO", "HMO", "EPO", "POS", "Indemnity", "Medicare", "Medicaid"] },
+    { "key": "networkStatus", "label": "Network Status", "group": "coverage", "row": 4, "required": true, "options": ["IN-NETWORK", "OUT-OF-NETWORK"] },
+    { "key": "coverageStatus", "label": "Coverage", "group": "coverage", "row": 4, "required": true },
+    { "key": "effectiveDate", "label": "Effective Date", "group": "coverage", "row": 4, "required": true, "placeholder": "00/00/0000" },
+    { "key": "terminationDate", "label": "Termination Date", "group": "coverage", "row": 4, "required": false, "placeholder": "NA" },
+    { "key": "hsaHraAmt", "label": "HCA/HRA AMT", "group": "coverage", "row": 4, "required": false, "placeholder": "NA" },
+    { "key": "copay", "label": "Co-pay", "group": "costshare", "row": 5, "required": false, "options": ["NO", "YES"] },
+    { "key": "copayAmount", "label": "Amount", "group": "costshare", "row": 5, "required": false, "placeholder": "$0000.00" },
+    { "key": "deductibleApplicable", "label": "Is Deductible Applied for PT Services", "group": "costshare", "row": 5, "required": true, "options": ["YES", "NO"] },
+    { "key": "deductibleIndividual", "label": "Deductible Individual", "group": "costshare", "row": 5, "required": false, "placeholder": "$0000.00" },
+    { "key": "deductibleMet", "label": "Met Amount", "group": "costshare", "row": 5, "required": false, "placeholder": "$0000.00" },
+    { "key": "deductibleRemaining", "label": "Remaining Amount", "group": "costshare", "row": 5, "required": false, "placeholder": "$0000.00" },
+    { "key": "copayCoinsurance", "label": "Co-insurance", "group": "oop", "row": 6, "required": true, "options": ["YES", "NO"] },
+    { "key": "coinsuranceCovered", "label": "Covered", "group": "oop", "row": 6, "required": false, "placeholder": "0%" },
+    { "key": "outOfPocket", "label": "Out of Pocket", "group": "oop", "row": 6, "required": false, "placeholder": "$0000.00" },
+    { "key": "oopMet", "label": "Met Amount", "group": "oop", "row": 6, "required": false, "placeholder": "$0000.00" },
+    { "key": "oopRemaining", "label": "Amount Remaining", "group": "oop", "row": 6, "required": false, "placeholder": "$0000.00" },
+    { "key": "visitsLimitation", "label": "Visit Limitations", "group": "visits", "row": 7, "required": false, "placeholder": "0" },
+    { "key": "visitsUsed", "label": "Used Visit", "group": "visits", "row": 7, "required": false, "placeholder": "NO" },
+    { "key": "authInitialEval", "label": "Is Authorization Required for Initial Eval", "group": "auth", "row": 8, "required": true, "options": ["NO", "YES"] },
+    { "key": "authTreatment", "label": "Is Authorization Required for Treatment", "group": "auth", "row": 8, "required": true, "options": ["NO", "YES"] },
+    { "key": "referral", "label": "Referral Required", "group": "auth", "row": 8, "required": false, "options": ["NO", "YES"] },
+    { "key": "pcpReferral", "label": "Is Referral Required from PCP for Approval", "group": "auth", "row": 8, "required": false, "options": ["NO", "YES"] },
+    { "key": "howToObtainAuth", "label": "How to obtain Authorization?", "group": "auth", "row": 8, "required": false, "placeholder": "Portal / Phone / Fax" },
+    { "key": "authRequestTat", "label": "With In How many days we can request for Auth from DOS?", "group": "auth", "row": 8, "required": false },
+    { "key": "authNumber", "label": "Authorization #", "group": "auth", "row": 9, "required": false },
+    { "key": "authCoverageDates", "label": "Auth Coverage Dates", "group": "auth", "row": 9, "required": false, "placeholder": "MM/DD/YYYY - MM/DD/YYYY" },
+    { "key": "primary", "label": "PRIMARY", "group": "rep", "row": 10, "required": false },
+    { "key": "secondary", "label": "SECONDARY", "group": "rep", "row": 10, "required": false, "options": ["NO", "YES"] },
+    { "key": "insuranceRep", "label": "Insurance Rep Name", "group": "rep", "row": 10, "required": false },
+    { "key": "callReference", "label": "Call Reference", "group": "rep", "row": 10, "required": false, "placeholder": "00000000" },
+    { "key": "claimMailingAddress", "label": "Claim Mailing Address", "group": "claims", "row": 11, "required": false },
+    { "key": "payerId", "label": "Payer ID", "group": "claims", "row": 11, "required": true },
+    { "key": "tflDaysClaims", "label": "TFL days for claims", "group": "claims", "row": 11, "required": false },
+    { "key": "tflCorrectedClaims", "label": "TFL for corrected claims", "group": "claims", "row": 11, "required": false },
+    { "key": "secondaryYesNo", "label": "SECONDARY (YES/NO)", "group": "secondary", "row": 12, "required": false, "options": ["NO", "YES"] },
+    { "key": "secondaryInsName", "label": "SECONDARY INS NAME", "group": "secondary", "row": 12, "required": false },
+    { "key": "secondaryPlanName", "label": "PLAN NAME", "group": "secondary", "row": 13, "required": false },
+    { "key": "secondaryPolicyId", "label": "POLICY ID", "group": "secondary", "row": 13, "required": false },
+    { "key": "secondaryEffectiveDate", "label": "EFFECTIVE DATE", "group": "secondary", "row": 14, "required": false },
+    { "key": "secondaryDeductible", "label": "DEDUCTIBLE", "group": "secondary", "row": 14, "required": false, "placeholder": "NA" },
+    { "key": "secondaryVisitLimit", "label": "VISIT LIMIT", "group": "secondary", "row": 15, "required": false, "placeholder": "MN" },
+    { "key": "secondaryUsedLimit", "label": "USED LIMIT", "group": "secondary", "row": 15, "required": false }
+  ],
+  "repVerificationFields": [
+    { "key": "idCard", "label": "Policy ID", "group": "rep" },
+    { "key": "groupNo", "label": "Group ID", "group": "rep" },
+    { "key": "planType", "label": "Plan Type", "group": "rep" },
+    { "key": "networkStatus", "label": "Network Status", "group": "rep" },
+    { "key": "coverageStatus", "label": "Coverage", "group": "rep" },
+    { "key": "effectiveDate", "label": "Effective Date", "group": "rep" },
+    { "key": "terminationDate", "label": "Termination Date", "group": "rep" },
+    { "key": "visitsLimitation", "label": "Visit Limitation", "group": "rep" },
+    { "key": "visitsUsed", "label": "Visits Used", "group": "rep" },
+    { "key": "insuranceRep", "label": "Insurance Rep", "group": "rep" },
+    { "key": "callReference", "label": "Call Reference", "group": "rep" },
+    { "key": "deductibleApplicable", "label": "Deductible Applies", "group": "rep" },
+    { "key": "deductibleIndividual", "label": "Deductible Individual", "group": "rep" },
+    { "key": "copayCoinsurance", "label": "Co-insurance", "group": "rep" },
+    { "key": "outOfPocket", "label": "Out of Pocket", "group": "rep" },
+    { "key": "authInitialEval", "label": "Auth Initial Eval", "group": "rep" },
+    { "key": "authTreatment", "label": "Auth Treatment", "group": "rep" },
+    { "key": "referral", "label": "Referral Required", "group": "rep" },
+    { "key": "pcpReferral", "label": "PCP Referral", "group": "rep" }
+  ],
+  "oursVerificationFields": [
+    { "key": "todayDate", "label": "Today's Date", "group": "ours" },
+    { "key": "insurance", "label": "Insurance", "group": "ours" },
+    { "key": "pat", "label": "PAT", "group": "ours" }
+  ],
+  "coreVerificationFields": [
+    { "key": "serviceType", "label": "Service type", "group": "core", "defaultValue": "PT" },
+    { "key": "patientName", "label": "Patient Name", "group": "core" }
+  ]
+}

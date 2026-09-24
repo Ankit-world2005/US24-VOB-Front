@@ -6,18 +6,11 @@ import { MasterDataView } from '../views/admin/MasterDataView';
 import { GlobalRecordsView } from '../views/admin/GlobalRecordsView';
 import { UserManagementView } from '../views/admin/UserManagementView';
 import { AuditLogsView } from '../views/admin/AuditLogsView';
+import { UI_CONTENT } from '../DB';
 
 export function AdminLayout() {
   const { activeTab, setActiveTab } = useWorkspace();
-
-  const tabs = [
-    { id: 'dashboard', label: '📊 Dashboard & Metrics' },
-    { id: 'upload_assign', label: '📥 Upload & Assign' },
-    { id: 'master_data', label: '🗄️ Master Data' },
-    { id: 'records', label: '📋 All Client Records' },
-    { id: 'users', label: '👥 User Access' },
-    { id: 'audit_logs', label: '🔒 HIPAA Audit Trail' }
-  ];
+  const tabs = UI_CONTENT.navigation.adminTabs;
 
   return (
     <div className="admin-layout">

@@ -5,17 +5,11 @@ import { VerificationFormView } from '../views/specialist/VerificationFormView';
 import { AuthQueueView } from '../views/specialist/AuthQueueView';
 import { ErrorQueueView } from '../views/specialist/ErrorQueueView';
 import { SavedRecordsView } from '../views/specialist/SavedRecordsView';
+import { UI_CONTENT } from '../DB';
 
 export function SpecialistLayout() {
   const { activeTab, setActiveTab } = useWorkspace();
-
-  const tabs = [
-    { id: 'my_dashboard', label: '⚡ My Dashboard' },
-    { id: 'verification', label: '📝 New Verification' },
-    { id: 'auth_queue', label: '⏳ Auth Queue' },
-    { id: 'error_queue', label: '⚠️ Error Queue' },
-    { id: 'saved_records', label: '✓ Saved Records' }
-  ];
+  const tabs = UI_CONTENT.navigation.specialistTabs;
 
   return (
     <div className="specialist-layout">

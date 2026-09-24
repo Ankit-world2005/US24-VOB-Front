@@ -2538,9 +2538,10 @@ body::before {
   margin-bottom: 24px;
 }
 
-.dropzone-box:hover {
-  border-color: var(--navy);
-  background: var(--surface);
+.dropzone-box:hover,
+.dropzone-box.dragging {
+  border-color: #0284c7;
+  background: rgba(2, 132, 199, 0.05);
 }
 
 .dropzone-icon {

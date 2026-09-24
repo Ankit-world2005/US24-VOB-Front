@@ -1,0 +1,56 @@
+{
+  "database": "US24 VOB Portal Static Database",
+  "version": "1.0.0",
+  "description": "Consolidated static database containing all sections and datasets displayed across the frontend",
+  "sections": {
+    "clients": {
+      "file": "clients.json",
+      "count": 9,
+      "description": "Healthcare client organizations with specific column mappings and colors"
+    },
+    "formFields": {
+      "file": "form_fields.json",
+      "count": 51,
+      "description": "Canonical verification form fields grouped by document row and category"
+    },
+    "users": {
+      "file": "users.json",
+      "count": 4,
+      "description": "Staff users, authentication records, roles, and assigned client queues"
+    },
+    "vobs": {
+      "file": "vobs.json",
+      "count": 18,
+      "description": "Initial VOB records cataloged by status (Assigned, In Progress, Auth Queue, Error, Approved)"
+    },
+    "masterData": {
+      "file": "master_data.json",
+      "count": 5,
+      "description": "Client master reference entries used for auto-prefilling"
+    },
+    "specialistWorkload": {
+      "file": "specialist_workload.json",
+      "count": 3,
+      "description": "Specialist staff allocation and capacity metrics"
+    },
+    "auditLogs": {
+      "file": "audit_logs.json",
+      "count": 5,
+      "description": "HIPAA compliance audit trail entries"
+    },
+    "transcripts": {
+      "file": "transcripts.json",
+      "count": 2,
+      "description": "AI extraction audio call and portal inquiry text samples"
+    },
+    "uiContent": {
+      "file": "ui_content.json",
+      "description": "Static UI copy, hero headlines, navigation tab lists, and branding"
+    },
+    "verificationSchema": {
+      "file": "schema.json",
+      "count": 51,
+      "description": "Input field names and specifications for the New Verification section arranged section-wise"
+    }
+  }
+}

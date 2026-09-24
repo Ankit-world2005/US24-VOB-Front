@@ -1,31 +1,28 @@
 import React from 'react';
+import { UI_CONTENT } from '../DB';
 
 export function Hero() {
+  const { eyebrow, headline, lede, facts } = UI_CONTENT.hero;
+
   return (
     <section className="intro">
       <span className="eyebrow">
         <span className="dot" aria-hidden="true" />
-        Internal access · Employees only
+        {eyebrow}
       </span>
       <h1 className="headline">
         Your workspace, <span className="mark">signed <span className="orange">in.</span></span>
       </h1>
       <p className="lede">
-        Sign in with your company Outlook account to reach internal tools, resources and your team dashboard.
+        {lede}
       </p>
       <div className="facts">
-        <div className="fact">
-          <div className="k">Access</div>
-          <div className="v">Role-based</div>
-        </div>
-        <div className="fact">
-          <div className="k">Account</div>
-          <div className="v">Outlook ID</div>
-        </div>
-        <div className="fact">
-          <div className="k">Session</div>
-          <div className="v">Per tab</div>
-        </div>
+        {facts.map((f, i) => (
+          <div key={i} className="fact">
+            <div className="k">{f.k}</div>
+            <div className="v">{f.v}</div>
+          </div>
+        ))}
       </div>
     </section>
   );

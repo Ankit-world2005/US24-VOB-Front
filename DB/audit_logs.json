@@ -1,0 +1,71 @@
+{
+  "section": "HIPAA Security & Audit Trail Logs",
+  "description": "Immutable append-only log of every PHI alteration, verification submission, and export",
+  "logs": [
+    {
+      "id": "aud_101",
+      "vobId": "vob_001",
+      "timestamp": "2026-09-21T07:15:30Z",
+      "user": "rohit.k@us24solutions.com",
+      "role": "user",
+      "action": "FIELD_UPDATE",
+      "client": "arra",
+      "field": "copayCoinsurance",
+      "oldValue": "$30.00",
+      "newValue": "$25.00 Copay / 10% Coinsurance",
+      "notes": "Verified via UHC Provider Portal"
+    },
+    {
+      "id": "aud_102",
+      "vobId": "vob_001",
+      "timestamp": "2026-09-21T07:18:12Z",
+      "user": "rohit.k@us24solutions.com",
+      "role": "user",
+      "action": "TRANSCRIPT_EXTRACTION",
+      "client": "arra",
+      "field": "inNetworkGroup",
+      "oldValue": "",
+      "newValue": "Yes",
+      "notes": "AI auto-fill from call transcript"
+    },
+    {
+      "id": "aud_103",
+      "vobId": "vob_004",
+      "timestamp": "2026-09-20T16:40:00Z",
+      "user": "saurabh@us24solutions.com",
+      "role": "admin",
+      "action": "ASSIGNED",
+      "client": "icure",
+      "field": "assignedTo",
+      "oldValue": "unassigned",
+      "newValue": "rohit.k@us24solutions.com",
+      "notes": "Batch task allocation"
+    },
+    {
+      "id": "aud_104",
+      "vobId": "vob_002",
+      "timestamp": "2026-09-20T14:10:15Z",
+      "user": "manish.v@us24solutions.com",
+      "role": "user",
+      "action": "STATUS_TRANSITION",
+      "client": "west_az",
+      "field": "vobStatus",
+      "oldValue": "In Progress",
+      "newValue": "Auth Queue",
+      "notes": "Payer indicated Prior Auth required for initial treatment"
+    },
+    {
+      "id": "aud_105",
+      "vobId": "vob_003",
+      "timestamp": "2026-09-20T11:05:00Z",
+      "user": "saurabh@us24solutions.com",
+      "role": "admin",
+      "action": "MASTER_DATA_UPLOAD",
+      "client": "sugarland",
+      "field": "masterBatch",
+      "oldValue": null,
+      "newValue": "Sugarland_Master_Q3_2026.xlsx (420 records)",
+      "notes": "Pre-fill baseline reference ingested"
+    }
+  ]
+}

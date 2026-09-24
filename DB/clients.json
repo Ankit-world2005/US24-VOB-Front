@@ -1,0 +1,130 @@
+{
+  "section": "Healthcare Client Organizations",
+  "description": "Client specifications, color palettes, and extended column definitions mapping onto canonical fields",
+  "clients": [
+    {
+      "id": "parker",
+      "name": "Parker Clinic",
+      "description": "Physical therapy & sports rehabilitation",
+      "color": "#0284c7",
+      "extendedColumns": [
+        "Request Type",
+        "Verification Type",
+        "PAT",
+        "Additional Info",
+        "HSA/HRA AMT",
+        "TFL Claims",
+        "Secondary Payer"
+      ],
+      "notes": "Uses Pre-Authorization & Benefits Determination format"
+    },
+    {
+      "id": "arra",
+      "name": "Arra",
+      "description": "Multi-specialty clinic group",
+      "color": "#2563eb",
+      "extendedColumns": [
+        "Call duration",
+        "INS Payment",
+        "Patient Payment",
+        "QA By",
+        "Call Recording QA",
+        "VOB File uploaded"
+      ]
+    },
+    {
+      "id": "west_az",
+      "name": "West AZ",
+      "description": "Regional outpatient practice",
+      "color": "#0d9488",
+      "extendedColumns": [
+        "Call duration",
+        "INS Payment",
+        "Patient Payment",
+        "QA By",
+        "Call Recording QA"
+      ]
+    },
+    {
+      "id": "namste",
+      "name": "Namste",
+      "description": "Holistic care & family medicine",
+      "color": "#7c3aed",
+      "extendedColumns": []
+    },
+    {
+      "id": "harikrishna_2",
+      "name": "Harikrishna - 2",
+      "description": "Surgical & specialty care",
+      "color": "#d97706",
+      "extendedColumns": [
+        "Project Name",
+        "User Name",
+        "Call duration",
+        "INS Payment",
+        "Patient Payment",
+        "QA By",
+        "Call Recording QA"
+      ],
+      "notes": "In-network columns labeled GRP / IND / GRP&IND"
+    },
+    {
+      "id": "icure",
+      "name": "Icure",
+      "description": "Urgent & primary care network",
+      "color": "#e11d48",
+      "extendedColumns": [
+        "Call duration",
+        "INS Payment",
+        "Patient Payment",
+        "QA By",
+        "Call Recording QA"
+      ],
+      "notes": "DOS comes after Appointment Type"
+    },
+    {
+      "id": "third_eye",
+      "name": "Third eye",
+      "description": "Diagnostic imaging & specialty",
+      "color": "#0284c7",
+      "extendedColumns": [
+        "Project Name",
+        "Call duration",
+        "INS Payment",
+        "Patient Payment",
+        "QA By",
+        "Call Recording QA"
+      ],
+      "notes": "DOS after Appointment Type"
+    },
+    {
+      "id": "sugarland",
+      "name": "Sugarland & Harvest Green",
+      "description": "Family health & wellness centers",
+      "color": "#059669",
+      "extendedColumns": [
+        "Project Name",
+        "User Name",
+        "Call duration",
+        "INS Payment",
+        "Patient Payment",
+        "QA By",
+        "Call Recording QA"
+      ],
+      "notes": "In-network columns named Group / IND / GRP&IND"
+    },
+    {
+      "id": "meyerland",
+      "name": "MeyerLand",
+      "description": "Comprehensive health pavilion",
+      "color": "#9333ea",
+      "extendedColumns": [
+        "Project Name",
+        "User Name",
+        "Call duration",
+        "INS Payment"
+      ],
+      "notes": "18 blank leading columns in original sheet"
+    }
+  ]
+}

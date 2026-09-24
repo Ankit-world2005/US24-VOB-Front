@@ -1,13 +1,15 @@
 import React from 'react';
+import { UI_CONTENT } from '../DB';
 
 export function Footer() {
   const year = new Date().getFullYear();
+  const { company, support } = UI_CONTENT.footer;
 
   return (
     <footer className="footer">
       <div className="footer-inner">
-        <span>© {year} US24 Solutions</span>
-        <span>Need access? Contact your administrator</span>
+        <span>© {year} {company}</span>
+        <span>{support}</span>
       </div>
     </footer>
   );

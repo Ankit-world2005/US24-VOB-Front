@@ -1,20 +1,15 @@
 import React, { useState } from 'react';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { CLIENTS } from '../../data/clients';
+import { MASTER_RECORDS } from '../../DB';
 
 export function MasterDataView() {
   const { showToast } = useWorkspace();
   const [selectedClient, setSelectedClient] = useState('sugarland');
   const [isUploading, setIsUploading] = useState(false);
 
-  // Sample master data reference entries
-  const masterRecords = [
-    { patient: "Eleanor Vance", dob: "1984-04-12", carrier: "UHC Choice Plus", policyId: "UHC-992817263", group: "904128", payerId: "87726", lastUpdated: "2026-08-15" },
-    { patient: "Marcus Thorne", dob: "1976-11-28", carrier: "BCBS Arizona HMO", policyId: "XZA90182736", group: "BC44192", payerId: "53205", lastUpdated: "2026-07-20" },
-    { patient: "David O'Connor", dob: "1968-09-15", carrier: "Cigna Open Access", policyId: "U819203910", group: "009827", payerId: "62308", lastUpdated: "2026-08-30" },
-    { patient: "Sarah Jenkins", dob: "1992-07-04", carrier: "Aetna POS II", policyId: "W182930412", group: "712893-01", payerId: "60054", lastUpdated: "2026-09-01" },
-    { patient: "Albert Gomez", dob: "1971-02-14", carrier: "BCBS Texas Choice", policyId: "TXB908172635", group: "TX-19283", payerId: "84980", lastUpdated: "2026-08-10" }
-  ];
+  // Master data reference entries sourced from DB folder
+  const masterRecords = MASTER_RECORDS;
 
   const handleUploadMaster = () => {
     setIsUploading(true);

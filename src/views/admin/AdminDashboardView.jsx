@@ -7,6 +7,7 @@ import { StatusBadge } from '../../components/vob/StatusBadge';
 import { ClientBadge } from '../../components/vob/ClientBadge';
 import { RecordDetailModal } from '../../components/vob/RecordDetailModal';
 import { CLIENTS } from '../../data/clients';
+import { SPECIALIST_WORKLOAD } from '../../DB';
 
 export function AdminDashboardView() {
   const { selectedClient, setSelectedClient, setActiveTab, openVerification } = useWorkspace();
@@ -127,11 +128,7 @@ export function AdminDashboardView() {
             <span className="panel-sub">Active staff workload</span>
           </div>
           <div className="specialist-workload-list">
-            {[
-              { name: "Rohit K", email: "rohit.k@us24solutions.com", count: 4, complete: 2, capacity: "80%" },
-              { name: "Manish V", email: "manish.v@us24solutions.com", count: 2, complete: 1, capacity: "65%" },
-              { name: "Jitender S", email: "jitender.s@us24solutions.com", count: 2, complete: 2, capacity: "50%" }
-            ].map(sp => (
+            {SPECIALIST_WORKLOAD.map(sp => (
               <div key={sp.email} className="spec-row">
                 <div className="spec-info">
                   <div className="spec-avatar">{sp.name.split(' ').map(p => p[0]).join('')}</div>

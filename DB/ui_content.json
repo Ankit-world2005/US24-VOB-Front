@@ -1,0 +1,41 @@
+{
+  "section": "Frontend UI Copy & Navigation",
+  "description": "Static text, banner copy, badges, navigation tabs, and footer information displayed on frontend",
+  "hero": {
+    "eyebrow": "Internal access · Employees only",
+    "headline": "Your workspace, signed in.",
+    "lede": "Sign in with your company Outlook account to reach internal tools, resources and your team dashboard.",
+    "facts": [
+      { "k": "Access", "v": "Role-based" },
+      { "k": "Account", "v": "Outlook ID" },
+      { "k": "Session", "v": "Per tab" }
+    ]
+  },
+  "branding": {
+    "title": "US24 SOLUTIONS",
+    "tagline": "Innovative Technology Driven",
+    "portalBadge": "VOB Portal",
+    "securityBadge": "HIPAA BAA"
+  },
+  "navigation": {
+    "adminTabs": [
+      { "id": "dashboard", "label": "📊 Dashboard & Metrics" },
+      { "id": "upload_assign", "label": "📥 Upload & Assign" },
+      { "id": "master_data", "label": "🗄️ Master Data" },
+      { "id": "records", "label": "📋 All Client Records" },
+      { "id": "users", "label": "👥 User Access" },
+      { "id": "audit_logs", "label": "🔒 HIPAA Audit Trail" }
+    ],
+    "specialistTabs": [
+      { "id": "my_dashboard", "label": "⚡ My Dashboard" },
+      { "id": "verification", "label": "📝 New Verification" },
+      { "id": "auth_queue", "label": "⏳ Auth Queue" },
+      { "id": "error_queue", "label": "⚠️ Error Queue" },
+      { "id": "saved_records", "label": "✓ Saved Records" }
+    ]
+  },
+  "footer": {
+    "company": "US24 Solutions",
+    "support": "Need access? Contact your administrator"
+  }
+}
