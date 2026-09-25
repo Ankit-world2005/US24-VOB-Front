@@ -16,6 +16,18 @@ let memoryRefresh = null;
 // that has already been spent.
 let refreshInFlight = null;
 
+// Why the last refresh was refused, for the sign-in page to explain.
+let refreshRefusal = null;
+
+/** The account this tab signed in as (saved by useAuth), or null. */
+function signedInUserId() {
+  try {
+    return JSON.parse(window.sessionStorage.getItem('us24-session') || 'null')?.id || null;
+  } catch {
+    return null;
+  }
+}
+
 export const apiClient = {
   baseUrl: API_BASE_URL,
 
@@ -110,6 +122,16 @@ export const apiClient = {
         const session = await res.json();
         if (!session?.access_token) return null;
 
+        // The refresh cookie belongs to the browser, not to this tab: it holds
+        // whoever signed in last. If that is another account, taking its token
+        // would carry on as them under this tab's name and role — an admin
+        // screen sending a specialist's requests.
+        const expected = signedInUserId();
+        if (expected && session.user?.id && session.user.id !== expected) {
+          refreshRefusal = 'account_changed';
+          return null;
+        }
+
         const remember =
           typeof window !== 'undefined' && Boolean(window.localStorage.getItem(TOKEN_KEY));
         this.setToken(session.access_token, remember);
@@ -188,8 +210,11 @@ export const apiClient = {
         }
         this.clearToken();
         if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT));
+          window.dispatchEvent(
+            new CustomEvent(SESSION_EXPIRED_EVENT, { detail: { reason: refreshRefusal } })
+          );
         }
+        refreshRefusal = null;
       }
 
       if (!res.ok) {

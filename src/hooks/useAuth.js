@@ -196,12 +196,18 @@ export function useAuth() {
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
 
-    const onExpired = () => {
+    const onExpired = (event) => {
       const hadSession = Boolean(storage.get(window.sessionStorage, SESSION_KEY));
       apiClient.clearToken();
       storage.del(window.sessionStorage, SESSION_KEY);
       setSession(null);
-      if (hadSession) setError('Your session has expired. Please sign in again.');
+      if (!hadSession) return;
+      setError(
+        event?.detail?.reason === 'account_changed'
+          ? 'Another account signed in on this browser, so this tab was signed out. ' +
+              'Use one account per browser, or a private window for a second account.'
+          : 'Your session has expired. Please sign in again.'
+      );
     };
 
     window.addEventListener(SESSION_EXPIRED_EVENT, onExpired);
