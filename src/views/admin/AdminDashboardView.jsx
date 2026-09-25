@@ -3,16 +3,17 @@ import { DataError } from '../../components/DataError';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { dashboardApi } from '../../api/dashboard';
 import { vobsApi } from '../../api/vobs';
+import { usersApi } from '../../api/users';
 import { StatusBadge } from '../../components/vob/StatusBadge';
 import { ClientBadge } from '../../components/vob/ClientBadge';
 import { RecordDetailModal } from '../../components/vob/RecordDetailModal';
 import { CLIENTS } from '../../data/clients';
-import { SPECIALIST_WORKLOAD } from '../../DB';
 
 export function AdminDashboardView() {
   const { selectedClient, setSelectedClient, setActiveTab, openVerification } = useWorkspace();
   const [summary, setSummary] = useState({ total: 0, pending: 0, authQueue: 0, error: 0, approved: 0 });
   const [recentVobs, setRecentVobs] = useState([]);
+  const [specialists, setSpecialists] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
@@ -23,10 +24,26 @@ export function AdminDashboardView() {
     setLoadError('');
     Promise.all([
       dashboardApi.getSummary({ clientId: selectedClient }),
-      vobsApi.getVobs({ clientId: selectedClient })
-    ]).then(([sumData, vobsList]) => {
+      vobsApi.getVobs({ clientId: selectedClient }),
+      usersApi.getUsers().catch(() => [])
+    ]).then(([sumData, vobsList, userList]) => {
       setSummary(sumData);
       setRecentVobs(vobsList);
+      const specs = (userList || [])
+        .filter(u => u.role === 'user' && u.active !== false)
+        .map(u => {
+          const assignedCount = vobsList.filter(v => v.assignedTo === u.email || v.assignedTo === u.id).length;
+          const completedCount = vobsList.filter(v => (v.assignedTo === u.email || v.assignedTo === u.id) && (v.vobStatus === 'Approved' || v.status === 'approved')).length;
+          return {
+            id: u.id,
+            name: u.name,
+            email: u.email,
+            count: assignedCount,
+            complete: completedCount,
+            capacity: assignedCount > 10 ? 'High' : assignedCount > 5 ? 'Medium' : 'Optimal'
+          };
+        });
+      setSpecialists(specs);
       setLoading(false);
     }).catch((err) => {
       console.error(err);
@@ -128,22 +145,28 @@ export function AdminDashboardView() {
             <span className="panel-sub">Active staff workload</span>
           </div>
           <div className="specialist-workload-list">
-            {SPECIALIST_WORKLOAD.map(sp => (
-              <div key={sp.email} className="spec-row">
-                <div className="spec-info">
-                  <div className="spec-avatar">{sp.name.split(' ').map(p => p[0]).join('')}</div>
-                  <div>
-                    <div className="spec-name">{sp.name}</div>
-                    <div className="spec-email">{sp.email}</div>
+            {specialists.length === 0 ? (
+              <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+                No active specialists found.
+              </div>
+            ) : (
+              specialists.map(sp => (
+                <div key={sp.email} className="spec-row">
+                  <div className="spec-info">
+                    <div className="spec-avatar">{sp.name.split(' ').map(p => p[0]).join('')}</div>
+                    <div>
+                      <div className="spec-name">{sp.name}</div>
+                      <div className="spec-email">{sp.email}</div>
+                    </div>
+                  </div>
+                  <div className="spec-stats">
+                    <div><span>Assigned:</span> <strong>{sp.count}</strong></div>
+                    <div><span>Completed:</span> <strong className="green">{sp.complete}</strong></div>
+                    <span className="capacity-pill">{sp.capacity} load</span>
                   </div>
                 </div>
-                <div className="spec-stats">
-                  <div><span>Assigned:</span> <strong>{sp.count}</strong></div>
-                  <div><span>Completed:</span> <strong className="green">{sp.complete}</strong></div>
-                  <span className="capacity-pill">{sp.capacity} load</span>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </section>

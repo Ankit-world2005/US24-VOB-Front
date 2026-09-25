@@ -158,7 +158,7 @@ export function normalizeVobListItem(item) {
 export function normalizeSingleVob(raw) {
   if (!raw) return raw;
 
-  // If already normalized or old mock format with direct properties
+  // Backend format has fields, patient, sources, and failures sub-objects
   const isBackendFormat = Boolean(raw.fields || raw.patient);
   const fields = raw.fields || {};
   const patient = raw.patient || {};

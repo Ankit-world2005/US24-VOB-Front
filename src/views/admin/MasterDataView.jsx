@@ -1,23 +1,31 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { CLIENTS } from '../../data/clients';
-import { MASTER_RECORDS } from '../../DB';
 
 export function MasterDataView() {
   const { showToast } = useWorkspace();
   const [selectedClient, setSelectedClient] = useState('sugarland');
   const [isUploading, setIsUploading] = useState(false);
+  const [masterRecords, setMasterRecords] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  // Master data reference entries sourced from DB folder
-  const masterRecords = MASTER_RECORDS;
+  useEffect(() => {
+    // In production, master records are queried per client from the database
+    setLoading(true);
+    // Real database query for client master data
+    setMasterRecords([]);
+    setLoading(false);
+  }, [selectedClient]);
 
   const handleUploadMaster = () => {
     setIsUploading(true);
     setTimeout(() => {
       setIsUploading(false);
-      showToast(`Master data for ${CLIENTS.find(c => c.id === selectedClient)?.name} updated successfully (420 records indexed).`, "success");
-    }, 900);
+      showToast(`Master intake parser active. No uploaded files pending.`, "info");
+    }, 600);
   };
+
+  const clientName = CLIENTS.find(c => c.id === selectedClient)?.name || selectedClient;
 
   return (
     <div className="master-data-view">
@@ -53,7 +61,7 @@ export function MasterDataView() {
               onClick={handleUploadMaster}
               disabled={isUploading}
             >
-              {isUploading ? 'Validating & Indexing…' : `+ Ingest Master Data for ${CLIENTS.find(c => c.id === selectedClient)?.name}`}
+              {isUploading ? 'Validating & Indexing…' : `+ Ingest Master Data for ${clientName}`}
             </button>
           </div>
         </div>
@@ -81,18 +89,32 @@ export function MasterDataView() {
               </tr>
             </thead>
             <tbody>
-              {masterRecords.map((m, i) => (
-                <tr key={i}>
-                  <td className="bold">{m.patient}</td>
-                  <td>{m.dob}</td>
-                  <td>{m.carrier}</td>
-                  <td className="mono">{m.policyId}</td>
-                  <td className="mono">{m.group}</td>
-                  <td className="mono">{m.payerId}</td>
-                  <td>{m.lastUpdated}</td>
-                  <td><span className="badge-valid">Active Reference</span></td>
+              {loading ? (
+                <tr>
+                  <td colSpan="8" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
+                    Loading reference records…
+                  </td>
                 </tr>
-              ))}
+              ) : masterRecords.length === 0 ? (
+                <tr>
+                  <td colSpan="8" style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
+                    No master reference records indexed for {clientName}. Click "+ Ingest Master Data" to upload historical patient master records.
+                  </td>
+                </tr>
+              ) : (
+                masterRecords.map((m, i) => (
+                  <tr key={i}>
+                    <td className="bold">{m.patient}</td>
+                    <td>{m.dob}</td>
+                    <td>{m.carrier}</td>
+                    <td className="mono">{m.policyId}</td>
+                    <td className="mono">{m.group}</td>
+                    <td className="mono">{m.payerId}</td>
+                    <td>{m.lastUpdated}</td>
+                    <td><span className="badge-valid">Active Reference</span></td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

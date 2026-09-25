@@ -16,7 +16,7 @@ export function WorkspaceProvider({ session, onLogout, children }) {
   const [activeRole, setActiveRole] = useState(session.role);
   const [selectedClient, setSelectedClient] = useState("all");
   const [activeTab, setActiveTab] = useState(session.role === "admin" ? "dashboard" : "my_dashboard");
-  const [activeVobId, setActiveVobId] = useState("vob_001");
+  const [activeVobId, setActiveVobId] = useState(null);
   const [toast, setToast] = useState(null);
 
   // Sync role if session changes

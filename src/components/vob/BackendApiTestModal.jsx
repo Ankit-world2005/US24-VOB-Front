@@ -11,7 +11,6 @@ export function BackendApiTestModal({ isOpen, onClose }) {
   const [liveHealth, setLiveHealth] = useState({ status: 'checking', latency: 0 });
 
   const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
-  const isFallbackMock = import.meta.env.VITE_FALLBACK_MOCK === 'true';
 
   const checkLiveness = async () => {
     setLiveHealth({ status: 'checking', latency: 0 });
@@ -134,9 +133,9 @@ export function BackendApiTestModal({ isOpen, onClose }) {
             </div>
           </div>
           <div>
-            <div style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Fallback Mock Mode</div>
-            <div style={{ fontSize: '14px', fontWeight: 600, color: isFallbackMock ? '#38bdf8' : '#94a3b8' }}>
-              {isFallbackMock ? 'Active (Auto-Fallback)' : 'Disabled'}
+            <div style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Data Mode</div>
+            <div style={{ fontSize: '14px', fontWeight: 600, color: '#10b981' }}>
+              Live Backend (No Mocks)
             </div>
           </div>
         </div>

@@ -1,6 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import { USERS } from '../data/users';
-import { sha256 } from '../utils/crypto';
 import { authApi } from '../api/auth';
 import { apiClient, SESSION_EXPIRED_EVENT } from '../api/client';
 
@@ -94,9 +92,6 @@ export function useAuth() {
   const login = useCallback(async ({ email, password, remember }) => {
     setError('');
 
-    // Trimmed but NOT lowercased. The API preserves address case on purpose and
-    // holds accounts that differ only in the case of their local part, so folding
-    // the case here makes one of them impossible to sign in to.
     const cleanEmail = email.trim();
     const now = Date.now();
 
@@ -118,32 +113,12 @@ export function useAuth() {
 
     setLoading(true);
     try {
-      // 1. First attempt login against the live backend API (/api/v1/auth/login)
-      let authResponse = null;
-      let usedLiveBackend = false;
-
+      // Authenticate against the live backend API (/api/v1/auth/login)
+      let authResponse;
       try {
         authResponse = await authApi.login({ email: cleanEmail, password });
-        usedLiveBackend = true;
       } catch (apiErr) {
-        // Demo accounts (Admin@123, User@123, …) only when there is no backend to
-        // ask. Its token is not a JWT: once a backend answered — even to refuse —
-        // a demo sign-in would make every API call fail with "Sign in to continue."
-        const backendAnswered = Boolean(apiErr.status) && !apiErr.unreachable && apiErr.status !== 404;
-        const localKey = cleanEmail.toLowerCase();
-        const hash = backendAnswered ? null : await sha256(`us24|${localKey}|${password}`);
-        const localUser = USERS[localKey];
-        if (localUser && hash && localUser.hashes.includes(hash)) {
-          authResponse = {
-            access_token: 'local_dev_token_' + Date.now(),
-            user: {
-              id: 'local_' + localUser.name.toLowerCase().replace(/\s+/g, '_'),
-              email: cleanEmail,
-              name: localUser.name,
-              role: localUser.role
-            }
-          };
-        } else if (apiErr.status === 401 || apiErr.status === 400 || apiErr.status === 403) {
+        if (apiErr.status === 401 || apiErr.status === 400 || apiErr.status === 403) {
           const nextAttempts = lockState.attempts + 1;
           if (nextAttempts >= MAX_ATTEMPTS) {
             const lockedUntil = Date.now() + LOCK_MS;
@@ -158,15 +133,15 @@ export function useAuth() {
           }
           setLoading(false);
           return false;
-        } else {
-          throw apiErr;
         }
+        throw apiErr;
       }
 
       if (authResponse?.access_token) {
         apiClient.setToken(authResponse.access_token, remember);
-        // Present in development only; production keeps it in an HttpOnly cookie.
-        apiClient.setRefreshToken(authResponse.refresh_token, remember);
+        if (authResponse.refresh_token) {
+          apiClient.setRefreshToken(authResponse.refresh_token, remember);
+        }
         saveLock({ attempts: 0, until: 0 });
 
         if (typeof window !== 'undefined') {
@@ -218,14 +193,10 @@ export function useAuth() {
     setError('');
   }, []);
 
-  // The client rotates an expired access token by itself. It only raises this
-  // when the refresh is refused too, which means the session is genuinely over —
-  // idle timeout, absolute cap, or an admin revoking access mid-session (SEC-7).
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
 
     const onExpired = () => {
-      // A signed-out request can raise this too; only a real session has expired.
       const hadSession = Boolean(storage.get(window.sessionStorage, SESSION_KEY));
       apiClient.clearToken();
       storage.del(window.sessionStorage, SESSION_KEY);

@@ -188,6 +188,30 @@ export function VerificationFormView() {
     { id: 'secondary', title: 'X. Secondary Insurance (rows 12–15)', fields: CANONICAL_FIELDS.filter(f => f.group === 'secondary') }
   ];
 
+  if (loading && !vob) {
+    return (
+      <div className="verification-form-view" style={{ padding: '48px', textAlign: 'center' }}>
+        <div className="spinner" style={{ margin: '0 auto 16px' }} />
+        <p style={{ color: 'var(--text-muted)' }}>Loading verification record…</p>
+      </div>
+    );
+  }
+
+  if (!vob) {
+    return (
+      <div className="verification-form-view" style={{ padding: '64px 24px', textAlign: 'center' }}>
+        <div style={{ fontSize: '40px', marginBottom: '16px' }}>📋</div>
+        <h3 style={{ marginBottom: '8px' }}>No VOB Record Selected</h3>
+        <p style={{ color: 'var(--text-muted)', maxWidth: '460px', margin: '0 auto 20px' }}>
+          There are no pending verification tasks currently assigned to your queue.
+        </p>
+        <button type="button" className="btn btn-sm" onClick={() => setActiveTab('my_dashboard')}>
+          Go to My Dashboard
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="verification-form-view">
       {/* Top Header Card */}

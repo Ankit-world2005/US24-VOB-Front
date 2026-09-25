@@ -59,11 +59,9 @@ export const vobsApi = {
     if (query.limit) params.limit = query.limit;
     if (query.cursor) params.cursor = query.cursor;
 
-    // The email filter is for the mock server only; the backend filters by token.
     const res = await apiClient.request({
       path: '/api/v1/vobs',
-      params,
-      mockParams: query.userEmail ? { userEmail: query.userEmail } : null
+      params
     });
 
     // Handle both { data: [...], page: {...} } backend format and legacy array
@@ -102,11 +100,6 @@ export const vobsApi = {
       };
     } else {
       payload = toBackendPatchPayload(edits, version);
-    }
-
-    // Include userEmail for mockServer audit log when offline
-    if (userEmail) {
-      payload.userEmail = userEmail;
     }
 
     return apiClient.request({

@@ -2,8 +2,8 @@ import React, { useState, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { uploadsApi } from '../../api/uploads';
+import { usersApi } from '../../api/users';
 import { CLIENTS } from '../../data/clients';
-import { MOCK_USERS } from '../../api/mock/mockUsersData';
 
 function formatDateValue(val) {
   if (!val) return '';
@@ -199,12 +199,23 @@ export function UploadAssignView() {
 
   const fileInputRef = useRef(null);
 
-  // Specialists only: the API gives a VOB to an active `user`, never to an admin.
-  const specialists = MOCK_USERS.filter(u => u.role === 'user').map(u => ({
-    email: u.email,
-    name: u.name,
-    role: u.role
-  }));
+  const [specialists, setSpecialists] = useState([]);
+
+  React.useEffect(() => {
+    usersApi.getUsers().then(users => {
+      const activeSpecialists = (users || [])
+        .filter(u => u.role === 'user' && u.active !== false)
+        .map(u => ({
+          id: u.id,
+          email: u.email,
+          name: u.name,
+          role: u.role
+        }));
+      setSpecialists(activeSpecialists);
+    }).catch(err => {
+      console.error('Failed to load specialists:', err);
+    });
+  }, []);
 
   const parseAndSetRows = async ({ headers, rows: rawRows, rowNumbers }, sourceName) => {
     if (!rawRows || rawRows.length === 0) {
@@ -423,8 +434,7 @@ export function UploadAssignView() {
       .filter((r, idx) => r.valid && selectedRowIndices.has(idx));
     if (rowsToCommit.length === 0) return;
 
-    // The API knows clients by id; /auth/me lists the ones this admin holds, by name.
-    // Without a match (mock mode) the slug goes, and only the mock server reads it.
+    // The API knows clients by UUID; /auth/me lists the ones this admin holds.
     const client = CLIENTS.find(c => c.id === selectedClient);
     const serverClient = (currentUser.accessibleClients || []).find(c =>
       c && typeof c === 'object' && client && normalizeKey(c.name) === normalizeKey(client.name)

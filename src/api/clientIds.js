@@ -35,11 +35,11 @@ async function serverClients() {
  *
  * Resolves to the UUID; to `undefined` for no filter ('all' or empty); and to
  * `null` when the server holds no such client for this caller, which means the
- * answer is an empty list. The mock server takes the slug as it is.
+ * answer is an empty list.
  */
 export async function toServerClientId(value) {
   if (!value || value === 'all') return undefined;
-  if (UUID.test(value) || apiClient.usesMock()) return value;
+  if (UUID.test(value)) return value;
 
   const name = CLIENTS.find((c) => c.id === value)?.name ?? value;
   const match = (await serverClients()).find(
