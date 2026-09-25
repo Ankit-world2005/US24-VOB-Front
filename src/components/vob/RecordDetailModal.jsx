@@ -16,7 +16,11 @@ export function RecordDetailModal({ vobId, isOpen, onClose }) {
       setLoading(true);
       Promise.all([
         vobsApi.getVobById(vobId),
-        vobsApi.getAudit(vobId)
+        // The history is a tab of its own: if it cannot load, still show the record.
+        vobsApi.getAudit(vobId).catch((err) => {
+          console.error(err);
+          return [];
+        })
       ]).then(([vobData, logs]) => {
         setVob(vobData);
         setAuditLogs(logs);

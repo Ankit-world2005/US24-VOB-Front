@@ -192,10 +192,22 @@ export const vobsApi = {
   /**
    * GET /api/v1/vobs/:id/audit - HIPAA audit log for this VOB
    */
-  getAudit(id) {
-    return apiClient.request({
+  async getAudit(id) {
+    const res = await apiClient.request({
       path: `/api/v1/vobs/${id}/audit`
     });
+    // The API sends { data: [{ occurred_at, actor, old_value, … }] }; the audit
+    // table reads the camelCase shape below.
+    return (res?.data || []).map((e) => ({
+      id: e.id,
+      timestamp: e.occurred_at,
+      user: e.actor?.name || 'System',
+      action: e.action,
+      field: e.field,
+      oldValue: e.old_value,
+      newValue: e.new_value,
+      notes: e.detail && Object.keys(e.detail).length ? JSON.stringify(e.detail) : ''
+    }));
   },
 
   /**
