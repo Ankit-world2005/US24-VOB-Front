@@ -3,6 +3,7 @@ import { toServerClientId } from './clientIds';
 import {
   normalizeVobListItem,
   normalizeSingleVob,
+  normalizeExtraction,
   toBackendPatchPayload,
   STATUS_MAP_TO_BACKEND
 } from '../utils/vobAdapter';
@@ -170,23 +171,17 @@ export const vobsApi = {
   },
 
   /**
-   * POST /api/v1/vobs/:id/transcript - Enqueues transcript extraction job
+   * POST /api/v1/vobs/:id/extract - Reads a pasted transcript and proposes values
+   * for the VOB's empty fields, each with the payer's words it came from. Saves
+   * nothing: the specialist applies, reviews and saves. Assigned specialist only.
    */
-  postTranscript(id, transcript) {
-    return apiClient.request({
-      path: `/api/v1/vobs/${id}/transcript`,
+  async extract(id, text, { channel } = {}) {
+    const res = await apiClient.request({
+      path: `/api/v1/vobs/${id}/extract`,
       method: 'POST',
-      data: { transcript }
+      data: channel ? { text, channel } : { text }
     });
-  },
-
-  /**
-   * GET /api/v1/vobs/:id/extraction/:jobId - Polls extraction progress and result
-   */
-  getExtraction(id, jobId) {
-    return apiClient.request({
-      path: `/api/v1/vobs/${id}/extraction/${jobId}`
-    });
+    return normalizeExtraction(res);
   },
 
   /**

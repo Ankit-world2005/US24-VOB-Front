@@ -224,6 +224,47 @@ export function normalizeSingleVob(raw) {
 }
 
 /**
+ * The form's view of POST /api/v1/vobs/:id/extract.
+ *
+ * Field keys follow the same rule as normalizeSingleVob(), so a proposed value
+ * lands on the key the form already renders. Client-specific `extra.*` columns
+ * are left out: the form keeps those in `extra`, not as fields.
+ *
+ * `fields` is what applying writes; the rest is for the specialist to read:
+ * each value's evidence and confidence, values that contradict the VOB, and
+ * what the call did not answer.
+ */
+export function normalizeExtraction(res) {
+  const formKey = (field) => REVERSE_FIELD_KEY_MAP[field] || field;
+  const ownFields = (items) => (items || []).filter((i) => !String(i.field).startsWith('extra.'));
+
+  const proposed = ownFields(res?.proposed).map((p) => ({
+    key: formKey(p.field),
+    label: p.label,
+    value: p.value,
+    confidence: p.confidence,
+    evidence: p.evidence
+  }));
+
+  return {
+    provider: res?.provider || 'unknown',
+    failovers: res?.failovers || [],
+    proposed,
+    fields: Object.fromEntries(proposed.map((p) => [p.key, p.value])),
+    conflicts: ownFields(res?.conflicts).map((c) => ({
+      key: formKey(c.field),
+      label: c.label,
+      current: c.current,
+      value: c.value,
+      evidence: c.evidence
+    })),
+    stillToAsk: ownFields(res?.skipped)
+      .filter((s) => s.reason === 'not_found')
+      .map((s) => s.label)
+  };
+}
+
+/**
  * Prepares payload for PATCH /api/v1/vobs/:id from form changes
  */
 export function toBackendPatchPayload(formData, version, options = {}) {

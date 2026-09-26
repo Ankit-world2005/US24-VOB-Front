@@ -1,12 +1,31 @@
 import React, { useState, useRef } from 'react';
 import { vobsApi } from '../../api/vobs';
-import { extractFieldsFromTranscript } from '../../utils/transcriptParser';
+
+/** What went wrong, in the specialist's terms. Never a guess in place of an answer. */
+function describeFailure(err) {
+  switch (err?.status) {
+    case 503: {
+      const reason = err.data?.error?.details?.reason;
+      return `Auto-fill is unavailable right now${reason ? ` (${reason.replace(/_/g, ' ')})` : ''}. Enter the values manually.`;
+    }
+    case 409:
+      return 'This VOB is approved and can no longer be changed.';
+    case 404:
+      return 'This VOB is not assigned to you.';
+    case 403:
+      return 'Only the specialist assigned to this VOB can run auto-fill.';
+    default:
+      return err?.message || 'Auto-fill failed. Enter the values manually.';
+  }
+}
+
+const displayValue = (v) => (v === true ? 'Yes' : v === false ? 'No' : String(v ?? ''));
 
 export function AiTranscriptDrawer({ isOpen, onClose, vobId, onApplyFields }) {
   const [transcript, setTranscript] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [extractedData, setExtractedData] = useState(null);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef(null);
 
@@ -24,52 +43,32 @@ export function AiTranscriptDrawer({ isOpen, onClose, vobId, onApplyFields }) {
     reader.onload = (event) => {
       const text = event.target?.result || '';
       setTranscript(text);
-      setExtractedData(null);
+      setResult(null);
+      setError('');
     };
     reader.readAsText(file);
   };
 
+  // One call: the API reads the transcript, checks every value against the
+  // payer's words in it, and answers. If it cannot, the specialist is told so —
+  // nothing is guessed in its place.
   const handleExtract = async () => {
     if (!transcript.trim()) return;
     setIsProcessing(true);
-    setProgress(20);
-    setExtractedData(null);
-
+    setResult(null);
+    setError('');
     try {
-      const { jobId } = await vobsApi.postTranscript(vobId, transcript);
-      setProgress(50);
-
-      // Poll extraction job
-      const pollInterval = setInterval(async () => {
-        try {
-          const res = await vobsApi.getExtraction(vobId, jobId);
-          if (res.status === 'completed') {
-            clearInterval(pollInterval);
-            setProgress(100);
-            setIsProcessing(false);
-            setExtractedData(res.extractedFields || extractFieldsFromTranscript(transcript));
-          } else {
-            setProgress(res.progress || 75);
-          }
-        } catch (e) {
-          clearInterval(pollInterval);
-          // Dynamic fallback parser on user's actual transcript
-          setProgress(100);
-          setIsProcessing(false);
-          setExtractedData(extractFieldsFromTranscript(transcript));
-        }
-      }, 400);
+      setResult(await vobsApi.extract(vobId, transcript));
     } catch (err) {
-      // Dynamic fallback parser on user's actual transcript
-      setProgress(100);
+      setError(describeFailure(err));
+    } finally {
       setIsProcessing(false);
-      setExtractedData(extractFieldsFromTranscript(transcript));
     }
   };
 
   const handleApply = () => {
-    if (extractedData) {
-      onApplyFields(extractedData);
+    if (result?.proposed.length) {
+      onApplyFields(result.fields);
       onClose();
     }
   };
@@ -79,7 +78,7 @@ export function AiTranscriptDrawer({ isOpen, onClose, vobId, onApplyFields }) {
       <div className="drawer-panel" onClick={(e) => e.stopPropagation()}>
         <div className="drawer-header">
           <div>
-            <div className="drawer-eyebrow">HIPAA BAA Compliant Engine</div>
+            <div className="drawer-eyebrow">Transcript Extraction</div>
             <h2 className="drawer-title">AI Transcript Auto-Fill</h2>
           </div>
           <button type="button" className="drawer-close-btn" onClick={onClose}>✕</button>
@@ -87,7 +86,7 @@ export function AiTranscriptDrawer({ isOpen, onClose, vobId, onApplyFields }) {
 
         <div className="drawer-body">
           <p className="drawer-description">
-            Paste payer phone call transcripts or provider portal eligibility text. The AI extracts coverage rules and fills <strong>only empty fields</strong> without overwriting existing data.
+            Paste the payer call transcript or portal eligibility text. The AI proposes values for <strong>empty fields only</strong>, each with the payer's words it came from. Nothing is saved until you save the form.
           </p>
 
 
@@ -115,7 +114,7 @@ export function AiTranscriptDrawer({ isOpen, onClose, vobId, onApplyFields }) {
                 <button
                   type="button"
                   className="btn btn-sm ghost"
-                  onClick={() => { setTranscript(''); setExtractedData(null); }}
+                  onClick={() => { setTranscript(''); setResult(null); setError(''); }}
                   title="Clear transcript text"
                 >
                   Clear
@@ -146,39 +145,84 @@ export function AiTranscriptDrawer({ isOpen, onClose, vobId, onApplyFields }) {
 
           {isProcessing && (
             <div className="ai-progress-wrap">
-              <div className="ai-progress-bar" style={{ width: `${progress}%` }} />
-              <span className="ai-progress-text">Analyzing transcript with HIPAA NLP model ({progress}%)…</span>
+              <div className="ai-progress-bar" style={{ width: '100%' }} />
+              <span className="ai-progress-text">Reading the transcript… this can take a few seconds.</span>
             </div>
           )}
 
-          {extractedData && (
+          {error && (
+            <div className="extracted-preview-box" role="alert" style={{ borderColor: 'var(--danger, #dc2626)' }}>
+              <span className="extracted-note" style={{ color: 'var(--danger, #dc2626)' }}>{error}</span>
+            </div>
+          )}
+
+          {result && (
             <div className="extracted-preview-box">
               <div className="extracted-preview-head">
-                <span className="ai-chip">✨ {Object.keys(extractedData).length} Fields Extracted</span>
-                <span className="extracted-note">Will apply with [AI Transcript] provenance badge</span>
+                <span className="ai-chip">
+                  ✨ {result.proposed.length} value{result.proposed.length === 1 ? '' : 's'} found
+                </span>
+                <span className="extracted-note">
+                  Read by {result.provider}
+                  {result.failovers.length > 0 && ` (after ${result.failovers.map((f) => f.provider).join(', ')} failed)`}
+                  {' · '}applies with the [AI Transcript] badge
+                </span>
               </div>
+
+              {result.proposed.length === 0 && (
+                <p className="extracted-note">
+                  The transcript did not clearly answer any empty field. Nothing will be filled.
+                </p>
+              )}
+
               <div className="extracted-grid">
-                {Object.entries(extractedData).map(([k, val]) => (
-                  <div key={k} className="extracted-item">
-                    <span className="extracted-k">{k}</span>
-                    <span className="extracted-v">{val}</span>
+                {result.proposed.map((p) => (
+                  <div key={p.key} className="extracted-item" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '4px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                      <span className="extracted-k">{p.label}</span>
+                      <span className="extracted-v">
+                        {displayValue(p.value)}
+                        {p.confidence === 'medium' && <span title="The payer's words needed interpreting — check this one"> ⚠</span>}
+                      </span>
+                    </div>
+                    <span style={{ fontSize: '11px', color: 'var(--ink-soft)', fontStyle: 'italic' }}>“{p.evidence}”</span>
                   </div>
                 ))}
               </div>
+
+              {result.conflicts.length > 0 && (
+                <div style={{ marginTop: '12px' }}>
+                  <span className="extracted-note">Not applied — the VOB already has a different value:</span>
+                  {result.conflicts.map((c) => (
+                    <div key={c.key} className="extracted-item">
+                      <span className="extracted-k">{c.label}</span>
+                      <span className="extracted-v">
+                        {displayValue(c.current)} → {displayValue(c.value)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {result.stillToAsk.length > 0 && (
+                <p className="extracted-note" style={{ marginTop: '12px' }}>
+                  Still to ask: {result.stillToAsk.join(', ')}
+                </p>
+              )}
             </div>
           )}
         </div>
 
         <div className="drawer-footer">
           <button type="button" className="btn ghost" onClick={onClose}>Cancel</button>
-          {!extractedData ? (
+          {!result ? (
             <button
               type="button"
               className="btn"
               onClick={handleExtract}
               disabled={isProcessing || !transcript.trim()}
             >
-              {isProcessing ? 'Extracting Fields…' : 'Extract & Preview'}
+              {isProcessing ? 'Reading…' : error ? 'Try Again' : 'Extract & Preview'}
             </button>
           ) : (
             <button
@@ -186,8 +230,9 @@ export function AiTranscriptDrawer({ isOpen, onClose, vobId, onApplyFields }) {
               className="btn"
               style={{ background: '#16a34a', borderColor: '#16a34a' }}
               onClick={handleApply}
+              disabled={result.proposed.length === 0}
             >
-              Apply to VOB Form (Safe Fill)
+              Apply {result.proposed.length} to VOB Form (Empty Fields Only)
             </button>
           )}
         </div>
