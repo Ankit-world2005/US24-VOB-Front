@@ -90,7 +90,7 @@ export function AiTranscriptDrawer({ isOpen, onClose, vobId, onApplyFields }) {
       <div className="drawer-panel" onClick={(e) => e.stopPropagation()}>
         <div className="drawer-header">
           <div>
-            <div className="drawer-eyebrow">Transcript Extraction (Groq AI)</div>
+            <div className="drawer-eyebrow">Transcript Extraction With Ai </div>
             <h2 className="drawer-title">AI Transcript Auto-Fill</h2>
           </div>
           <button type="button" className="drawer-close-btn" onClick={onClose}>✕</button>
@@ -157,7 +157,7 @@ export function AiTranscriptDrawer({ isOpen, onClose, vobId, onApplyFields }) {
           {isProcessing && (
             <div className="ai-progress-wrap">
               <div className="ai-progress-bar" style={{ width: '100%' }} />
-              <span className="ai-progress-text">Reading transcript with Groq AI… verifying quotes & payer statements.</span>
+              <span className="ai-progress-text">Reading transcript with  AI… verifying quotes & payer statements.</span>
             </div>
           )}
 
@@ -273,7 +273,7 @@ export function AiTranscriptDrawer({ isOpen, onClose, vobId, onApplyFields }) {
               onClick={handleExtract}
               disabled={isProcessing || !transcript.trim()}
             >
-              {isProcessing ? 'Reading with Groq…' : error ? 'Try Again' : 'Extract & Preview'}
+              {isProcessing ? 'Reading with AI ' : error ? 'Try Again' : 'Extract & Preview'}
             </button>
           ) : (
             <>
