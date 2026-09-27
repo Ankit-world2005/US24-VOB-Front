@@ -12,11 +12,11 @@ const HOST = process.env.HOST || '0.0.0.0';
 // In-memory database initialized from DB/vobs.json if present
 let vobsDb = [];
 let usersDb = [
-  { id: 'usr_01', email: 'rohit.k@us24solutions.com', name: 'Rohit Kumar', role: 'specialist' },
-  { id: 'usr_02', email: 'anita.s@us24solutions.com', name: 'Anita Sharma', role: 'specialist' },
-  { id: 'usr_03', email: 'auth@us24solutions.com', name: 'Auth Specialist', role: 'auth' },
-  { id: 'usr_04', email: 'saurabh@us24solutions.com', name: 'Saurabh Admin', role: 'admin' },
-  { id: 'usr_05', email: 'admin@us24solutions.com', name: 'System Admin', role: 'admin' }
+  { id: 'usr_01', email: 'rohit.k@us24solutions.com', name: 'Rohit Kumar', role: 'specialist', assignedClients: ['parker'], status: 'active' },
+  { id: 'usr_02', email: 'anita.s@us24solutions.com', name: 'Anita Sharma', role: 'specialist', assignedClients: ['arra'], status: 'active' },
+  { id: 'usr_03', email: 'auth@us24solutions.com', name: 'Auth Specialist', role: 'auth', assignedClients: ['all'], status: 'active' },
+  { id: 'usr_04', email: 'saurabh@us24solutions.com', name: 'Saurabh Admin', role: 'admin', assignedClients: ['all'], status: 'active' },
+  { id: 'usr_05', email: 'admin@us24solutions.com', name: 'System Admin', role: 'admin', assignedClients: ['all'], status: 'active' }
 ];
 
 function loadSeedData() {
@@ -634,10 +634,24 @@ const server = http.createServer(async (req, res) => {
     }
 
     // -------------------------------------------------------------
-    // 7. Users collection: GET /api/v1/users
+    // 7. Users collection: GET /api/v1/users & PATCH /api/v1/users/:id
     // -------------------------------------------------------------
     if (pathname === '/api/v1/users' && method === 'GET') {
       sendJson(res, 200, { data: usersDb });
+      logDone(200);
+      return;
+    }
+
+    if (pathname.startsWith('/api/v1/users/') && method === 'PATCH') {
+      const userId = pathname.replace('/api/v1/users/', '');
+      const user = usersDb.find(u => u.id === userId || u.email === userId);
+      if (!user) {
+        sendJson(res, 404, { error: { code: 'not_found', message: `User ${userId} not found` } });
+        logDone(404);
+        return;
+      }
+      Object.assign(user, body);
+      sendJson(res, 200, user);
       logDone(200);
       return;
     }

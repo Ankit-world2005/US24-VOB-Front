@@ -2,8 +2,12 @@ import { apiClient } from './client';
 
 export const usersApi = {
   // GET /users
-  getUsers() {
-    return apiClient.request({ path: '/api/v1/users' });
+  async getUsers() {
+    const res = await apiClient.request({ path: '/api/v1/users' });
+    if (Array.isArray(res)) return res;
+    if (Array.isArray(res?.data)) return res.data;
+    if (Array.isArray(res?.users)) return res.users;
+    return [];
   },
 
   // POST /users
