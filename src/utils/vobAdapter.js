@@ -220,6 +220,38 @@ export function normalizeSingleVob(raw) {
     normalized[snakeKey] = val !== null && val !== undefined ? val : '';
   }
 
+  // Normalize boolean / option fields for UI dropdowns
+  const isAuth = fields.authorization_required ?? raw.authorization_required ?? raw.authTreatment;
+  if (isAuth === true || isAuth === 'YES' || isAuth === 'yes') {
+    normalized.authTreatment = 'YES';
+    normalized.authInitialEval = 'YES';
+    normalized.authorizationRequired = 'YES';
+    normalized.authorization_required = true;
+  } else if (isAuth === false || isAuth === 'NO' || isAuth === 'no') {
+    normalized.authTreatment = 'NO';
+    normalized.authInitialEval = 'NO';
+    normalized.authorizationRequired = 'NO';
+    normalized.authorization_required = false;
+  }
+
+  const isRef = fields.referral_required ?? raw.referral_required ?? raw.referral;
+  if (isRef === true || isRef === 'YES' || isRef === 'yes') {
+    normalized.referral = 'YES';
+    normalized.referralRequired = 'YES';
+    normalized.referral_required = true;
+  } else if (isRef === false || isRef === 'NO' || isRef === 'no') {
+    normalized.referral = 'NO';
+    normalized.referralRequired = 'NO';
+    normalized.referral_required = false;
+  }
+
+  const netStatus = fields.network_status || raw.network_status || raw.networkStatus;
+  if (netStatus) {
+    const s = String(netStatus).toUpperCase();
+    if (s.includes('IN') && !s.includes('OUT')) normalized.networkStatus = 'IN-NETWORK';
+    else if (s.includes('OUT')) normalized.networkStatus = 'OUT-OF-NETWORK';
+  }
+
   // Also map existing top-level properties if present
   for (const [camelKey, snakeKey] of Object.entries(FIELD_KEY_MAP)) {
     if (normalized[camelKey] === undefined && raw[camelKey] !== undefined) {
@@ -408,6 +440,22 @@ export function toBackendPatchPayload(formData, version, options = {}) {
 
     // Default string / number field handling
     fields[snakeKey] = (val === '' || val === undefined) ? null : val;
+  }
+
+  // Explicitly handle authorization_required based on any authorization field
+  const authCandidates = [formData.authTreatment, formData.authInitialEval, formData.authorizationRequired, formData.authorization_required];
+  if (authCandidates.some(v => v === true || (typeof v === 'string' && ['YES', 'TRUE'].includes(v.trim().toUpperCase())))) {
+    fields['authorization_required'] = true;
+  } else if (authCandidates.some(v => v === false || (typeof v === 'string' && ['NO', 'FALSE'].includes(v.trim().toUpperCase())))) {
+    fields['authorization_required'] = false;
+  }
+
+  // Explicitly handle referral_required based on referral fields
+  const refCandidates = [formData.referral, formData.referralRequired, formData.referral_required];
+  if (refCandidates.some(v => v === true || (typeof v === 'string' && ['YES', 'TRUE'].includes(v.trim().toUpperCase())))) {
+    fields['referral_required'] = true;
+  } else if (refCandidates.some(v => v === false || (typeof v === 'string' && ['NO', 'FALSE'].includes(v.trim().toUpperCase())))) {
+    fields['referral_required'] = false;
   }
 
   return {

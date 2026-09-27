@@ -132,7 +132,8 @@ export function VerificationFormView() {
       const status = (result.status || '').toLowerCase();
       if (status === 'error') {
         setFailingRules(result.failingRules || []);
-        showToast("Validation failed. Check highlighted errors and resubmit.", "error");
+        showToast("Validation failed. Incomplete fields moved to Error Queue.", "error");
+        setActiveTab('error_queue');
       } else if (status === 'auth_queue' || status === 'auth queue') {
         showToast("Prior Authorization required! VOB moved to Auth Queue.", "info");
         setActiveTab('auth_queue');

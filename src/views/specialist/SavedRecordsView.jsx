@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { DataError } from '../../components/DataError';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { vobsApi } from '../../api/vobs';
@@ -92,9 +92,9 @@ export function SavedRecordsView() {
                           type="button"
                           className="btn-action-link"
                           onClick={() => openVerification(v.id)}
+                          title="Edit saved record"
                         >
-                          Inspect
-                        </button>
+                          Edit / Open</button>
                       </div>
                     </td>
                   </tr>
@@ -113,3 +113,5 @@ export function SavedRecordsView() {
     </div>
   );
 }
+
+
