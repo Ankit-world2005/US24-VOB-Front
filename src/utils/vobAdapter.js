@@ -21,9 +21,10 @@ export const FIELD_KEY_MAP = {
   groupNo: 'group_no',
   
   // Coverage & Network
-  serviceType: 'service_type',
-  planType: 'plan_type',
-  planName: 'plan_name',
+  serviceType: 'appointment_type',
+  appointmentType: 'appointment_type',
+  planType: 'plan_type_and_name',
+  planName: 'plan_type_and_name',
   planTypeAndName: 'plan_type_and_name',
   networkStatus: 'network_status',
   inNetworkGroup: 'in_network_group',
@@ -33,9 +34,10 @@ export const FIELD_KEY_MAP = {
   hsaHraAmt: 'hsa_hra_amt',
   
   // Cost Sharing
-  copay: 'copay',
-  copayAmount: 'copay_amount',
+  copay: 'copay_coins',
+  copayAmount: 'copay_coins',
   copayCoinsurance: 'copay_coins',
+  copayCoins: 'copay_coins',
   deductibleApplicable: 'deductible_applicable',
   deductibleIndividual: 'deductible_individual',
   deductibleMet: 'deductible_met',
@@ -50,9 +52,10 @@ export const FIELD_KEY_MAP = {
   
   // Authorization & Referral
   authorizationRequired: 'authorization_required',
-  authInitialEval: 'auth_initial_eval',
-  authTreatment: 'auth_treatment',
-  referral: 'referral',
+  authInitialEval: 'authorization_required',
+  authTreatment: 'authorization_required',
+  referral: 'referral_required',
+  referralRequired: 'referral_required',
   pcpReferral: 'pcp_referral',
   howToObtainAuth: 'how_to_obtain_auth',
   authRequestTat: 'auth_request_tat',
@@ -69,7 +72,10 @@ export const FIELD_KEY_MAP = {
   
   // Claims
   claimMailingAddress: 'claim_mailing_address',
-  payerId: 'payer_id',
+  payerId: 'payer_id_claims',
+  payerIdClaims: 'payer_id_claims',
+  idCard: 'id_card_ref',
+  policyId: 'id_card_ref',
   tflDaysClaims: 'tfl_days_claims',
   tflCorrectedClaims: 'tfl_corrected_claims',
   
@@ -88,10 +94,20 @@ export const FIELD_KEY_MAP = {
 };
 
 // Reverse map: snake_case -> camelCase
-export const REVERSE_FIELD_KEY_MAP = Object.entries(FIELD_KEY_MAP).reduce((acc, [camel, snake]) => {
-  acc[snake] = camel;
-  return acc;
-}, {});
+export const REVERSE_FIELD_KEY_MAP = {
+  ...Object.entries(FIELD_KEY_MAP).reduce((acc, [camel, snake]) => {
+    acc[snake] = camel;
+    return acc;
+  }, {}),
+  plan_type_and_name: 'planType',
+  authorization_required: 'authTreatment',
+  referral_required: 'referral',
+  appointment_type: 'serviceType',
+  payer_id_claims: 'payerId',
+  id_card_ref: 'idCard',
+  copay_coins: 'copayCoinsurance',
+  call_or_website: 'callWebsite'
+};
 
 // Status mapping between backend snake_case and UI display
 export const STATUS_MAP_TO_UI = {
@@ -238,24 +254,56 @@ export function normalizeExtraction(res) {
   const formKey = (field) => REVERSE_FIELD_KEY_MAP[field] || field;
   const ownFields = (items) => (items || []).filter((i) => !String(i.field).startsWith('extra.'));
 
-  const proposed = ownFields(res?.proposed).map((p) => ({
-    key: formKey(p.field),
-    label: p.label,
-    value: p.value,
-    confidence: p.confidence,
-    evidence: p.evidence,
-    status: p.status || 'FOUND',
-    source: p.source || 'payer_rep',
-    isSafe: p.isSafe !== undefined ? p.isSafe : p.confidence === 'high',
-    validationError: p.validationError || null
-  }));
+  const formatSelectVal = (key, val) => {
+    if (val === null || val === undefined) return val;
+    // Format boolean / yes-no fields for UI dropdowns
+    if (['authTreatment', 'authorizationRequired', 'authInitialEval', 'referral', 'referralRequired', 'deductibleApplicable', 'copay', 'copayCoinsurance', 'secondary', 'secondaryYesNo'].includes(key)) {
+      if (val === true || String(val).toLowerCase() === 'yes' || String(val).toLowerCase() === 'true') return 'YES';
+      if (val === false || String(val).toLowerCase() === 'no' || String(val).toLowerCase() === 'false') return 'NO';
+    }
+    // Format network status for UI dropdown
+    if (key === 'networkStatus') {
+      const s = String(val).toUpperCase();
+      if (s.includes('IN') && !s.includes('OUT')) return 'IN-NETWORK';
+      if (s.includes('OUT')) return 'OUT-OF-NETWORK';
+    }
+    // Format plan type for UI dropdown
+    if (key === 'planType' || key === 'planTypeAndName') {
+      const known = ['PPO', 'HMO', 'EPO', 'POS', 'Indemnity', 'Medicare', 'Medicaid'];
+      const match = known.find(k => k.toLowerCase() === String(val).toLowerCase());
+      if (match) return match;
+    }
+    return val;
+  };
+
+  const proposed = ownFields(res?.proposed).map((p) => {
+    const k = formKey(p.field);
+    const formattedVal = formatSelectVal(k, p.value);
+    return {
+      key: k,
+      label: p.label,
+      value: formattedVal,
+      confidence: p.confidence,
+      evidence: p.evidence,
+      status: p.status || 'FOUND',
+      source: p.source || 'payer_rep',
+      isSafe: p.isSafe !== undefined ? p.isSafe : p.confidence === 'high',
+      validationError: p.validationError || null
+    };
+  });
 
   return {
     provider: res?.provider || 'unknown',
     failovers: res?.failovers || [],
     quality: res?.quality || { classification: 'human', warning: null },
     proposed,
-    fields: Object.fromEntries(proposed.map((p) => [p.key, p.value])),
+    fields: {
+      ...Object.fromEntries(proposed.map((p) => [p.key, p.value])),
+      // Populate canonical aliases so both the UI form and backend payload get populated
+      ...(proposed.some(p => p.key === 'planType') ? { planTypeAndName: proposed.find(p => p.key === 'planType').value } : {}),
+      ...(proposed.some(p => p.key === 'authTreatment') ? { authorizationRequired: proposed.find(p => p.key === 'authTreatment').value, authInitialEval: proposed.find(p => p.key === 'authTreatment').value } : {}),
+      ...(proposed.some(p => p.key === 'referral') ? { referralRequired: proposed.find(p => p.key === 'referral').value } : {})
+    },
     conflicts: ownFields(res?.conflicts).map((c) => ({
       key: formKey(c.field),
       label: c.label,
@@ -278,28 +326,88 @@ export function normalizeExtraction(res) {
 /**
  * Prepares payload for PATCH /api/v1/vobs/:id from form changes
  */
+const CANONICAL_BACKEND_FIELDS = new Set([
+  'dos',
+  'appointment_type',
+  'insurance',
+  'plan_type_and_name',
+  'group_no',
+  'coverage_order',
+  'coverage_status',
+  'network_status',
+  'in_network_group',
+  'in_network_individual',
+  'in_network_both',
+  'authorization_required',
+  'referral_required',
+  'auth_request_tat',
+  'deductible_applicable',
+  'copay_coins',
+  'visits_limitation',
+  'initial_dos',
+  'vob_status_text',
+  'dos_over_15_days_new_pt',
+  'payer_id_claims',
+  'insurance_phone',
+  'call_or_website',
+  'id_card_ref',
+  'dialed_time',
+  'auth_number',
+  'auth_valid_from',
+  'auth_valid_to'
+]);
+
+const DATE_FIELDS = new Set(['dos', 'initial_dos', 'auth_valid_from', 'auth_valid_to']);
+const BOOLEAN_FIELDS = new Set(['authorization_required', 'referral_required', 'in_network_group', 'in_network_individual', 'in_network_both', 'dos_over_15_days_new_pt']);
+
 export function toBackendPatchPayload(formData, version, options = {}) {
   const fields = {};
   const extra = { ...(options.extra || {}) };
   const confirm = [...(options.confirm || [])];
 
-  for (const [camelKey, val] of Object.entries(formData)) {
-    // Skip internal UI metadata
-    if (['id', 'version', 'status', 'vobStatus', 'client', 'client_id', 'provenance', 'sources', 'failures', 'failingRules', 'format', 'extra'].includes(camelKey)) {
+  for (const [camelKey, val] of Object.entries(formData || {})) {
+    // Check if it's an extra key from the client format
+    if (String(camelKey).startsWith('extra.')) {
+      extra[camelKey.replace(/^extra./, '')] = val;
       continue;
     }
 
     const snakeKey = FIELD_KEY_MAP[camelKey] || camelKey;
-    
-    // Server does not accept vob_completion_date in PATCH
-    if (snakeKey === 'vob_completion_date') continue;
 
-    // Convert booleans for authorization_required
-    if (snakeKey === 'authorization_required' && typeof val === 'string') {
-      fields[snakeKey] = val.toUpperCase() === 'YES' || val.toUpperCase() === 'TRUE';
-    } else {
-      fields[snakeKey] = val === '' ? null : val;
+    // Strict validation: Only send valid canonical fields in the fields object
+    if (!CANONICAL_BACKEND_FIELDS.has(snakeKey)) {
+      continue;
     }
+
+    // Format boolean fields (handles string 'YES'/'NO', booleans, and nulls)
+    if (BOOLEAN_FIELDS.has(snakeKey)) {
+      if (typeof val === 'boolean') {
+        fields[snakeKey] = val;
+      } else if (typeof val === 'string' && val.trim().length > 0) {
+        const upper = val.trim().toUpperCase();
+        fields[snakeKey] = upper === 'YES' || upper === 'TRUE';
+      } else {
+        fields[snakeKey] = null;
+      }
+      continue;
+    }
+
+    // Format date fields as YYYY-MM-DD (backend Zod rejects full ISO timestamps like 2026-10-01T00:00:00.000Z)
+    if (DATE_FIELDS.has(snakeKey)) {
+      if (!val || val === '') {
+        fields[snakeKey] = null;
+      } else if (typeof val === 'string') {
+        fields[snakeKey] = val.slice(0, 10);
+      } else if (val instanceof Date) {
+        fields[snakeKey] = val.toISOString().slice(0, 10);
+      } else {
+        fields[snakeKey] = null;
+      }
+      continue;
+    }
+
+    // Default string / number field handling
+    fields[snakeKey] = (val === '' || val === undefined) ? null : val;
   }
 
   return {
