@@ -243,12 +243,17 @@ export function normalizeExtraction(res) {
     label: p.label,
     value: p.value,
     confidence: p.confidence,
-    evidence: p.evidence
+    evidence: p.evidence,
+    status: p.status || 'FOUND',
+    source: p.source || 'payer_rep',
+    isSafe: p.isSafe !== undefined ? p.isSafe : p.confidence === 'high',
+    validationError: p.validationError || null
   }));
 
   return {
     provider: res?.provider || 'unknown',
     failovers: res?.failovers || [],
+    quality: res?.quality || { classification: 'human', warning: null },
     proposed,
     fields: Object.fromEntries(proposed.map((p) => [p.key, p.value])),
     conflicts: ownFields(res?.conflicts).map((c) => ({
@@ -256,11 +261,17 @@ export function normalizeExtraction(res) {
       label: c.label,
       current: c.current,
       value: c.value,
-      evidence: c.evidence
+      confidence: c.confidence,
+      evidence: c.evidence,
+      status: c.status || 'CONFLICTING',
+      source: c.source || 'payer_rep',
+      conflictType: c.conflictType || 'existing_value'
     })),
-    stillToAsk: ownFields(res?.skipped)
-      .filter((s) => s.reason === 'not_found')
-      .map((s) => s.label)
+    stillToAsk: res?.stillToAsk && Array.isArray(res.stillToAsk) && res.stillToAsk.length > 0
+      ? res.stillToAsk
+      : ownFields(res?.skipped)
+          .filter((s) => s.reason === 'not_found')
+          .map((s) => s.label)
   };
 }
 
