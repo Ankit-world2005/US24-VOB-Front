@@ -169,6 +169,159 @@ export function normalizeVobListItem(item) {
 }
 
 /**
+ * Where each field of the VOB form (src/DB/form_fields.json) lives in the API:
+ * a canonical `fields` key, or an `extra` key — the backend's PT template
+ * (src/features/vobs/template.ts in the API repo), which every VOB accepts.
+ *
+ * One table for loading, saving and applying AI proposals, so a field saves to
+ * the same place it loads from. `yesNo` fields show as "YES"/"NO": canonical
+ * ones are booleans in the API ('bool'), the rest are kept as text ('text').
+ * Patient name and DOB come from intake and are read-only here; "PAT" and
+ * "Today's Date" are not stored.
+ */
+export const FORM_FIELDS = {
+  additionalInfo: { extra: 'additional_info' },
+  insurance: { field: 'insurance' },
+  insurancePhone: { field: 'insurance_phone' },
+  idCard: { field: 'id_card_ref' },
+  groupNo: { field: 'group_no' },
+  serviceType: { field: 'appointment_type' },
+  planType: { field: 'plan_type_and_name' },
+  networkStatus: { field: 'network_status', network: true },
+  coverageStatus: { field: 'coverage_status' },
+  effectiveDate: { extra: 'effective_date' },
+  terminationDate: { extra: 'termination_date' },
+  hsaHraAmt: { extra: 'hsa_hra_amt' },
+  copay: { extra: 'copay', yesNo: 'text' },
+  copayAmount: { field: 'copay_coins' },
+  deductibleApplicable: { field: 'deductible_applicable', yesNo: 'text' },
+  deductibleIndividual: { extra: 'deductible_individual' },
+  deductibleMet: { extra: 'deductible_met' },
+  deductibleRemaining: { extra: 'deductible_remaining' },
+  copayCoinsurance: { extra: 'coinsurance', yesNo: 'text' },
+  coinsuranceCovered: { extra: 'coinsurance_covered' },
+  outOfPocket: { extra: 'out_of_pocket' },
+  oopMet: { extra: 'oop_met' },
+  oopRemaining: { extra: 'oop_remaining' },
+  visitsLimitation: { field: 'visits_limitation' },
+  visitsUsed: { extra: 'visits_used' },
+  authInitialEval: { extra: 'auth_initial_eval', yesNo: 'text' },
+  authTreatment: { field: 'authorization_required', yesNo: 'bool' },
+  referral: { field: 'referral_required', yesNo: 'bool' },
+  pcpReferral: { extra: 'pcp_referral', yesNo: 'text' },
+  howToObtainAuth: { extra: 'how_to_obtain_auth' },
+  authRequestTat: { field: 'auth_request_tat' },
+  authNumber: { field: 'auth_number' },
+  authCoverageDates: { extra: 'auth_coverage_dates' },
+  primary: { field: 'coverage_order' },
+  secondary: { extra: 'secondary', yesNo: 'text' },
+  insuranceRep: { extra: 'insurance_rep' },
+  callReference: { extra: 'call_reference' },
+  claimMailingAddress: { extra: 'claim_mailing_address' },
+  payerId: { field: 'payer_id_claims' },
+  tflDaysClaims: { extra: 'tfl_days_claims' },
+  tflCorrectedClaims: { extra: 'tfl_corrected_claims' },
+  secondaryYesNo: { extra: 'secondary_yes_no', yesNo: 'text' },
+  secondaryInsName: { extra: 'secondary_ins_name' },
+  secondaryPlanName: { extra: 'secondary_plan_name' },
+  secondaryPolicyId: { extra: 'secondary_policy_id' },
+  secondaryEffectiveDate: { extra: 'secondary_effective_date' },
+  secondaryDeductible: { extra: 'secondary_deductible' },
+  secondaryVisitLimit: { extra: 'secondary_visit_limit' },
+  secondaryUsedLimit: { extra: 'secondary_used_limit' }
+};
+
+/**
+ * Canonical fields the form does not show. An AI proposal for one is kept under
+ * its own key and saved once filled; the form never clears one.
+ */
+const HIDDEN_FIELDS = {
+  dos: 'date',
+  initial_dos: 'date',
+  auth_valid_from: 'date',
+  auth_valid_to: 'date',
+  dialed_time: 'timestamp',
+  in_network_group: 'bool',
+  in_network_individual: 'bool',
+  in_network_both: 'bool',
+  dos_over_15_days_new_pt: 'bool',
+  vob_status_text: 'text',
+  call_or_website: 'text'
+};
+
+const FIELD_TO_FORM = Object.fromEntries(
+  Object.entries(FORM_FIELDS).filter(([, s]) => s.field).map(([k, s]) => [s.field, k])
+);
+const EXTRA_TO_FORM = Object.fromEntries(
+  Object.entries(FORM_FIELDS).filter(([, s]) => s.extra).map(([k, s]) => [s.extra, k])
+);
+
+/** The form key an API field (`group_no`, `extra.oop_met`) shows under, or null when the form has none. */
+export function formKeyFor(apiField) {
+  const key = String(apiField);
+  if (key.startsWith('extra.')) return EXTRA_TO_FORM[key.slice('extra.'.length)] || null;
+  if (FIELD_TO_FORM[key]) return FIELD_TO_FORM[key];
+  return HIDDEN_FIELDS[key] ? key : null;
+}
+
+/** A value as a YES/NO select shows it; anything else is kept as it is. */
+function toYesNo(value) {
+  if (value === true) return 'YES';
+  if (value === false) return 'NO';
+  if (value === null || value === undefined) return '';
+  const s = String(value).trim();
+  if (/^(y|yes|true)\b/i.test(s)) return 'YES';
+  if (/^(n|no|false|none|n\/?a)\b|not\s+appl|does\s+not/i.test(s)) return 'NO';
+  return value;
+}
+
+function toNetwork(value) {
+  const s = String(value ?? '').toUpperCase();
+  if (s.includes('OUT')) return 'OUT-OF-NETWORK';
+  if (s.includes('IN')) return 'IN-NETWORK';
+  return value ?? '';
+}
+
+/** A form field's value as the form shows it. */
+function toFormValue(spec, value) {
+  if (spec.yesNo) return toYesNo(value);
+  if (spec.network && value) return toNetwork(value);
+  return value === null || value === undefined ? '' : value;
+}
+
+const sameFormValue = (a, b) => String(a ?? '') === String(b ?? '');
+
+/**
+ * A form value as the API takes it, or undefined when it cannot be sent as
+ * that field's type — the whole save would be refused for one bad value.
+ */
+function toApiValue(type, value) {
+  if (value === '' || value === null || value === undefined) return null;
+  switch (type) {
+    case 'bool': {
+      const yn = toYesNo(value);
+      return yn === 'YES' ? true : yn === 'NO' ? false : undefined;
+    }
+    case 'yesNoText': {
+      const yn = toYesNo(value);
+      return yn === 'YES' || yn === 'NO' ? yn : String(value);
+    }
+    case 'date': {
+      const s = value instanceof Date ? value.toISOString() : String(value);
+      return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : undefined;
+    }
+    case 'timestamp':
+      return /^\d{4}-\d{2}-\d{2}T/.test(String(value)) && !Number.isNaN(Date.parse(value))
+        ? String(value)
+        : undefined;
+    default:
+      return typeof value === 'string' ? value : String(value);
+  }
+}
+
+const specType = (spec) => (spec.yesNo === 'bool' ? 'bool' : spec.yesNo === 'text' ? 'yesNoText' : 'text');
+
+/**
  * Normalizes a single full VOB from GET /api/v1/vobs/:id
  */
 export function normalizeSingleVob(raw) {
@@ -259,10 +412,27 @@ export function normalizeSingleVob(raw) {
     }
   }
 
+  // Every form field from the one table, last, so it wins over the loose
+  // copies above. `__loaded` is what the form showed on load: saving sends
+  // only what differs from it.
+  const extra = raw.extra || {};
+  const loaded = {};
+  for (const [formKey, spec] of Object.entries(FORM_FIELDS)) {
+    const value = toFormValue(spec, spec.field ? fields[spec.field] : extra[spec.extra]);
+    normalized[formKey] = value;
+    loaded[formKey] = value;
+  }
+  for (const key of Object.keys(HIDDEN_FIELDS)) {
+    const value = fields[key] ?? '';
+    normalized[key] = value;
+    loaded[key] = value;
+  }
+  normalized.__loaded = loaded;
+
   // Map sources to provenance object for UI badges
   if (sources && Object.keys(sources).length > 0) {
     for (const [field, src] of Object.entries(sources)) {
-      const camelKey = REVERSE_FIELD_KEY_MAP[field] || field;
+      const camelKey = formKeyFor(field) || REVERSE_FIELD_KEY_MAP[field] || field;
       normalized.provenance[camelKey] = { source: src.source, date: src.source_date, confirmed: src.confirmed };
       normalized.provenance[field] = normalized.provenance[camelKey];
     }
@@ -274,33 +444,26 @@ export function normalizeSingleVob(raw) {
 /**
  * The form's view of POST /api/v1/vobs/:id/extract.
  *
- * Field keys follow the same rule as normalizeSingleVob(), so a proposed value
- * lands on the key the form already renders. Client-specific `extra.*` columns
- * are left out: the form keeps those in `extra`, not as fields.
+ * Field keys come from FORM_FIELDS, as in normalizeSingleVob(), so a proposed
+ * value lands on the key the form renders — `extra.oop_met` on "Met Amount",
+ * `authorization_required` on "Is Authorization Required for Treatment". A
+ * client's own `extra.*` column with no field on this form is left out.
  *
  * `fields` is what applying writes; the rest is for the specialist to read:
  * each value's evidence and confidence, values that contradict the VOB, and
  * what the call did not answer.
  */
 export function normalizeExtraction(res) {
-  const formKey = (field) => REVERSE_FIELD_KEY_MAP[field] || field;
-  const ownFields = (items) => (items || []).filter((i) => !String(i.field).startsWith('extra.'));
+  const formKey = formKeyFor;
+  const ownFields = (items) => (items || []).filter((i) => formKeyFor(i.field) !== null);
 
   const formatSelectVal = (key, val) => {
     if (val === null || val === undefined) return val;
-    // Format boolean / yes-no fields for UI dropdowns
-    if (['authTreatment', 'authorizationRequired', 'authInitialEval', 'referral', 'referralRequired', 'deductibleApplicable', 'copay', 'copayCoinsurance', 'secondary', 'secondaryYesNo'].includes(key)) {
-      if (val === true || String(val).toLowerCase() === 'yes' || String(val).toLowerCase() === 'true') return 'YES';
-      if (val === false || String(val).toLowerCase() === 'no' || String(val).toLowerCase() === 'false') return 'NO';
-    }
-    // Format network status for UI dropdown
-    if (key === 'networkStatus') {
-      const s = String(val).toUpperCase();
-      if (s.includes('IN') && !s.includes('OUT')) return 'IN-NETWORK';
-      if (s.includes('OUT')) return 'OUT-OF-NETWORK';
-    }
+    const spec = FORM_FIELDS[key];
+    // Yes/no and network fields show as their dropdowns do
+    if (spec && (spec.yesNo || spec.network)) return toFormValue(spec, val);
     // Format plan type for UI dropdown
-    if (key === 'planType' || key === 'planTypeAndName') {
+    if (key === 'planType') {
       const known = ['PPO', 'HMO', 'EPO', 'POS', 'Indemnity', 'Medicare', 'Medicaid'];
       const match = known.find(k => k.toLowerCase() === String(val).toLowerCase());
       if (match) return match;
@@ -329,13 +492,7 @@ export function normalizeExtraction(res) {
     failovers: res?.failovers || [],
     quality: res?.quality || { classification: 'human', warning: null },
     proposed,
-    fields: {
-      ...Object.fromEntries(proposed.map((p) => [p.key, p.value])),
-      // Populate canonical aliases so both the UI form and backend payload get populated
-      ...(proposed.some(p => p.key === 'planType') ? { planTypeAndName: proposed.find(p => p.key === 'planType').value } : {}),
-      ...(proposed.some(p => p.key === 'authTreatment') ? { authorizationRequired: proposed.find(p => p.key === 'authTreatment').value, authInitialEval: proposed.find(p => p.key === 'authTreatment').value } : {}),
-      ...(proposed.some(p => p.key === 'referral') ? { referralRequired: proposed.find(p => p.key === 'referral').value } : {})
-    },
+    fields: Object.fromEntries(proposed.map((p) => [p.key, p.value])),
     conflicts: ownFields(res?.conflicts).map((c) => ({
       key: formKey(c.field),
       label: c.label,
@@ -356,112 +513,42 @@ export function normalizeExtraction(res) {
 }
 
 /**
- * Prepares payload for PATCH /api/v1/vobs/:id from form changes
+ * The PATCH /api/v1/vobs/:id body for what the specialist changed on the form.
+ *
+ * Only fields that differ from what loaded (`__loaded`, set by
+ * normalizeSingleVob) are sent, each to where FORM_FIELDS says it lives, so a
+ * save never clears or re-stamps a field nobody touched. Hidden canonical
+ * fields (an applied AI proposal the form does not show) are sent once filled.
+ *
+ * `authorization_required` routes a VOB to the auth queue. As the form has
+ * always saved it, it is YES when the initial eval or the treatment needs auth.
  */
-const CANONICAL_BACKEND_FIELDS = new Set([
-  'dos',
-  'appointment_type',
-  'insurance',
-  'plan_type_and_name',
-  'group_no',
-  'coverage_order',
-  'coverage_status',
-  'network_status',
-  'in_network_group',
-  'in_network_individual',
-  'in_network_both',
-  'authorization_required',
-  'referral_required',
-  'auth_request_tat',
-  'deductible_applicable',
-  'copay_coins',
-  'visits_limitation',
-  'initial_dos',
-  'vob_status_text',
-  'dos_over_15_days_new_pt',
-  'payer_id_claims',
-  'insurance_phone',
-  'call_or_website',
-  'id_card_ref',
-  'dialed_time',
-  'auth_number',
-  'auth_valid_from',
-  'auth_valid_to'
-]);
-
-const DATE_FIELDS = new Set(['dos', 'initial_dos', 'auth_valid_from', 'auth_valid_to']);
-const BOOLEAN_FIELDS = new Set(['authorization_required', 'referral_required', 'in_network_group', 'in_network_individual', 'in_network_both', 'dos_over_15_days_new_pt']);
-
-export function toBackendPatchPayload(formData, version, options = {}) {
+export function toBackendPatchPayload(formData, version) {
+  const data = formData || {};
+  const loaded = data.__loaded || {};
+  const changed = (key) => data[key] !== undefined && !sameFormValue(data[key], loaded[key]);
   const fields = {};
-  const extra = { ...(options.extra || {}) };
-  const confirm = [...(options.confirm || [])];
+  const extra = {};
 
-  for (const [camelKey, val] of Object.entries(formData || {})) {
-    // Check if it's an extra key from the client format
-    if (String(camelKey).startsWith('extra.')) {
-      extra[camelKey.replace(/^extra./, '')] = val;
-      continue;
-    }
-
-    const snakeKey = FIELD_KEY_MAP[camelKey] || camelKey;
-
-    // Strict validation: Only send valid canonical fields in the fields object
-    if (!CANONICAL_BACKEND_FIELDS.has(snakeKey)) {
-      continue;
-    }
-
-    // Format boolean fields (handles string 'YES'/'NO', booleans, and nulls)
-    if (BOOLEAN_FIELDS.has(snakeKey)) {
-      if (typeof val === 'boolean') {
-        fields[snakeKey] = val;
-      } else if (typeof val === 'string' && val.trim().length > 0) {
-        const upper = val.trim().toUpperCase();
-        fields[snakeKey] = upper === 'YES' || upper === 'TRUE';
-      } else {
-        fields[snakeKey] = null;
-      }
-      continue;
-    }
-
-    // Format date fields as YYYY-MM-DD (backend Zod rejects full ISO timestamps like 2026-10-01T00:00:00.000Z)
-    if (DATE_FIELDS.has(snakeKey)) {
-      if (!val || val === '') {
-        fields[snakeKey] = null;
-      } else if (typeof val === 'string') {
-        fields[snakeKey] = val.slice(0, 10);
-      } else if (val instanceof Date) {
-        fields[snakeKey] = val.toISOString().slice(0, 10);
-      } else {
-        fields[snakeKey] = null;
-      }
-      continue;
-    }
-
-    // Default string / number field handling
-    fields[snakeKey] = (val === '' || val === undefined) ? null : val;
+  for (const [formKey, spec] of Object.entries(FORM_FIELDS)) {
+    if (!changed(formKey)) continue;
+    const value = toApiValue(specType(spec), data[formKey]);
+    if (value === undefined) continue;
+    if (spec.field) fields[spec.field] = value;
+    else extra[spec.extra] = value;
   }
 
-  // Explicitly handle authorization_required based on any authorization field
-  const authCandidates = [formData.authTreatment, formData.authInitialEval, formData.authorizationRequired, formData.authorization_required];
-  if (authCandidates.some(v => v === true || (typeof v === 'string' && ['YES', 'TRUE'].includes(v.trim().toUpperCase())))) {
-    fields['authorization_required'] = true;
-  } else if (authCandidates.some(v => v === false || (typeof v === 'string' && ['NO', 'FALSE'].includes(v.trim().toUpperCase())))) {
-    fields['authorization_required'] = false;
+  for (const [key, type] of Object.entries(HIDDEN_FIELDS)) {
+    if (!changed(key)) continue;
+    const value = toApiValue(type, data[key]);
+    if (value !== undefined && value !== null) fields[key] = value;
   }
 
-  // Explicitly handle referral_required based on referral fields
-  const refCandidates = [formData.referral, formData.referralRequired, formData.referral_required];
-  if (refCandidates.some(v => v === true || (typeof v === 'string' && ['YES', 'TRUE'].includes(v.trim().toUpperCase())))) {
-    fields['referral_required'] = true;
-  } else if (refCandidates.some(v => v === false || (typeof v === 'string' && ['NO', 'FALSE'].includes(v.trim().toUpperCase())))) {
-    fields['referral_required'] = false;
+  const answers = [data.authTreatment, data.authInitialEval].map(toYesNo);
+  const readable = answers.every((a) => a === 'YES' || a === 'NO' || a === '');
+  if ((changed('authTreatment') || changed('authInitialEval')) && readable) {
+    fields.authorization_required = answers.includes('YES') ? true : answers.includes('NO') ? false : null;
   }
 
-  return {
-    version,
-    fields,
-    extra,
-    confirm
-  };
+  return { version, fields, extra, confirm: [] };
 }
