@@ -50,8 +50,17 @@ export default defineConfig(({ mode }) => {
     ],
     build: {
       rollupOptions: {
-        input: path.resolve(__dirname, 'public/index.html')
+        input: path.resolve(__dirname, 'public/index.html'),
+        output: {
+          manualChunks: {
+            'vendor-react': ['react', 'react-dom'],
+            'vendor-xlsx': ['xlsx']
+          }
+        }
       }
+    },
+    optimizeDeps: {
+      include: ['react', 'react-dom', 'xlsx']
     },
     server: {
       port: 3000,

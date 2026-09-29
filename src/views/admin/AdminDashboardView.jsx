@@ -24,7 +24,7 @@ export function AdminDashboardView() {
     setLoadError('');
     Promise.all([
       dashboardApi.getSummary({ clientId: selectedClient }),
-      vobsApi.getVobs({ clientId: selectedClient }),
+      vobsApi.getVobs({ clientId: selectedClient, limit: 50 }),
       usersApi.getUsers().catch(() => [])
     ]).then(([sumData, vobsList, userList]) => {
       setSummary(sumData);

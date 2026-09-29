@@ -19,7 +19,7 @@ export function SpecialistDashboardView() {
     setLoadError('');
     Promise.all([
       dashboardApi.getSummary({ userEmail: currentUser.email }),
-      vobsApi.getVobs({ userEmail: currentUser.email })
+      vobsApi.getVobs({ assigneeId: currentUser.email, limit: 50 })
     ]).then(([sumData, list]) => {
       setSummary(sumData);
       setMyVobs(list);
