@@ -3,6 +3,7 @@ import { DataError } from '../../components/DataError';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { vobsApi } from '../../api/vobs';
 import { ClientBadge } from '../../components/vob/ClientBadge';
+import { ReassignModal } from '../../components/vob/ReassignModal';
 import { StatusBadge } from '../../components/vob/StatusBadge';
 
 export function AuthQueueView() {
@@ -11,6 +12,7 @@ export function AuthQueueView() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
+  const [reassignVob, setReassignVob] = useState(null);
   const [editingAuthId, setEditingAuthId] = useState(null);
   const [authInputs, setAuthInputs] = useState({ authNumber: '', authStartDate: '', authEndDate: '', notes: '' });
 
@@ -133,6 +135,14 @@ export function AuthQueueView() {
                           onClick={() => handleOpenAuthModal(v)}
                         >
                           Update Auth #
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-sm"
+                          style={{ background: 'transparent', border: '1px solid var(--rule, #cbd5e1)', color: 'var(--text, #1e293b)' }}
+                          onClick={() => setReassignVob(v)}
+                        >
+                          Reassign
                         </button>
                         <button
                           type="button"

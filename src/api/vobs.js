@@ -92,15 +92,20 @@ export const vobsApi = {
    */
   async patchVob(id, edits, version = 1, userEmail) {
     let payload;
-    if (edits && edits.fields !== undefined) {
+    if (edits && edits.fields !== undefined && !edits.patientName && !edits.insurance && !edits.status) {
+      const cleanFields = { ...(edits.fields || {}) };
+      delete cleanFields.vob_completion_date;
       payload = {
         version: edits.version !== undefined ? edits.version : version,
-        fields: edits.fields || {},
+        fields: cleanFields,
         extra: edits.extra || {},
         confirm: edits.confirm || []
       };
     } else {
       payload = toBackendPatchPayload(edits, version);
+      if (payload.fields) {
+        delete payload.fields.vob_completion_date;
+      }
     }
 
     return apiClient.request({
@@ -208,6 +213,22 @@ export const vobsApi = {
   /**
    * GET /api/v1/audit - All audit logs (Admin only)
    */
+  /**
+   * POST /api/v1/vobs/:id/reassign - Reassign an assigned/error/auth task
+   * Body: { assignee_id, reason, version }
+   */
+  async reassignVob(id, { assignee_id, assigneeId, reason, version = 1 } = {}) {
+    return apiClient.request({
+      path: `/api/v1/vobs/${id}/reassign`,
+      method: 'POST',
+      data: {
+        assignee_id: assignee_id || assigneeId,
+        reason: reason || undefined,
+        version: version || 1
+      }
+    });
+  },
+
   getAllAuditLogs() {
     return apiClient.request({
       path: '/api/v1/audit'

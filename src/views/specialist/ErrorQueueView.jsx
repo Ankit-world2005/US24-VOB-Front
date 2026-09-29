@@ -4,6 +4,7 @@ import { useWorkspace } from '../../context/WorkspaceContext';
 import { vobsApi } from '../../api/vobs';
 import { ClientBadge } from '../../components/vob/ClientBadge';
 import { CANONICAL_FIELDS } from '../../data/clients';
+import { ReassignModal } from '../../components/vob/ReassignModal';
 
 export function ErrorQueueView() {
   const { currentUser, openVerification } = useWorkspace();
@@ -11,6 +12,7 @@ export function ErrorQueueView() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
+  const [reassignVob, setReassignVob] = useState(null);
 
   useEffect(() => {
     setLoading(true);
@@ -58,11 +60,11 @@ export function ErrorQueueView() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan="7" className="table-empty">Loading Error Queue…</td></tr>
+                <tr><td colSpan="7" className="table-empty">Loading Error Queue...</td></tr>
               ) : loadError ? (
                 <tr><td colSpan="7" className="table-empty">Could not load this data.</td></tr>
               ) : errorVobs.length === 0 ? (
-                <tr><td colSpan="7" className="table-empty">🎉 Clean slate! Zero validation errors in your queue.</td></tr>
+                <tr><td colSpan="7" className="table-empty">Clean slate! Zero validation errors in your queue.</td></tr>
               ) : (
                 errorVobs.map(v => (
                   <tr key={v.id} className="row-has-error">
@@ -88,13 +90,23 @@ export function ErrorQueueView() {
                       </div>
                     </td>
                     <td>
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-danger-action"
-                        onClick={() => openVerification(v.id)}
-                      >
-                        Correct & Resubmit →
-                      </button>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-danger-action"
+                          onClick={() => openVerification(v.id)}
+                        >
+                          Correct & Resubmit &rarr;
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-sm"
+                          style={{ background: 'transparent', border: '1px solid var(--rule, #cbd5e1)', color: 'var(--text, #1e293b)' }}
+                          onClick={() => setReassignVob(v)}
+                        >
+                          Reassign
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -103,6 +115,13 @@ export function ErrorQueueView() {
           </table>
         </div>
       </div>
+
+      <ReassignModal
+        vob={reassignVob}
+        isOpen={Boolean(reassignVob)}
+        onClose={() => setReassignVob(null)}
+        onSuccess={() => setReloadKey(k => k + 1)}
+      />
     </div>
   );
 }
