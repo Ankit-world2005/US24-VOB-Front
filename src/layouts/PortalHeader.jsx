@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { CLIENTS } from '../data/clients';
 import { ThemeToggle } from '../components/ThemeToggle';
-import { BackendApiTestModal } from '../components/vob/BackendApiTestModal';
 
 export function PortalHeader({ isDark, toggleTheme }) {
   const {
@@ -13,7 +12,6 @@ export function PortalHeader({ isDark, toggleTheme }) {
     onLogout
   } = useWorkspace();
 
-  const [isApiTestModalOpen, setIsApiTestModalOpen] = useState(false);
 
   const initials = currentUser?.name
     ? currentUser.name
@@ -73,28 +71,6 @@ export function PortalHeader({ isDark, toggleTheme }) {
 
         {/* Right: HIPAA status badge, User info, Theme & Logout */}
         <div className="header-right-group">
-          <button
-            type="button"
-            className="btn-api-status hide-sm"
-            onClick={() => setIsApiTestModalOpen(true)}
-            title="Backend API Diagnostics & Endpoint Tester"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '4px 10px',
-              fontSize: '12px',
-              fontWeight: 500,
-              background: 'rgba(56, 189, 248, 0.1)',
-              color: 'var(--primary-color, #38bdf8)',
-              border: '1px solid rgba(56, 189, 248, 0.25)',
-              borderRadius: '6px',
-              cursor: 'pointer'
-            }}
-          >
-            <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#22c55e' }} />
-            API Test
-          </button>
 
           <span className="hipaa-badge hide-md" title="HIPAA Security Rule & BAA Active">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
@@ -123,11 +99,6 @@ export function PortalHeader({ isDark, toggleTheme }) {
           </button>
         </div>
       </div>
-
-      <BackendApiTestModal
-        isOpen={isApiTestModalOpen}
-        onClose={() => setIsApiTestModalOpen(false)}
-      />
     </header>
   );
 }
