@@ -36,18 +36,29 @@ export function AuthQueueView() {
     loadAuthQueue();
   }, [currentUser.email, reloadKey]);
 
+  const toDateInputVal = (d) => {
+    if (!d) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+    const mmdd = String(d).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (mmdd) return `${mmdd[3]}-${mmdd[1].padStart(2, '0')}-${mmdd[2].padStart(2, '0')}`;
+    const parsed = Date.parse(d);
+    if (!isNaN(parsed)) return new Date(parsed).toISOString().slice(0, 10);
+    return '';
+  };
+
   const handleOpenAuthModal = (vob) => {
     setEditingAuthId(vob.id);
     setAuthInputs({
       authNumber: vob.authDetails?.authNumber || '',
-      authStartDate: vob.authDetails?.authStartDate || vob.dos,
-      authEndDate: vob.authDetails?.authEndDate || '',
+      authStartDate: toDateInputVal(vob.authDetails?.authStartDate || vob.dos),
+      authEndDate: toDateInputVal(vob.authDetails?.authEndDate),
       notes: vob.authDetails?.notes || ''
     });
   };
 
   const handleSaveAndApprove = async () => {
-    if (!authInputs.authNumber.trim()) {
+    const trimmedAuth = authInputs.authNumber.trim();
+    if (!trimmedAuth) {
       showToast("Please enter the authorization number received from the payer", "error");
       return;
     }
@@ -56,12 +67,12 @@ export function AuthQueueView() {
       const vob = authVobs.find(v => v.id === editingAuthId);
       await vobsApi.authVob(editingAuthId, {
         version: vob?.version || 1,
-        auth_number: authInputs.authNumber,
-        auth_valid_from: authInputs.authStartDate,
-        auth_valid_to: authInputs.authEndDate
+        auth_number: trimmedAuth,
+        auth_valid_from: authInputs.authStartDate || undefined,
+        auth_valid_to: authInputs.authEndDate || undefined
       });
 
-      showToast(`Auth #${authInputs.authNumber} verified! Record moved to Saved Records.`, "success");
+      showToast(`Auth #${trimmedAuth} verified! Record moved to Saved Records.`, "success");
       setEditingAuthId(null);
       loadAuthQueue();
     } catch (err) {
@@ -233,6 +244,17 @@ export function AuthQueueView() {
           </div>
         </div>
       )}
+
+      {/* Reassign Modal */}
+      <ReassignModal
+        vob={reassignVob}
+        isOpen={Boolean(reassignVob)}
+        onClose={() => setReassignVob(null)}
+        onSuccess={() => {
+          setReassignVob(null);
+          loadAuthQueue();
+        }}
+      />
     </div>
   );
 }
