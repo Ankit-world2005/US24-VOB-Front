@@ -256,27 +256,8 @@ export function UploadAssignView() {
 
       initialAssignees[index] = assignedTo;
 
-      let valid = true;
-      let reason = '';
-      if (!patientName) {
-        valid = false;
-        reason = 'Missing Patient Name';
-      } else if (dobRequired && !dob) {
-        valid = false;
-        reason = 'Missing Date of Birth (DOB)';
-      } else if (/complet/i.test(vobStatus)) {
-        // Client Request sheets are running logs; re-importing a finished row duplicates work.
-        valid = false;
-        reason = 'Already completed';
-      } else if (project && client && !projectMatchesClient(project, client)) {
-        // One client's patients must never land in another client's queue.
-        valid = false;
-        reason = `Project "${project}" is not ${client.name}`;
-      }
-
-      if (valid) {
-        validIndices.add(index);
-      }
+      // Every uploaded row is accepted and ready to be assigned to the user
+      validIndices.add(index);
 
       return {
         row: rowNumbers[index],
@@ -290,38 +271,23 @@ export function UploadAssignView() {
         idCard,
         groupNo,
         assignedTo,
-        valid,
-        reason
+        valid: true,
+        reason: ''
       };
     });
 
-    // The preview is built here, from the file. Nothing reaches the server until
-    // Import, so an abandoned preview leaves no patient rows held on a batch.
+    // Every row is valid and selectable for assignment
     setPreviewData({
       totalRows: mappedRows.length,
-      validRows: validIndices.size,
-      rejectedRows: mappedRows.length - validIndices.size,
+      validRows: mappedRows.length,
+      rejectedRows: 0,
       rows: mappedRows
     });
     setRowAssignees(initialAssignees);
     setSelectedRowIndices(validIndices);
     setUploadedFileName(sourceName);
 
-    if (validIndices.size === 0) {
-      const reasonCounts = mappedRows.reduce((acc, r) => {
-        acc[r.reason] = (acc[r.reason] || 0) + 1;
-        return acc;
-      }, {});
-      const reasons = Object.entries(reasonCounts).map(([reason, n]) => `${n} × ${reason}`).join(', ');
-      const columns = headers.filter(Boolean).slice(0, 10).join(', ');
-      showToast(
-        `0 of ${mappedRows.length} rows can be imported (${reasons}). Columns found: ${columns}.`,
-        "warning"
-      );
-      return;
-    }
-
-    showToast(`Read ${mappedRows.length} rows. ${validIndices.size} ready to import and assign.`, "info");
+    showToast(`Read ${mappedRows.length} rows. All rows ready to import and assign.`, "info");
   };
 
   const processFile = async (file) => {
@@ -412,26 +378,20 @@ export function UploadAssignView() {
   const toggleSelectAll = () => {
     if (!previewData) return;
     setPendingBatch(null);
-    if (selectedRowIndices.size === previewData.validRows) {
+    if (selectedRowIndices.size === previewData.rows.length) {
       setSelectedRowIndices(new Set());
     } else {
-      const allValid = new Set();
-      previewData.rows.forEach((r, idx) => {
-        if (r.valid) allValid.add(idx);
-      });
-      setSelectedRowIndices(allValid);
+      setSelectedRowIndices(new Set(previewData.rows.map((_, idx) => idx)));
     }
   };
 
   const handleCommitAndAssign = async () => {
     if (!previewData) return;
 
-    // Only the ticked rows, each carrying the assignee chosen for it. Filtering
-    // before the upload keeps rows and created VOBs in step, and the commit copies
-    // each row's assignedTo onto its VOB, so no separate assignment call is needed.
+    // Every selected row is created and assigned to the chosen user
     const rowsToCommit = previewData.rows
       .map((r, idx) => ({ ...r, assignedTo: rowAssignees[idx] || defaultAssignee }))
-      .filter((r, idx) => r.valid && selectedRowIndices.has(idx));
+      .filter((r, idx) => selectedRowIndices.has(idx));
     if (rowsToCommit.length === 0) return;
 
     // The API knows clients by UUID; /auth/me lists the ones this admin holds.
@@ -678,20 +638,14 @@ export function UploadAssignView() {
         {previewData && (
           <div className="preview-results-wrap" style={{ marginTop: '24px' }}>
             {/* KPI Summary Bar */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '20px' }}>
               <div style={{ padding: '12px 16px', background: 'var(--surface-2)', border: '1px solid var(--rule)', borderRadius: '8px' }}>
                 <span style={{ fontSize: '12px', color: 'var(--ink-soft)', display: 'block' }}>Total Records</span>
                 <strong style={{ fontSize: '18px', fontWeight: 700 }}>{previewData.totalRows} rows</strong>
               </div>
               <div style={{ padding: '12px 16px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '8px' }}>
-                <span style={{ fontSize: '12px', color: '#059669', display: 'block' }}>Valid (Ready to Assign)</span>
-                <strong style={{ fontSize: '18px', fontWeight: 700, color: '#059669' }}>{previewData.validRows} rows</strong>
-              </div>
-              <div style={{ padding: '12px 16px', background: previewData.rejectedRows > 0 ? 'rgba(239, 68, 68, 0.08)' : 'var(--surface-2)', border: '1px solid var(--rule)', borderRadius: '8px' }}>
-                <span style={{ fontSize: '12px', color: previewData.rejectedRows > 0 ? '#dc2626' : 'var(--ink-soft)', display: 'block' }}>Incomplete (Rejected)</span>
-                <strong style={{ fontSize: '18px', fontWeight: 700, color: previewData.rejectedRows > 0 ? '#dc2626' : 'var(--ink-soft)' }}>
-                  {previewData.rejectedRows} {previewData.rejectedRows === 1 ? 'row' : 'rows'}
-                </strong>
+                <span style={{ fontSize: '12px', color: '#059669', display: 'block' }}>Ready to Assign</span>
+                <strong style={{ fontSize: '18px', fontWeight: 700, color: '#059669' }}>{previewData.totalRows} rows</strong>
               </div>
               <div style={{ padding: '12px 16px', background: 'var(--surface-2)', border: '1px solid var(--rule)', borderRadius: '8px' }}>
                 <span style={{ fontSize: '12px', color: 'var(--ink-soft)', display: 'block' }}>Selected for Assignment</span>
@@ -707,9 +661,9 @@ export function UploadAssignView() {
                     <th style={{ padding: '10px 12px', width: '38px', textAlign: 'center' }}>
                       <input
                         type="checkbox"
-                        checked={previewData.validRows > 0 && selectedRowIndices.size === previewData.validRows}
+                        checked={previewData.rows.length > 0 && selectedRowIndices.size === previewData.rows.length}
                         onChange={toggleSelectAll}
-                        title="Select / Unselect all valid rows"
+                        title="Select / Unselect all rows"
                       />
                     </th>
                     <th style={{ padding: '10px 12px' }}>Row #</th>
@@ -719,7 +673,6 @@ export function UploadAssignView() {
                     <th style={{ padding: '10px 12px' }}>Insurance / Payer</th>
                     <th style={{ padding: '10px 12px' }}>Member ID</th>
                     <th style={{ padding: '10px 12px' }}>Assigned Specialist</th>
-                    <th style={{ padding: '10px 12px' }}>Validation</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -732,28 +685,24 @@ export function UploadAssignView() {
                         key={r.row}
                         style={{
                           borderBottom: '1px solid var(--rule-soft)',
-                          background: !r.valid ? 'rgba(239, 68, 68, 0.04)' : (isSelected ? 'rgba(37, 99, 235, 0.03)' : undefined)
+                          background: isSelected ? 'rgba(37, 99, 235, 0.03)' : undefined
                         }}
                       >
                         <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                           <input
                             type="checkbox"
-                            disabled={!r.valid}
                             checked={isSelected}
                             onChange={() => toggleRowSelect(idx)}
                           />
                         </td>
                         <td style={{ padding: '10px 12px', fontFamily: 'var(--mono)', color: 'var(--ink-soft)' }}>#{r.row}</td>
                         <td style={{ padding: '10px 12px', fontWeight: 600 }}>{r.patientName}</td>
-                        <td style={{ padding: '10px 12px' }}>{r.dob || (r.dobRequired
-                          ? <span style={{ color: 'var(--danger)', fontWeight: 600 }}>Missing</span>
-                          : <span style={{ color: 'var(--ink-soft)' }}>—</span>)}</td>
+                        <td style={{ padding: '10px 12px' }}>{r.dob || <span style={{ color: 'var(--ink-soft)' }}>—</span>}</td>
                         <td style={{ padding: '10px 12px' }}>{r.dos || <span style={{ color: 'var(--ink-soft)' }}>—</span>}</td>
                         <td style={{ padding: '10px 12px' }}>{r.insurance || <span style={{ color: 'var(--ink-soft)' }}>—</span>}</td>
                         <td style={{ padding: '10px 12px', fontFamily: 'var(--mono)', fontSize: '12px' }}>{r.idCard || <span style={{ color: 'var(--ink-soft)' }}>—</span>}</td>
                         <td style={{ padding: '8px 12px' }}>
                           <select
-                            disabled={!r.valid}
                             value={currentAssignee}
                             onChange={(e) => handleRowAssigneeChange(idx, e.target.value)}
                             style={{
@@ -769,26 +718,6 @@ export function UploadAssignView() {
                               <option key={s.email} value={s.email}>{s.name} ({s.role})</option>
                             ))}
                           </select>
-                        </td>
-                        <td style={{ padding: '10px 12px' }}>
-                          {r.valid && duplicateByRow.has(r.row) ? (
-                            <span
-                              title={duplicateByRow.get(r.row).on.includes('patient_name')
-                                ? 'Same name as a patient with an open task. May be a different person.'
-                                : 'Same patient already has this task.'}
-                              style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', borderRadius: '12px', background: 'rgba(245, 158, 11, 0.14)', color: '#b45309', fontSize: '11.5px', fontWeight: 600 }}
-                            >
-                              ⚠ {duplicateByRow.get(r.row).on.includes('patient_name') ? 'Possible duplicate' : 'Already imported'}
-                            </span>
-                          ) : r.valid ? (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.12)', color: '#059669', fontSize: '11.5px', fontWeight: 600 }}>
-                              ✓ Ready
-                            </span>
-                          ) : (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', borderRadius: '12px', background: 'rgba(239, 68, 68, 0.12)', color: '#dc2626', fontSize: '11.5px', fontWeight: 600 }}>
-                              ✕ {r.reason}
-                            </span>
-                          )}
                         </td>
                       </tr>
                     );
