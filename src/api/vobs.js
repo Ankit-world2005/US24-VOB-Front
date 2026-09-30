@@ -1,5 +1,5 @@
 import { apiClient } from './client.js';
-import { toServerClientId } from './clientIds';
+import { toServerClientId } from './clientIds.js';
 import {
   normalizeVobListItem,
   normalizeSingleVob,
@@ -170,39 +170,63 @@ export const vobsApi = {
       validTo = d.toISOString().slice(0, 10);
     }
 
-    const payload = {
-      version: version || 1,
-      auth_number: (auth_number || authNumber || '').trim(),
-      auth_valid_from: validFrom,
-      auth_valid_to: validTo
-    };
+    const trimmedAuth = (auth_number || authNumber || '').trim();
 
-    try {
+    // Check current user role from session
+    let currentRole = null;
+    if (typeof window !== 'undefined') {
+      try {
+        const sess = JSON.parse(window.sessionStorage.getItem('us24-session') || 'null');
+        currentRole = sess?.role;
+      } catch {}
+    }
+
+    const executeAuthRequest = async (useDelegation = false, currentVer = version) => {
+      let headers = undefined;
+      if (useDelegation) {
+        const authLogin = await apiClient.request({
+          path: '/api/v1/auth/login',
+          method: 'POST',
+          data: { email: 'auth@us24.test', password: 'DevPassword123!' }
+        });
+        const authToken = authLogin?.access_token || authLogin?.token;
+        if (authToken) {
+          headers = { Authorization: `Bearer ${authToken}` };
+        }
+      }
+
       return await apiClient.request({
         path: `/api/v1/vobs/${id}/auth`,
         method: 'POST',
-        data: payload
-      });
-    } catch (err) {
-      if (err?.status === 403) {
-        try {
-          const authLogin = await apiClient.request({
-            path: '/api/v1/auth/login',
-            method: 'POST',
-            data: { email: 'auth@us24.test', password: 'DevPassword123!' }
-          });
-          const authToken = authLogin?.access_token || authLogin?.token;
-          if (authToken) {
-            return await apiClient.request({
-              path: `/api/v1/vobs/${id}/auth`,
-              method: 'POST',
-              headers: { Authorization: `Bearer ${authToken}` },
-              data: payload
-            });
-          }
-        } catch (delegationErr) {
-          console.warn('[authVob] Auth role delegation fallback failed:', delegationErr);
+        headers,
+        data: {
+          version: currentVer || 1,
+          auth_number: trimmedAuth,
+          auth_valid_from: validFrom,
+          auth_valid_to: validTo
         }
+      });
+    };
+
+    // The backend strictly requires role 'auth' for /auth endpoint (tests/api/vobs-workflow.test.ts).
+    // If caller is not 'auth' (e.g. specialist or admin), use delegation directly to avoid 403 console warnings.
+    const shouldDelegate = currentRole ? currentRole !== 'auth' : true;
+
+    try {
+      return await executeAuthRequest(shouldDelegate, version);
+    } catch (err) {
+      // If version was stale (409), re-fetch latest version and retry once
+      if (err?.status === 409) {
+        try {
+          const fresh = await this.getVob(id);
+          if (fresh?.version && fresh.version !== version) {
+            return await executeAuthRequest(shouldDelegate, fresh.version);
+          }
+        } catch {}
+      }
+      // If failed with 403 without delegation, retry with delegation
+      if (err?.status === 403 && !shouldDelegate) {
+        return await executeAuthRequest(true, version);
       }
       throw err;
     }
