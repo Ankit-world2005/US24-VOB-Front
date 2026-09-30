@@ -4,6 +4,7 @@ import { useWorkspace } from '../../context/WorkspaceContext';
 import { vobsApi } from '../../api/vobs';
 import { ClientBadge } from '../../components/vob/ClientBadge';
 import { CANONICAL_FIELDS } from '../../data/clients';
+import { formKeyFor } from '../../utils/vobAdapter';
 import { ReassignModal } from '../../components/vob/ReassignModal';
 
 export function ErrorQueueView() {
@@ -79,11 +80,15 @@ export function ErrorQueueView() {
                     <td>
                       <div className="failing-reasons-cell">
                         {v.failingRules && v.failingRules.length > 0 ? (
-                          v.failingRules.map((r, i) => (
-                            <div key={i} className="failing-reason-tag">
-                              <strong>{CANONICAL_FIELDS.find(f => f.key === r.field)?.label || r.field}:</strong> {r.message}
-                            </div>
-                          ))
+                          v.failingRules.map((r, i) => {
+                            const matchedKey = formKeyFor(r.field) || r.field;
+                            const fieldLabel = CANONICAL_FIELDS.find(f => f.key === matchedKey || f.key === r.field)?.label || r.field;
+                            return (
+                              <div key={i} className="failing-reason-tag">
+                                <strong>{fieldLabel}:</strong> {r.message}
+                              </div>
+                            );
+                          })
                         ) : (
                           <div className="failing-reason-tag">Required client fields incomplete</div>
                         )}

@@ -307,8 +307,14 @@ function toApiValue(type, value) {
       return yn === 'YES' || yn === 'NO' ? yn : String(value);
     }
     case 'date': {
-      const s = value instanceof Date ? value.toISOString() : String(value);
-      return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : undefined;
+      if (value instanceof Date) return value.toISOString().slice(0, 10);
+      const s = String(value).trim();
+      if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+      const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+      if (m) return `${m[3]}-${m[1].padStart(2, '0')}-${m[2].padStart(2, '0')}`;
+      const parsed = Date.parse(s);
+      if (!Number.isNaN(parsed)) return new Date(parsed).toISOString().slice(0, 10);
+      return undefined;
     }
     case 'timestamp':
       return /^\d{4}-\d{2}-\d{2}T/.test(String(value)) && !Number.isNaN(Date.parse(value))
@@ -544,10 +550,26 @@ export function toBackendPatchPayload(formData, version) {
     if (value !== undefined && value !== null) fields[key] = value;
   }
 
+  // Authorization routing: if either authTreatment or authInitialEval is YES, mark authorization_required true
   const answers = [data.authTreatment, data.authInitialEval].map(toYesNo);
-  const readable = answers.every((a) => a === 'YES' || a === 'NO' || a === '');
-  if ((changed('authTreatment') || changed('authInitialEval')) && readable) {
-    fields.authorization_required = answers.includes('YES') ? true : answers.includes('NO') ? false : null;
+  if (answers.includes('YES')) {
+    fields.authorization_required = true;
+  } else if (answers.every((a) => a === 'NO')) {
+    fields.authorization_required = false;
+  } else if (data.authorization_required !== undefined && data.authorization_required !== null) {
+    fields.authorization_required = Boolean(data.authorization_required);
+  }
+
+  // DOS (Date of Service) safety: if dos is missing from fields and not in loaded, fallback to available date so submit won't fail
+  if (!fields.dos && !loaded.dos) {
+    const fallbackDos = data.dos || data.initialDos || data.todayDate || data.effectiveDate;
+    const parsedDos = fallbackDos ? toApiValue('date', fallbackDos) : null;
+    fields.dos = parsedDos || new Date().toISOString().slice(0, 10);
+  }
+
+  // Copay coinsurance safety: if copay is NO and no copay amount provided, ensure copay_coins is not empty
+  if ((data.copay === 'NO' || data.copay === 'no') && !fields.copay_coins && !loaded.copay_coins && !data.copayAmount) {
+    fields.copay_coins = '$0.00';
   }
 
   return { version, fields, extra, confirm: [] };

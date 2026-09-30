@@ -8,6 +8,7 @@ import { AiTranscriptDrawer } from '../../components/vob/AiTranscriptDrawer';
 import { ParkerLivePreview } from '../../components/vob/ParkerLivePreview';
 import { CallVerificationPanel } from '../../components/vob/CallVerificationPanel';
 import { CANONICAL_FIELDS, getVerificationProgress } from '../../data/clients';
+import { formKeyFor } from '../../utils/vobAdapter';
 
 export function VerificationFormView() {
   const { activeVobId, setActiveVobId, showToast, setActiveTab, currentUser } = useWorkspace();
@@ -309,11 +310,15 @@ export function VerificationFormView() {
                   <h4>Validation Error — {failingRules.length} Rule(s) Failed</h4>
                   <p>The Parker VOB format requires all mandatory fields to be verified before approval:</p>
                   <ul className="error-fields-list">
-                    {failingRules.map((err, i) => (
-                      <li key={i}>
-                        <strong>{CANONICAL_FIELDS.find(f => f.key === err.field)?.label || err.field}:</strong> {err.message}
-                      </li>
-                    ))}
+                    {failingRules.map((err, i) => {
+                      const matchedKey = formKeyFor(err.field) || err.field;
+                      const fieldLabel = CANONICAL_FIELDS.find(f => f.key === matchedKey || f.key === err.field)?.label || err.field;
+                      return (
+                        <li key={i}>
+                          <strong>{fieldLabel}:</strong> {err.message}
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               </div>
@@ -326,7 +331,7 @@ export function VerificationFormView() {
                   <h3 className="group-heading">{grp.title}</h3>
                   <div className="group-fields-layout">
                     {grp.fields.map(f => {
-                      const hasError = failingRules.some(r => r.field === f.key);
+                      const hasError = failingRules.some(r => (formKeyFor(r.field) || r.field) === f.key || r.field === f.key);
                       const prov = provenance[f.key];
 
                       return (
