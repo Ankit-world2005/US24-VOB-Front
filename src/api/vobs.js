@@ -90,7 +90,7 @@ export const vobsApi = {
    * PATCH /api/v1/vobs/:id - User (the assignee) only. Saves field edits.
    * Body: { version, fields: { ... }, extra: { ... }, confirm: [...] }
    */
-  async patchVob(id, edits, version = 1, userEmail) {
+  async patchVob(id, edits, version = 1, userEmail, { only } = {}) {
     let payload;
     if (edits && edits.fields !== undefined && !edits.patientName && !edits.insurance && !edits.status) {
       const cleanFields = { ...(edits.fields || {}) };
@@ -102,7 +102,7 @@ export const vobsApi = {
         confirm: edits.confirm || []
       };
     } else {
-      payload = toBackendPatchPayload(edits, version);
+      payload = toBackendPatchPayload(edits, version, { only });
       if (payload.fields) {
         delete payload.fields.vob_completion_date;
       }

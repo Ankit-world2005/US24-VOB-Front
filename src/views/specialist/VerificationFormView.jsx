@@ -10,6 +10,9 @@ import { CallVerificationPanel } from '../../components/vob/CallVerificationPane
 import { CANONICAL_FIELDS, getVerificationProgress } from '../../data/clients';
 import { formKeyFor } from '../../utils/vobAdapter';
 
+/** The form's Authorization & Referral section: all an Auth Queue VOB can still change. */
+const AUTH_FIELD_KEYS = CANONICAL_FIELDS.filter(f => f.group === 'auth').map(f => f.key);
+
 export function VerificationFormView() {
   const { activeVobId, setActiveVobId, showToast, setActiveTab, currentUser } = useWorkspace();
   const [vob, setVob] = useState(null);
@@ -99,8 +102,8 @@ export function VerificationFormView() {
     showToast(`AI auto-filled ${filledCount} empty fields with [AI Transcript] tags!`, "success");
   };
 
-  // A 409 is either a stale version or a status the API won't edit from (an
-  // Auth Queue VOB belongs to the auth person). Reload either way; say which.
+  // A 409 is either a stale version or an edit the API won't take in this
+  // status (an Auth Queue VOB takes its auth fields only). Reload either way; say which.
   const reloadAfterConflict = (err) => {
     showToast(
       err?.data?.error?.code === 'invalid_transition'
@@ -114,9 +117,18 @@ export function VerificationFormView() {
     });
   };
 
+  // In the Auth Queue only the authorization section is open, so only it is sent.
+  const saveForm = () => vobsApi.patchVob(
+    activeVobId,
+    { ...formData, provenance },
+    vob.version,
+    currentUser.email,
+    vob.status === 'auth_queue' ? { only: AUTH_FIELD_KEYS } : {}
+  );
+
   const handleSaveDraft = async () => {
     try {
-      const patchRes = await vobsApi.patchVob(activeVobId, { ...formData, provenance }, vob.version, currentUser.email);
+      const patchRes = await saveForm();
       if (patchRes?.version) {
         setVob(prev => ({ ...prev, version: patchRes.version }));
       }
@@ -134,7 +146,7 @@ export function VerificationFormView() {
     setIsSubmitting(true);
     try {
       // Save latest form edits first
-      const patchRes = await vobsApi.patchVob(activeVobId, { ...formData, provenance }, vob.version, currentUser.email);
+      const patchRes = await saveForm();
       const currentVersion = patchRes?.version || (vob.version ? vob.version + 1 : 1);
       setVob(prev => ({ ...prev, version: currentVersion }));
 
@@ -190,8 +202,8 @@ export function VerificationFormView() {
   }
 
   const { filledCount, totalCount } = getVerificationProgress(formData);
-  // The API refuses edits to an Auth Queue VOB until the auth person records the
-  // authorization (POST /vobs/:id/auth, from the Auth Queue), so lock the form.
+  // In the Auth Queue only the authorization section is open: the API takes edits
+  // to those fields alone, and a submit with all of them filled saves the VOB.
   const inAuthQueue = vob.status === 'auth_queue';
 
   // One section per block of the Parker document, in the order it reads, so
@@ -329,8 +341,8 @@ export function VerificationFormView() {
               <div className="auth-queue-lock-banner" role="status">
                 <div className="error-banner-icon">⏳</div>
                 <div className="error-banner-content">
-                  <h4>In the Auth Queue: fields are locked</h4>
-                  <p>This VOB is waiting on its authorization, so it can't be edited or resubmitted here. Record the payer's authorization number in the Auth Queue to approve it.</p>
+                  <h4>In the Auth Queue: only the authorization fields are open</h4>
+                  <p>Fill in every field in VII. Authorization &amp; Referral, then submit to move this VOB to Saved Records. The other sections are locked.</p>
                 </div>
               </div>
             )}
@@ -359,7 +371,9 @@ export function VerificationFormView() {
 
             {/* Form Sections */}
             <div className="form-sections-grid">
-              {fieldGroups.map(grp => (
+              {fieldGroups.map(grp => {
+                const locked = inAuthQueue && grp.id !== 'auth';
+                return (
                 <div key={grp.id} className="form-section-card">
                   <h3 className="group-heading">{grp.title}</h3>
                   <div className="group-fields-layout">
@@ -382,7 +396,7 @@ export function VerificationFormView() {
                               className={`vob-select ${hasError ? 'input-error' : ''}`}
                               value={formData[f.key] || ''}
                               onChange={(e) => handleFieldChange(f.key, e.target.value)}
-                              disabled={inAuthQueue}
+                              disabled={locked}
                             >
                               <option value="">Select option…</option>
                               {f.options.map(opt => (
@@ -397,7 +411,7 @@ export function VerificationFormView() {
                               value={formData[f.key] || ''}
                               placeholder={f.placeholder || `Enter ${f.label.toLowerCase()}…`}
                               onChange={(e) => handleFieldChange(f.key, e.target.value)}
-                              disabled={inAuthQueue}
+                              disabled={locked}
                             />
                           )}
 
@@ -411,7 +425,8 @@ export function VerificationFormView() {
                     })}
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -439,33 +454,21 @@ export function VerificationFormView() {
         </div>
 
         <div className="action-bar-right">
-          {inAuthQueue ? (
-            <button
-              type="button"
-              className="btn"
-              onClick={() => setActiveTab('auth_queue')}
-            >
-              ⏳ Record Auth in Auth Queue
-            </button>
-          ) : (
-            <>
-              <button
-                type="button"
-                className="btn ghost"
-                onClick={handleSaveDraft}
-              >
-                💾 Save Draft
-              </button>
-              <button
-                type="button"
-                className="btn btn-submit-vob"
-                onClick={handleSubmit}
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? 'Validating against Client Rules…' : '✓ Submit VOB for Validation'}
-              </button>
-            </>
-          )}
+          <button
+            type="button"
+            className="btn ghost"
+            onClick={handleSaveDraft}
+          >
+            💾 Save Draft
+          </button>
+          <button
+            type="button"
+            className="btn btn-submit-vob"
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? 'Validating against Client Rules…' : '✓ Submit VOB for Validation'}
+          </button>
         </div>
       </div>
 

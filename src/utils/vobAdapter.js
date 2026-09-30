@@ -530,11 +530,15 @@ export function normalizeExtraction(res) {
  *
  * The authorization answers are saved as given, a blank one staying blank:
  * submit sends a VOB with any empty authorization field to the Auth Queue.
+ *
+ * `only` limits the save to those form keys, for a VOB whose other fields the
+ * API will not take (an Auth Queue VOB takes its authorization section alone).
  */
-export function toBackendPatchPayload(formData, version) {
+export function toBackendPatchPayload(formData, version, { only } = {}) {
   const data = formData || {};
   const loaded = data.__loaded || {};
-  const changed = (key) => data[key] !== undefined && !sameFormValue(data[key], loaded[key]);
+  const changed = (key) =>
+    (!only || only.includes(key)) && data[key] !== undefined && !sameFormValue(data[key], loaded[key]);
   const fields = {};
   const extra = {};
 
@@ -553,7 +557,7 @@ export function toBackendPatchPayload(formData, version) {
   }
 
   // Copay coinsurance safety: if copay is NO and no copay amount provided, ensure copay_coins is not empty
-  if ((data.copay === 'NO' || data.copay === 'no') && !fields.copay_coins && !loaded.copay_coins && !data.copayAmount) {
+  if (!only && (data.copay === 'NO' || data.copay === 'no') && !fields.copay_coins && !loaded.copay_coins && !data.copayAmount) {
     fields.copay_coins = '$0.00';
   }
 

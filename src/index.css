@@ -2999,6 +2999,14 @@ body::before {
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
 
+/* Locked fields (outside the auth section while in the Auth Queue) read as read-only. */
+.vob-input:disabled, .vob-select:disabled {
+  background: var(--surface-2);
+  color: var(--ink-soft);
+  border-color: var(--rule-soft);
+  cursor: not-allowed;
+}
+
 .input-error {
   border-color: var(--danger) !important;
   background: #fff5f5 !important;
