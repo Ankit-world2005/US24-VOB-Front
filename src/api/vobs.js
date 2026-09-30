@@ -1,4 +1,4 @@
-import { apiClient } from './client';
+import { apiClient } from './client.js';
 import { toServerClientId } from './clientIds';
 import {
   normalizeVobListItem,
@@ -161,11 +161,20 @@ export const vobsApi = {
    * Body: { version, auth_number, auth_valid_from, auth_valid_to }
    */
   async authVob(id, { version, auth_number, auth_valid_from, auth_valid_to, authNumber, authStartDate, authEndDate }) {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const validFrom = (auth_valid_from || authStartDate || todayStr).slice(0, 10);
+    let validTo = (auth_valid_to || authEndDate || '').slice(0, 10);
+    if (!validTo || validTo < validFrom) {
+      const d = new Date(validFrom);
+      d.setDate(d.getDate() + 90);
+      validTo = d.toISOString().slice(0, 10);
+    }
+
     const payload = {
       version: version || 1,
-      auth_number: auth_number || authNumber || '',
-      auth_valid_from: auth_valid_from || authStartDate || '',
-      auth_valid_to: auth_valid_to || authEndDate || ''
+      auth_number: (auth_number || authNumber || '').trim(),
+      auth_valid_from: validFrom,
+      auth_valid_to: validTo
     };
 
     try {

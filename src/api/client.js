@@ -1,6 +1,9 @@
 // Base API client configuration
 // When using Vite dev proxy, API_BASE_URL defaults to '' (relative root) so requests route through proxy
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+const API_BASE_URL =
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE_URL !== undefined)
+    ? import.meta.env.VITE_API_BASE_URL
+    : (typeof window !== 'undefined' ? '' : 'http://localhost:8000');
 const TOKEN_KEY = 'us24-token';
 const REFRESH_KEY = 'us24-refresh';
 
@@ -150,7 +153,7 @@ export const apiClient = {
   /**
    * Sends HTTP request directly to the backend API.
    */
-  async request({ path, method = 'GET', data = null, params = null, _retried = false }) {
+  async request({ path, method = 'GET', data = null, params = null, headers = null, _retried = false }) {
     const token = this.getToken();
 
     // Live HTTP fetch implementation routing through proxy or direct API
@@ -174,13 +177,14 @@ export const apiClient = {
       method,
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json'
+        'Accept': 'application/json',
+        ...(headers || {})
       },
       credentials: 'include' // Sends cookies automatically
     };
 
-    // Attach Bearer token if available
-    if (token) {
+    // Attach Bearer token if available and not overridden by custom headers
+    if (!options.headers['Authorization'] && !options.headers['authorization'] && token) {
       options.headers['Authorization'] = `Bearer ${token}`;
     }
 
