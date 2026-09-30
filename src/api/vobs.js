@@ -208,25 +208,27 @@ export const vobsApi = {
       });
     };
 
-    // The backend strictly requires role 'auth' for /auth endpoint (tests/api/vobs-workflow.test.ts).
-    // If caller is not 'auth' (e.g. specialist or admin), use delegation directly to avoid 403 console warnings.
-    const shouldDelegate = currentRole ? currentRole !== 'auth' : true;
-
+    // The backend now accepts 'auth', 'admin', and 'user' directly.
+    // Try direct execution first; fall back to auth delegation if 403 is received.
     try {
-      return await executeAuthRequest(shouldDelegate, version);
+      return await executeAuthRequest(false, version);
     } catch (err) {
       // If version was stale (409), re-fetch latest version and retry once
       if (err?.status === 409) {
         try {
           const fresh = await this.getVob(id);
           if (fresh?.version && fresh.version !== version) {
-            return await executeAuthRequest(shouldDelegate, fresh.version);
+            return await executeAuthRequest(false, fresh.version);
           }
         } catch {}
       }
-      // If failed with 403 without delegation, retry with delegation
-      if (err?.status === 403 && !shouldDelegate) {
-        return await executeAuthRequest(true, version);
+      // If failed with 403, retry with delegation as fallback
+      if (err?.status === 403) {
+        try {
+          return await executeAuthRequest(true, version);
+        } catch (delegationErr) {
+          console.warn('[authVob] Auth delegation fallback failed:', delegationErr);
+        }
       }
       throw err;
     }
