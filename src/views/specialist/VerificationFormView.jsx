@@ -434,10 +434,7 @@ export function VerificationFormView() {
         {/* RIGHT PANE: Live Preview of Parker VOB Document (Image 2 reference) */}
         {(layoutMode === 'split' || layoutMode === 'preview') && (
           <div className="verification-right-pane">
-            <ParkerLivePreview
-              formData={formData}
-              onPrint={() => window.print()}
-            />
+            <ParkerLivePreview formData={formData} />
           </div>
         )}
       </div>

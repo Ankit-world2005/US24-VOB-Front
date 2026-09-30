@@ -3244,6 +3244,16 @@ body::before {
   margin: 0.75in 0.5in;
 }
 
+/* The frame printElement() prints from: the sheet alone, on white. */
+body.print-frame {
+  display: block;
+  min-height: 0;
+  background: #ffffff;
+}
+body.print-frame::before {
+  display: none;
+}
+
 @media print {
   /* Browsers drop background colours when printing unless told otherwise, which
      would silently strip the D9E2F3 row banding out of every exported PDF. */
@@ -3256,6 +3266,11 @@ body::before {
   .p-row {
     break-inside: avoid;
     page-break-inside: avoid;
+  }
+
+  /* Single-spaced, as the Word document is, so the form and its footer fit one page. */
+  .p-line {
+    margin-bottom: 1px;
   }
 
   body * {

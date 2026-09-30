@@ -648,6 +648,35 @@ const server = http.createServer(async (req, res) => {
     }
 
     // -------------------------------------------------------------
+    // 6b. Tracker export: POST /api/v1/exports (header + rows; the browser writes the file)
+    // -------------------------------------------------------------
+    if (pathname === '/api/v1/exports' && method === 'POST') {
+      const body = await parseJsonBody(req);
+      const client = body.client || body.clientId || 'all';
+      const format = body.format || 'xlsx';
+      const rowsFor = vobsDb.filter(v => client === 'all' || v.client_id === client || v.client?.id === client);
+      const fieldKeys = [...new Set(rowsFor.flatMap(v => Object.keys(v.fields || {})))];
+      const extraKeys = [...new Set(rowsFor.flatMap(v => Object.keys(v.extra || {})))];
+      const cell = (x) => (x === true ? 'YES' : x === false ? 'NO' : x ?? null);
+      const columns = ['Record ID', 'Client', 'Patient Name', 'DOB', 'Status', 'Assigned To', ...fieldKeys, ...extraKeys];
+      const rows = rowsFor.map(v => [
+        v.id, v.client?.name ?? v.client_id, v.patient?.name ?? null, v.patient?.dob ?? null, v.status, v.assignee?.name ?? null,
+        ...fieldKeys.map(k => cell(v.fields?.[k])),
+        ...extraKeys.map(k => cell(v.extra?.[k]))
+      ]);
+      const safe = String(client === 'all' ? 'All_Clients' : rowsFor[0]?.client?.name || client).replace(/[^A-Za-z0-9]+/g, '_');
+      sendJson(res, 200, {
+        filename: `VOB_Export_${safe}_${new Date().toISOString().slice(0, 10)}.${format}`,
+        exportedRows: rows.length,
+        timestamp: new Date().toISOString(),
+        columns,
+        rows
+      });
+      logDone(200);
+      return;
+    }
+
+    // -------------------------------------------------------------
     // 7. Users collection: GET /api/v1/users & PATCH /api/v1/users/:id
     // -------------------------------------------------------------
     if (pathname === '/api/v1/users' && method === 'GET') {

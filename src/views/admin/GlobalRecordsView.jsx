@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import { DataError } from '../../components/DataError';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { vobsApi } from '../../api/vobs';
@@ -49,9 +50,17 @@ export function GlobalRecordsView() {
     setIsExporting(true);
     try {
       const res = await clientsApi.exportClientVobs(selectedClient);
-      showToast(`Export generated: ${res.filename} (${res.exportedRows} records). Logged in audit trail.`, "success");
+      if (!res.exportedRows) {
+        showToast("No records to export for this client.", "info");
+        return;
+      }
+      const book = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([res.columns, ...res.rows]), 'VOB Tracker');
+      XLSX.writeFile(book, res.filename);
+      showToast(`Exported ${res.exportedRows} records to ${res.filename}. Logged in audit trail.`, "success");
     } catch (err) {
-      showToast("Export failed", "error");
+      console.error(err);
+      showToast(err?.message || "Export failed", "error");
     } finally {
       setIsExporting(false);
     }
