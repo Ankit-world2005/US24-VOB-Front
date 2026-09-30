@@ -89,7 +89,7 @@ export function AuthQueueView() {
         <div className="panel-header">
           <div>
             <h3>Prior Authorization Queue (U6, FR-10)</h3>
-            <span className="panel-sub">VOB records requiring clinical pre-certification before the date of service</span>
+            <span className="panel-sub">VOB records with an incomplete authorization section. Record the payer's authorization to move them to Saved Records.</span>
           </div>
           <div className="auth-pill-count">
             {authVobs.length} Records Pending Auth

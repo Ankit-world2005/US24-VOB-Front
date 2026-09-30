@@ -10,6 +10,7 @@
         { "key": "pat", "label": "PAT", "group": "patient", "row": 0, "required": false, "placeholder": "100%(RESP)" },
         { "key": "patientName", "label": "Name", "group": "patient", "row": 1, "required": true },
         { "key": "dob", "label": "DOB", "group": "patient", "row": 1, "required": true, "placeholder": "00/00/0000" },
+        { "key": "dos", "label": "DOS", "group": "patient", "row": 1, "required": true, "placeholder": "00/00/0000" },
         { "key": "todayDate", "label": "Today's Date", "group": "patient", "row": 2, "required": true, "placeholder": "00/00/0000_xx" },
         { "key": "additionalInfo", "label": "Additional Info", "group": "patient", "row": 2, "required": false }
       ]
@@ -130,6 +131,7 @@
     { "key": "pat", "label": "PAT", "group": "patient", "row": 0, "required": false, "placeholder": "100%(RESP)" },
     { "key": "patientName", "label": "Name", "group": "patient", "row": 1, "required": true },
     { "key": "dob", "label": "DOB", "group": "patient", "row": 1, "required": true, "placeholder": "00/00/0000" },
+    { "key": "dos", "label": "DOS", "group": "patient", "row": 1, "required": true, "placeholder": "00/00/0000" },
     { "key": "todayDate", "label": "Today's Date", "group": "patient", "row": 2, "required": true, "placeholder": "00/00/0000_xx" },
     { "key": "additionalInfo", "label": "Additional Info", "group": "patient", "row": 2, "required": false },
     { "key": "insurance", "label": "Insurance Name", "group": "insurance", "row": 3, "required": true },

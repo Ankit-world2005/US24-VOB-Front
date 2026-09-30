@@ -176,10 +176,12 @@ export function normalizeVobListItem(item) {
  * One table for loading, saving and applying AI proposals, so a field saves to
  * the same place it loads from. `yesNo` fields show as "YES"/"NO": canonical
  * ones are booleans in the API ('bool'), the rest are kept as text ('text').
- * Patient name and DOB come from intake and are read-only here; "PAT" and
- * "Today's Date" are not stored.
+ * `date` fields are sent as YYYY-MM-DD. Patient name and DOB come from intake
+ * and are read-only here; DOS comes from intake too, but is entered here when
+ * the upload had none. "PAT" and "Today's Date" are not stored.
  */
 export const FORM_FIELDS = {
+  dos: { field: 'dos', date: true },
   additionalInfo: { extra: 'additional_info' },
   insurance: { field: 'insurance' },
   insurancePhone: { field: 'insurance_phone' },
@@ -236,7 +238,6 @@ export const FORM_FIELDS = {
  * its own key and saved once filled; the form never clears one.
  */
 const HIDDEN_FIELDS = {
-  dos: 'date',
   initial_dos: 'date',
   auth_valid_from: 'date',
   auth_valid_to: 'date',
@@ -325,7 +326,8 @@ function toApiValue(type, value) {
   }
 }
 
-const specType = (spec) => (spec.yesNo === 'bool' ? 'bool' : spec.yesNo === 'text' ? 'yesNoText' : 'text');
+const specType = (spec) =>
+  spec.date ? 'date' : spec.yesNo === 'bool' ? 'bool' : spec.yesNo === 'text' ? 'yesNoText' : 'text';
 
 /**
  * Normalizes a single full VOB from GET /api/v1/vobs/:id
@@ -526,8 +528,8 @@ export function normalizeExtraction(res) {
  * save never clears or re-stamps a field nobody touched. Hidden canonical
  * fields (an applied AI proposal the form does not show) are sent once filled.
  *
- * `authorization_required` routes a VOB to the auth queue. As the form has
- * always saved it, it is YES when the initial eval or the treatment needs auth.
+ * The authorization answers are saved as given, a blank one staying blank:
+ * submit sends a VOB with any empty authorization field to the Auth Queue.
  */
 export function toBackendPatchPayload(formData, version) {
   const data = formData || {};
@@ -548,23 +550,6 @@ export function toBackendPatchPayload(formData, version) {
     if (!changed(key)) continue;
     const value = toApiValue(type, data[key]);
     if (value !== undefined && value !== null) fields[key] = value;
-  }
-
-  // Authorization routing: if either authTreatment or authInitialEval is YES, mark authorization_required true
-  const answers = [data.authTreatment, data.authInitialEval].map(toYesNo);
-  if (answers.includes('YES')) {
-    fields.authorization_required = true;
-  } else if (answers.every((a) => a === 'NO')) {
-    fields.authorization_required = false;
-  } else if (data.authorization_required !== undefined && data.authorization_required !== null) {
-    fields.authorization_required = Boolean(data.authorization_required);
-  }
-
-  // DOS (Date of Service) safety: if dos is missing from fields and not in loaded, fallback to available date so submit won't fail
-  if (!fields.dos && !loaded.dos) {
-    const fallbackDos = data.dos || data.initialDos || data.todayDate || data.effectiveDate;
-    const parsedDos = fallbackDos ? toApiValue('date', fallbackDos) : null;
-    fields.dos = parsedDos || new Date().toISOString().slice(0, 10);
   }
 
   // Copay coinsurance safety: if copay is NO and no copay amount provided, ensure copay_coins is not empty

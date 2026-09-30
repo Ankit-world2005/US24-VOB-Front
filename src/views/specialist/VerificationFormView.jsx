@@ -136,7 +136,17 @@ export function VerificationFormView() {
         showToast("Validation failed. Incomplete fields moved to Error Queue.", "error");
         setActiveTab('error_queue');
       } else if (status === 'auth_queue' || status === 'auth queue') {
-        showToast("Prior Authorization required! VOB moved to Auth Queue.", "info");
+        const pending = (result.awaiting || []).map(field => {
+          const key = formKeyFor(field) || field;
+          return CANONICAL_FIELDS.find(f => f.key === key)?.label || field;
+        });
+        const shown = pending.slice(0, 3).join(', ') + (pending.length > 3 ? ` +${pending.length - 3} more` : '');
+        showToast(
+          pending.length > 0
+            ? `Authorization section incomplete (${shown}). VOB moved to Auth Queue.`
+            : "VOB moved to Auth Queue.",
+          "info"
+        );
         setActiveTab('auth_queue');
       } else {
         showToast("VOB validated and approved! Saved to Approved Records.", "success");
@@ -229,7 +239,7 @@ export function VerificationFormView() {
           <h2 className="vob-patient-name">{formData.patientName || 'Unnamed Patient'}</h2>
           <div className="vob-patient-meta">
             <span>DOB: <strong>{formData.dob || '—'}</strong></span>
-            <span>DOS: <strong>{formData.dos || formData.initialDos || '—'}</strong></span>
+            <span>DOS: <strong>{formData.dos || '—'}</strong></span>
             <span>Type: <strong>{formData.serviceType || 'PT'}</strong></span>
             <span>Insurance: <strong>{formData.insurance || '—'}</strong></span>
           </div>

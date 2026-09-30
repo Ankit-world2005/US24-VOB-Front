@@ -526,15 +526,29 @@ const server = http.createServer(async (req, res) => {
           return;
         }
 
-        // Check if authorization is required
-        if (f.authorization_required === true && !f.auth_number) {
+        // Authorization section (form rows 8–9): any empty field sends the VOB to the Auth Queue
+        const x = vob.extra || {};
+        const blank = (v) => v === null || v === undefined || String(v).trim() === '';
+        const awaiting = [
+          ['extra.auth_initial_eval', x.auth_initial_eval],
+          ['authorization_required', f.authorization_required],
+          ['referral_required', f.referral_required],
+          ['extra.pcp_referral', x.pcp_referral],
+          ['extra.how_to_obtain_auth', x.how_to_obtain_auth],
+          ['auth_request_tat', f.auth_request_tat],
+          ['auth_number', f.auth_number],
+          ['extra.auth_coverage_dates', x.auth_coverage_dates || (f.auth_valid_from && f.auth_valid_to ? 'dates' : '')]
+        ].filter(([, v]) => blank(v)).map(([k]) => k);
+
+        if (awaiting.length > 0) {
           vob.status = 'auth_queue';
           vob.version = (vob.version || 1) + 1;
           vob.updated_at = new Date().toISOString();
 
           sendJson(res, 200, {
             status: 'auth_queue',
-            version: vob.version
+            version: vob.version,
+            awaiting
           });
           logDone(200);
           return;
