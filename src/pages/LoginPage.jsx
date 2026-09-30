@@ -6,8 +6,6 @@ import { LoginForm } from '../components/LoginForm';
 import { Footer } from '../components/Footer';
 
 export function LoginPage({
-  isDark,
-  toggleTheme,
   rememberedEmail,
   loading,
   error,
@@ -19,7 +17,7 @@ export function LoginPage({
 }) {
   return (
     <div className="page login-page">
-      <Navbar isDark={isDark} onToggleTheme={toggleTheme} />
+      <Navbar />
 
       <main className="main">
         <Hero />

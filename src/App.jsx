@@ -1,11 +1,9 @@
 import React from 'react';
-import { useTheme } from './hooks/useTheme';
 import { useAuth } from './hooks/useAuth';
 import { LoginPage } from './pages/LoginPage';
 import { HomePage } from './pages/HomePage';
 
 export function App() {
-  const { isDark, toggleTheme } = useTheme();
   const {
     session,
     rememberedEmail,
@@ -24,16 +22,12 @@ export function App() {
       <HomePage
         session={session}
         onLogout={logout}
-        isDark={isDark}
-        toggleTheme={toggleTheme}
       />
     );
   }
 
   return (
     <LoginPage
-      isDark={isDark}
-      toggleTheme={toggleTheme}
       rememberedEmail={rememberedEmail}
       loading={loading}
       error={

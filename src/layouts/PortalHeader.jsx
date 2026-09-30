@@ -1,9 +1,8 @@
 import React from 'react';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { CLIENTS } from '../data/clients';
-import { ThemeToggle } from '../components/ThemeToggle';
 
-export function PortalHeader({ isDark, toggleTheme }) {
+export function PortalHeader() {
   const {
     currentUser,
     activeRole,
@@ -86,8 +85,6 @@ export function PortalHeader({ isDark, toggleTheme }) {
               <span className="user-sub">{isAdmin ? 'Administrator' : 'Specialist'}</span>
             </div>
           </div>
-
-          <ThemeToggle isDark={isDark} onToggle={toggleTheme} />
 
           <button
             type="button"

@@ -5,12 +5,12 @@ import { AdminLayout } from '../layouts/AdminLayout';
 import { SpecialistLayout } from '../layouts/SpecialistLayout';
 import { Footer } from '../components/Footer';
 
-function WorkspaceShell({ isDark, toggleTheme }) {
+function WorkspaceShell() {
   const { activeRole } = useWorkspace();
 
   return (
     <div className="portal-app-shell">
-      <PortalHeader isDark={isDark} toggleTheme={toggleTheme} />
+      <PortalHeader />
 
       <main className="portal-main-container">
         {activeRole === 'admin' ? (
@@ -25,10 +25,10 @@ function WorkspaceShell({ isDark, toggleTheme }) {
   );
 }
 
-export function HomePage({ session, onLogout, isDark, toggleTheme }) {
+export function HomePage({ session, onLogout }) {
   return (
     <WorkspaceProvider session={session} onLogout={onLogout}>
-      <WorkspaceShell isDark={isDark} toggleTheme={toggleTheme} />
+      <WorkspaceShell />
     </WorkspaceProvider>
   );
 }

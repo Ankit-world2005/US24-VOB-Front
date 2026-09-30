@@ -1,7 +1,6 @@
 import React from 'react';
-import { ThemeToggle } from './ThemeToggle';
 
-export function Navbar({ isDark, onToggleTheme }) {
+export function Navbar() {
   return (
     <nav className="nav">
       <div className="nav-inner">
@@ -20,7 +19,6 @@ export function Navbar({ isDark, onToggleTheme }) {
           <span className="nav-link hide-sm" style={{ cursor: 'default' }}>
             Employee Portal
           </span>
-          <ThemeToggle isDark={isDark} onToggle={onToggleTheme} />
         </div>
       </div>
     </nav>
