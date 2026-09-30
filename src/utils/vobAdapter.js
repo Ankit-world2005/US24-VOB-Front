@@ -214,7 +214,7 @@ export const FORM_FIELDS = {
   authNumber: { field: 'auth_number' },
   authCoverageDates: { extra: 'auth_coverage_dates' },
   primary: { field: 'coverage_order' },
-  secondary: { extra: 'secondary', yesNo: 'text' },
+  secondary: { extra: 'secondary' },
   insuranceRep: { extra: 'insurance_rep' },
   callReference: { extra: 'call_reference' },
   claimMailingAddress: { extra: 'claim_mailing_address' },

@@ -441,9 +441,9 @@
         {
           "name": "secondary",
           "label": "SECONDARY",
-          "type": "select",
+          "type": "text",
           "required": false,
-          "options": ["NO", "YES"],
+          "placeholder": "Enter secondary…",
           "documentRow": 10
         },
         {

@@ -94,7 +94,7 @@
       "rows": [10],
       "fields": [
         { "key": "primary", "label": "PRIMARY", "group": "rep", "row": 10, "required": false },
-        { "key": "secondary", "label": "SECONDARY", "group": "rep", "row": 10, "required": false, "options": ["NO", "YES"] },
+        { "key": "secondary", "label": "SECONDARY", "group": "rep", "row": 10, "required": false, "placeholder": "Enter secondary…" },
         { "key": "insuranceRep", "label": "Insurance Rep Name", "group": "rep", "row": 10, "required": false },
         { "key": "callReference", "label": "Call Reference", "group": "rep", "row": 10, "required": false, "placeholder": "00000000" }
       ]
@@ -165,7 +165,7 @@
     { "key": "authNumber", "label": "Authorization #", "group": "auth", "row": 9, "required": false },
     { "key": "authCoverageDates", "label": "Auth Coverage Dates", "group": "auth", "row": 9, "required": false, "placeholder": "MM/DD/YYYY - MM/DD/YYYY" },
     { "key": "primary", "label": "PRIMARY", "group": "rep", "row": 10, "required": false },
-    { "key": "secondary", "label": "SECONDARY", "group": "rep", "row": 10, "required": false, "options": ["NO", "YES"] },
+    { "key": "secondary", "label": "SECONDARY", "group": "rep", "row": 10, "required": false, "placeholder": "Enter secondary…" },
     { "key": "insuranceRep", "label": "Insurance Rep Name", "group": "rep", "row": 10, "required": false },
     { "key": "callReference", "label": "Call Reference", "group": "rep", "row": 10, "required": false, "placeholder": "00000000" },
     { "key": "claimMailingAddress", "label": "Claim Mailing Address", "group": "claims", "row": 11, "required": false },
