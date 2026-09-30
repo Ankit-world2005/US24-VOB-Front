@@ -99,6 +99,21 @@ export function VerificationFormView() {
     showToast(`AI auto-filled ${filledCount} empty fields with [AI Transcript] tags!`, "success");
   };
 
+  // A 409 is either a stale version or a status the API won't edit from (an
+  // Auth Queue VOB belongs to the auth person). Reload either way; say which.
+  const reloadAfterConflict = (err) => {
+    showToast(
+      err?.data?.error?.code === 'invalid_transition'
+        ? "This VOB's status changed and it can't be edited here. Reloading."
+        : "Conflict 409: Record was updated by someone else. Reloading.",
+      "error"
+    );
+    vobsApi.getVobById(activeVobId).then(data => {
+      setVob(data);
+      setFormData(data);
+    });
+  };
+
   const handleSaveDraft = async () => {
     try {
       const patchRes = await vobsApi.patchVob(activeVobId, { ...formData, provenance }, vob.version, currentUser.email);
@@ -108,11 +123,7 @@ export function VerificationFormView() {
       showToast("Draft changes saved successfully.", "info");
     } catch (err) {
       if (err.status === 409) {
-        showToast("Conflict 409: Record was updated by someone else. Reloading.", "error");
-        vobsApi.getVobById(activeVobId).then(data => {
-          setVob(data);
-          setFormData(data);
-        });
+        reloadAfterConflict(err);
       } else {
         showToast("Error saving draft", "error");
       }
@@ -155,11 +166,7 @@ export function VerificationFormView() {
     } catch (err) {
       console.error(err);
       if (err.status === 409) {
-        showToast("Conflict 409: Record version mismatch. Reloading record.", "error");
-        vobsApi.getVobById(activeVobId).then(data => {
-          setVob(data);
-          setFormData(data);
-        });
+        reloadAfterConflict(err);
       } else {
         showToast(err?.message || "Submission error", "error");
       }
@@ -183,6 +190,9 @@ export function VerificationFormView() {
   }
 
   const { filledCount, totalCount } = getVerificationProgress(formData);
+  // The API refuses edits to an Auth Queue VOB until the auth person records the
+  // authorization (POST /vobs/:id/auth, from the Auth Queue), so lock the form.
+  const inAuthQueue = vob.status === 'auth_queue';
 
   // One section per block of the Parker document, in the order it reads, so
   // working down the form works down the document. The row numbers are the
@@ -292,7 +302,10 @@ export function VerificationFormView() {
             type="button"
             className="btn btn-sm"
             onClick={() => setIsAiDrawerOpen(true)}
-            title="Paste call transcript or payer portal text to auto-fill"
+            disabled={inAuthQueue}
+            title={inAuthQueue
+              ? "Locked while the VOB is in the Auth Queue"
+              : "Paste call transcript or payer portal text to auto-fill"}
           >
             Paste Transcript
           </button>
@@ -311,6 +324,16 @@ export function VerificationFormView() {
               onOpenTranscript={() => setIsAiDrawerOpen(true)}
               onSelectField={handleSelectField}
             />
+
+            {inAuthQueue && (
+              <div className="auth-queue-lock-banner" role="status">
+                <div className="error-banner-icon">⏳</div>
+                <div className="error-banner-content">
+                  <h4>In the Auth Queue: fields are locked</h4>
+                  <p>This VOB is waiting on its authorization, so it can't be edited or resubmitted here. Record the payer's authorization number in the Auth Queue to approve it.</p>
+                </div>
+              </div>
+            )}
 
             {/* Validation Error Banner */}
             {failingRules.length > 0 && (
@@ -359,6 +382,7 @@ export function VerificationFormView() {
                               className={`vob-select ${hasError ? 'input-error' : ''}`}
                               value={formData[f.key] || ''}
                               onChange={(e) => handleFieldChange(f.key, e.target.value)}
+                              disabled={inAuthQueue}
                             >
                               <option value="">Select option…</option>
                               {f.options.map(opt => (
@@ -373,6 +397,7 @@ export function VerificationFormView() {
                               value={formData[f.key] || ''}
                               placeholder={f.placeholder || `Enter ${f.label.toLowerCase()}…`}
                               onChange={(e) => handleFieldChange(f.key, e.target.value)}
+                              disabled={inAuthQueue}
                             />
                           )}
 
@@ -414,21 +439,33 @@ export function VerificationFormView() {
         </div>
 
         <div className="action-bar-right">
-          <button
-            type="button"
-            className="btn ghost"
-            onClick={handleSaveDraft}
-          >
-            💾 Save Draft
-          </button>
-          <button
-            type="button"
-            className="btn btn-submit-vob"
-            onClick={handleSubmit}
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? 'Validating against Client Rules…' : '✓ Submit VOB for Validation'}
-          </button>
+          {inAuthQueue ? (
+            <button
+              type="button"
+              className="btn"
+              onClick={() => setActiveTab('auth_queue')}
+            >
+              ⏳ Record Auth in Auth Queue
+            </button>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={handleSaveDraft}
+              >
+                💾 Save Draft
+              </button>
+              <button
+                type="button"
+                className="btn btn-submit-vob"
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Validating against Client Rules…' : '✓ Submit VOB for Validation'}
+              </button>
+            </>
+          )}
         </div>
       </div>
 

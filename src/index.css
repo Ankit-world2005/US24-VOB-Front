@@ -1878,6 +1878,18 @@ body::before {
   animation: shake .35s ease;
 }
 
+/* Informational twin of the error banner: the VOB is locked, nothing is wrong. */
+.auth-queue-lock-banner {
+  display: flex;
+  gap: 14px;
+  padding: 16px 20px;
+  background: var(--mint-soft);
+  border: 1px solid var(--navy);
+  border-left-width: 4px;
+  border-radius: var(--r-md);
+  color: var(--navy);
+}
+
 .error-banner-icon {
   font-size: 24px;
 }
