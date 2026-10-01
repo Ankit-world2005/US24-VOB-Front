@@ -21,7 +21,6 @@
     "adminTabs": [
       { "id": "dashboard", "label": "📊 Dashboard & Metrics" },
       { "id": "upload_assign", "label": "📥 Upload & Assign" },
-      { "id": "master_data", "label": "🗄️ Master Data" },
       { "id": "records", "label": "📋 All Client Records" },
       { "id": "users", "label": "👥 User Access" },
       { "id": "audit_logs", "label": "🔒 HIPAA Audit Trail" }

@@ -68,9 +68,6 @@ export function AdminDashboardView() {
             <button type="button" className="btn btn-sm" onClick={() => setActiveTab('upload_assign')}>
               + Upload & Assign Intake
             </button>
-            <button type="button" className="btn btn-sm ghost" onClick={() => setActiveTab('master_data')}>
-              Master Reference Data
-            </button>
           </div>
         </div>
 

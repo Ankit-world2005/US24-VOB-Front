@@ -83,9 +83,20 @@ function describe(entry) {
   return { title: humanize(entry.action), note: entry.notes };
 }
 
-export function TaskLogTimeline({ entries, freshIds, now }) {
+/** One line for a list cell: "Status → Approved", "Insurance Name updated". */
+export function summarizeLogEntry(entry) {
+  const { title, to } = describe(entry);
+  if (entry.field === 'status' && to) return `Status → ${to}`;
+  return title;
+}
+
+/**
+ * `entries` may span several tasks (the "All Task Logs" feed): an entry with a
+ * `vobId` is tagged with its task, and `onSelectTask(vobId)` opens it.
+ */
+export function TaskLogTimeline({ entries, freshIds, now, onSelectTask, emptyText = 'No changes recorded for this task yet.' }) {
   if (entries.length === 0) {
-    return <div className="task-log-empty">No changes recorded for this task yet.</div>;
+    return <div className="task-log-empty">{emptyText}</div>;
   }
 
   return (
@@ -100,6 +111,16 @@ export function TaskLogTimeline({ entries, freshIds, now }) {
           >
             <span className="task-log-dot" aria-hidden="true" />
             <div className="task-log-body">
+              {entry.vobId && (
+                <button
+                  type="button"
+                  className="task-log-task"
+                  onClick={() => onSelectTask?.(entry.vobId)}
+                  title="Show this task"
+                >
+                  {entry.patientName} <span className="mono">{entry.vobId.slice(0, 8)}</span>
+                </button>
+              )}
               <div className="task-log-title">{title}</div>
               {(from !== undefined || to) && (
                 <div className="task-log-change">

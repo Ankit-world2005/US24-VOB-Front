@@ -4,7 +4,6 @@ import { UI_CONTENT } from '../DB';
 
 const AdminDashboardView = lazy(() => import('../views/admin/AdminDashboardView').then(m => ({ default: m.AdminDashboardView })));
 const UploadAssignView = lazy(() => import('../views/admin/UploadAssignView').then(m => ({ default: m.UploadAssignView })));
-const MasterDataView = lazy(() => import('../views/admin/MasterDataView').then(m => ({ default: m.MasterDataView })));
 const GlobalRecordsView = lazy(() => import('../views/admin/GlobalRecordsView').then(m => ({ default: m.GlobalRecordsView })));
 const UserManagementView = lazy(() => import('../views/admin/UserManagementView').then(m => ({ default: m.UserManagementView })));
 const AuditLogsView = lazy(() => import('../views/admin/AuditLogsView').then(m => ({ default: m.AuditLogsView })));
@@ -46,7 +45,6 @@ export function AdminLayout() {
         }>
           {activeTab === 'dashboard' && <AdminDashboardView />}
           {activeTab === 'upload_assign' && <UploadAssignView />}
-          {activeTab === 'master_data' && <MasterDataView />}
           {activeTab === 'records' && <GlobalRecordsView />}
           {activeTab === 'users' && <UserManagementView />}
           {activeTab === 'audit_logs' && <AuditLogsView />}

@@ -1,16 +1,17 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { DataError } from '../../components/DataError';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { dashboardApi } from '../../api/dashboard';
 import { vobsApi } from '../../api/vobs';
 import { usePolling } from '../../hooks/usePolling';
+import { useTaskLogs } from '../../hooks/useTaskLogs';
 import { cardFor, cardsFor } from '../../data/dashboardCards';
 import { timeAgo } from '../../utils/timeAgo';
 import { formKeyFor } from '../../utils/vobAdapter';
 import { CANONICAL_FIELDS } from '../../data/clients';
 import { StatusBadge } from '../../components/vob/StatusBadge';
 import { ClientBadge } from '../../components/vob/ClientBadge';
-import { TaskLogTimeline } from '../../components/vob/TaskLogTimeline';
+import { TaskLogTimeline, summarizeLogEntry } from '../../components/vob/TaskLogTimeline';
 import { DocumentGeneratorModal } from '../../components/vob/DocumentGeneratorModal';
 import { RecordDetailModal } from '../../components/vob/RecordDetailModal';
 
@@ -18,6 +19,8 @@ const LIST_POLL_MS = 15000;
 const TASK_POLL_MS = 10000;
 // The API's largest page.
 const LIST_LIMIT = 200;
+// Newest events shown in the all-tasks feed.
+const FEED_LIMIT = 150;
 
 /** The current time, re-read every `ms`, so "5s ago" labels keep counting. */
 function useNow(ms) {
@@ -45,9 +48,10 @@ function LiveIndicator({ lastUpdated, refreshing, onRefresh, now }) {
 
 /**
  * The page a dashboard KPI card opens: the VOBs that card counts, kept live by
- * polling, with the selected task's details alongside. Admins also see that
- * task's change history, updating as it changes; the audit log is admin-only in
- * the API and the database (SEC-6), so specialists do not.
+ * polling, with the selected task's details alongside. Admins also see the
+ * change history of every task on the page — each row's latest event, the
+ * selected task's full log, and one live feed of all of them. The audit log is
+ * admin-only in the API and the database (SEC-6), so specialists do not.
  */
 export function CardDetailView() {
   const { currentUser, selectedClient, activeCard, openCardPage, setActiveTab } = useWorkspace();
@@ -129,7 +133,24 @@ function CardRecords({ card, isAdmin }) {
     if (!selectedId && vobs.length > 0) setSelectedId(vobs[0].id);
   }, [vobs, selectedId]);
 
+  // Every listed task's log, re-read as the list shows it changed (admins only).
+  const { logs: taskLogs, freshIds: feedFreshIds } = useTaskLogs(vobs, isAdmin);
+  const loggedCount = vobs.filter(v => taskLogs[v.id]).length;
+  const feed = useMemo(() => (
+    vobs
+      .flatMap(v => (taskLogs[v.id] || []).map(e => ({ ...e, vobId: v.id, patientName: v.patientName })))
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+      .slice(0, FEED_LIMIT)
+  ), [vobs, taskLogs]);
+
+  const taskPanelRef = useRef(null);
+  const showTask = (id) => {
+    setSelectedId(id);
+    taskPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   const selectedRow = vobs.find(v => v.id === selectedId) || null;
+  // Admins swap Updated for Latest Activity and add Assigned To.
   const columns = 6 + (isAdmin ? 1 : 0) + (card.id === 'error' ? 1 : 0);
 
   return (
@@ -161,7 +182,8 @@ function CardRecords({ card, isAdmin }) {
                   {isAdmin && <th>Assigned To</th>}
                   <th>Status</th>
                   {card.id === 'error' && <th>Failing Rules</th>}
-                  <th>Updated</th>
+                  {/* Admins see when, and what, in Latest Activity; specialists have no log. */}
+                  {isAdmin ? <th>Latest Activity</th> : <th>Updated</th>}
                 </tr>
               </thead>
               <tbody>
@@ -192,9 +214,29 @@ function CardRecords({ card, isAdmin }) {
                       {isAdmin && <td>{v.assignedTo || 'Unassigned'}</td>}
                       <td><StatusBadge status={v.vobStatus} /></td>
                       {card.id === 'error' && <td className="mono failure-count">{v.failureCount}</td>}
-                      <td className="mono" title={v.updatedAt ? new Date(v.updatedAt).toLocaleString() : ''}>
-                        {timeAgo(v.updatedAt, now)}
-                      </td>
+                      {isAdmin ? (
+                        <td className="latest-activity-cell">
+                          {taskLogs[v.id]?.[0] ? (
+                            <>
+                              <span className={feedFreshIds.has(taskLogs[v.id][0].id) ? 'log-entry-new' : ''}>
+                                {summarizeLogEntry(taskLogs[v.id][0])}
+                              </span>
+                              <span
+                                className="patient-sub-cell"
+                                title={new Date(taskLogs[v.id][0].timestamp).toLocaleString()}
+                              >
+                                by {taskLogs[v.id][0].user} · {timeAgo(taskLogs[v.id][0].timestamp, now)}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="patient-sub-cell">{taskLogs[v.id] ? 'No changes yet' : 'Loading…'}</span>
+                          )}
+                        </td>
+                      ) : (
+                        <td className="mono" title={v.updatedAt ? new Date(v.updatedAt).toLocaleString() : ''}>
+                          {timeAgo(v.updatedAt, now)}
+                        </td>
+                      )}
                     </tr>
                   ))
                 )}
@@ -206,7 +248,7 @@ function CardRecords({ card, isAdmin }) {
           )}
         </section>
 
-        <aside className="panel-card card-detail-task">
+        <aside className="panel-card card-detail-task" ref={taskPanelRef}>
           {selectedId ? (
             <TaskPanel
               key={selectedId}
@@ -223,6 +265,38 @@ function CardRecords({ card, isAdmin }) {
           )}
         </aside>
       </div>
+
+      {isAdmin && (
+        <section className="panel-card task-feed">
+          <div className="panel-header">
+            <div>
+              <h3>All Task Logs</h3>
+              <span className="panel-sub">
+                Every change to the records above, newest first. A task's log is re-read as soon as the list shows it changed.
+              </span>
+            </div>
+            <div className="live-indicator">
+              <span className="live-dot" aria-hidden="true" />
+              <span>
+                {loggedCount < vobs.length
+                  ? `Loading logs ${loggedCount}/${vobs.length}…`
+                  : `${vobs.length} tasks · ${feed.length}${feed.length === FEED_LIMIT ? '+' : ''} events`}
+              </span>
+            </div>
+          </div>
+          {loading || (vobs.length > 0 && loggedCount === 0) ? (
+            <div className="task-log-empty">Loading logs…</div>
+          ) : (
+            <TaskLogTimeline
+              entries={feed}
+              freshIds={feedFreshIds}
+              now={now}
+              onSelectTask={showTask}
+              emptyText="No records on this page, so no logs to show."
+            />
+          )}
+        </section>
+      )}
     </>
   );
 }
