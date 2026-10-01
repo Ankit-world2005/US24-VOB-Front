@@ -8,10 +8,13 @@ const MasterDataView = lazy(() => import('../views/admin/MasterDataView').then(m
 const GlobalRecordsView = lazy(() => import('../views/admin/GlobalRecordsView').then(m => ({ default: m.GlobalRecordsView })));
 const UserManagementView = lazy(() => import('../views/admin/UserManagementView').then(m => ({ default: m.UserManagementView })));
 const AuditLogsView = lazy(() => import('../views/admin/AuditLogsView').then(m => ({ default: m.AuditLogsView })));
+const CardDetailView = lazy(() => import('../views/shared/CardDetailView').then(m => ({ default: m.CardDetailView })));
 
 export function AdminLayout() {
   const { activeTab, setActiveTab } = useWorkspace();
   const tabs = UI_CONTENT.navigation.adminTabs;
+  // A card's page belongs to the dashboard, so its tab stays highlighted there.
+  const highlightedTab = activeTab === 'card_detail' ? 'dashboard' : activeTab;
 
   return (
     <div className="admin-layout">
@@ -23,7 +26,7 @@ export function AdminLayout() {
               <button
                 key={tab.id}
                 type="button"
-                className={`workspace-tab-btn ${activeTab === tab.id ? 'active' : ''}`}
+                className={`workspace-tab-btn ${highlightedTab === tab.id ? 'active' : ''}`}
                 onClick={() => setActiveTab(tab.id)}
               >
                 {tab.label}
@@ -47,6 +50,7 @@ export function AdminLayout() {
           {activeTab === 'records' && <GlobalRecordsView />}
           {activeTab === 'users' && <UserManagementView />}
           {activeTab === 'audit_logs' && <AuditLogsView />}
+          {activeTab === 'card_detail' && <CardDetailView />}
         </Suspense>
       </div>
     </div>

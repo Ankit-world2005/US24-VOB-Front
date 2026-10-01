@@ -17,6 +17,8 @@ export function WorkspaceProvider({ session, onLogout, children }) {
   const [selectedClient, setSelectedClient] = useState("all");
   const [activeTab, setActiveTab] = useState(session.role === "admin" ? "dashboard" : "my_dashboard");
   const [activeVobId, setActiveVobId] = useState(null);
+  // Which dashboard card's page is open (see src/data/dashboardCards.js).
+  const [activeCard, setActiveCard] = useState(null);
   const [toast, setToast] = useState(null);
 
   // Sync role if session changes
@@ -65,6 +67,11 @@ export function WorkspaceProvider({ session, onLogout, children }) {
     setActiveTab("verification");
   };
 
+  const openCardPage = (cardId) => {
+    setActiveCard(cardId);
+    setActiveTab("card_detail");
+  };
+
   return (
     <WorkspaceContext.Provider
       value={{
@@ -78,6 +85,8 @@ export function WorkspaceProvider({ session, onLogout, children }) {
         activeVobId,
         setActiveVobId,
         openVerification,
+        activeCard,
+        openCardPage,
         showToast,
         toast,
         onLogout

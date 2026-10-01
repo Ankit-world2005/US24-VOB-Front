@@ -7,10 +7,13 @@ const VerificationFormView = lazy(() => import('../views/specialist/Verification
 const AuthQueueView = lazy(() => import('../views/specialist/AuthQueueView').then(m => ({ default: m.AuthQueueView })));
 const ErrorQueueView = lazy(() => import('../views/specialist/ErrorQueueView').then(m => ({ default: m.ErrorQueueView })));
 const SavedRecordsView = lazy(() => import('../views/specialist/SavedRecordsView').then(m => ({ default: m.SavedRecordsView })));
+const CardDetailView = lazy(() => import('../views/shared/CardDetailView').then(m => ({ default: m.CardDetailView })));
 
 export function SpecialistLayout() {
   const { activeTab, setActiveTab } = useWorkspace();
   const tabs = UI_CONTENT.navigation.specialistTabs;
+  // A card's page belongs to the dashboard, so its tab stays highlighted there.
+  const highlightedTab = activeTab === 'card_detail' ? 'my_dashboard' : activeTab;
 
   return (
     <div className="specialist-layout">
@@ -22,7 +25,7 @@ export function SpecialistLayout() {
               <button
                 key={tab.id}
                 type="button"
-                className={`workspace-tab-btn ${activeTab === tab.id ? 'active' : ''}`}
+                className={`workspace-tab-btn ${highlightedTab === tab.id ? 'active' : ''}`}
                 onClick={() => setActiveTab(tab.id)}
               >
                 {tab.label}
@@ -45,6 +48,7 @@ export function SpecialistLayout() {
           {activeTab === 'auth_queue' && <AuthQueueView />}
           {activeTab === 'error_queue' && <ErrorQueueView />}
           {activeTab === 'saved_records' && <SavedRecordsView />}
+          {activeTab === 'card_detail' && <CardDetailView />}
         </Suspense>
       </div>
     </div>

@@ -3809,3 +3809,338 @@ body.print-frame::before {
   font-weight: 400;
   color: #000000;
 }
+
+/* ==========================================================================
+   Dashboard card pages (CardDetailView): the records a KPI card counts, kept
+   live, with the selected task and its log alongside.
+   ========================================================================== */
+.card-detail-view {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.card-detail-view .panel-card {
+  margin-bottom: 0;
+}
+
+.kpi-card:focus-visible,
+.card-chip:focus-visible,
+.card-detail-list tr:focus-visible {
+  outline: 2px solid var(--cobalt);
+  outline-offset: 2px;
+}
+
+.card-detail-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+  flex-wrap: wrap;
+}
+
+.card-switcher {
+  display: flex;
+  gap: 8px;
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 2px;
+}
+
+.card-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  padding: 7px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--surface);
+  font-family: var(--sans);
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: border-color .15s ease, background .15s ease, color .15s ease;
+}
+
+.card-chip:hover {
+  border-color: var(--ink-soft);
+  color: var(--ink);
+}
+
+.card-chip-count {
+  font-family: var(--mono);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.card-chip.kpi-pending .card-chip-count { color: var(--cobalt); }
+.card-chip.kpi-auth .card-chip-count { color: var(--orange-text); }
+.card-chip.kpi-approved .card-chip-count { color: #16a34a; }
+.card-chip.kpi-error .card-chip-count { color: var(--danger); }
+
+.card-chip.active {
+  background: var(--navy);
+  border-color: var(--navy);
+  color: #ffffff;
+}
+
+.card-chip.active .card-chip-count {
+  color: #ffffff;
+}
+
+.card-detail-header {
+  padding: 18px 24px;
+}
+
+.card-detail-header .panel-header {
+  margin-bottom: 0;
+}
+
+.live-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #16a34a;
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, .15);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.card-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(320px, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 1000px) {
+  .card-detail-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.card-detail-list {
+  padding: 12px;
+}
+
+.data-table tr.row-selected td {
+  background: var(--mint-soft);
+}
+
+.data-table tr.row-selected td:first-child {
+  box-shadow: inset 3px 0 0 var(--navy);
+}
+
+.failure-count {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.card-detail-footnote {
+  margin: 12px 12px 0;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+/* ---- Selected task ---- */
+.task-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.task-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.task-panel-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  color: var(--ink-soft);
+}
+
+.task-panel-title {
+  font-family: var(--serif);
+  font-size: 22px;
+  font-weight: 400;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.task-moved-note {
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  background: var(--mint-soft);
+  color: var(--navy);
+  font-size: 13px;
+}
+
+.task-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px;
+  margin: 0;
+}
+
+.task-facts dt {
+  margin-bottom: 2px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--ink-soft);
+}
+
+.task-facts dd {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.task-actions {
+  flex-wrap: wrap;
+}
+
+/* ---- Task log ---- */
+.task-log-section {
+  border-top: 1px solid var(--rule-soft);
+  padding-top: 16px;
+}
+
+.task-log-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.task-log-heading h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.task-log-empty {
+  padding: 8px 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.task-log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 480px;
+  overflow-y: auto;
+}
+
+.task-log-entry {
+  position: relative;
+  display: flex;
+  gap: 12px;
+  padding: 4px 6px 14px;
+  border-radius: var(--r-md);
+}
+
+/* The rail joining each entry's dot to the next. */
+.task-log-entry::before {
+  content: "";
+  position: absolute;
+  left: 10px;
+  top: 18px;
+  bottom: 0;
+  width: 1px;
+  background: var(--rule);
+}
+
+.task-log-entry:last-child::before {
+  display: none;
+}
+
+.task-log-dot {
+  position: relative;
+  z-index: 1;
+  flex: none;
+  width: 9px;
+  height: 9px;
+  margin-top: 5px;
+  border-radius: 50%;
+  border: 2px solid var(--rule);
+  background: var(--surface);
+}
+
+.task-log-entry.is-status .task-log-dot {
+  border-color: var(--cobalt);
+  background: var(--cobalt);
+}
+
+.task-log-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.task-log-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.task-log-change {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 2px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.task-log-arrow {
+  color: var(--ink-soft);
+}
+
+.task-log-note {
+  margin-top: 2px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+
+.task-log-meta {
+  display: flex;
+  gap: 6px;
+  margin-top: 3px;
+  font-size: 11.5px;
+  color: var(--ink-soft);
+}
+
+/* An entry that arrived since the last poll. */
+.log-entry-new {
+  animation: logFlash 2.4s ease-out;
+}
+
+@keyframes logFlash {
+  from { background: color-mix(in srgb, var(--cobalt) 14%, transparent); }
+  to { background: transparent; }
+}

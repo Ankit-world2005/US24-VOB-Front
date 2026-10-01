@@ -269,6 +269,7 @@ export const vobsApi = {
       field: e.field,
       oldValue: e.old_value,
       newValue: e.new_value,
+      detail: e.detail || {},
       notes: e.detail && Object.keys(e.detail).length ? JSON.stringify(e.detail) : ''
     }));
   },

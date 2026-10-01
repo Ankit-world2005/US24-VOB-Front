@@ -7,10 +7,11 @@ import { usersApi } from '../../api/users';
 import { StatusBadge } from '../../components/vob/StatusBadge';
 import { ClientBadge } from '../../components/vob/ClientBadge';
 import { RecordDetailModal } from '../../components/vob/RecordDetailModal';
+import { KpiCardGrid } from '../../components/vob/KpiCardGrid';
 import { CLIENTS } from '../../data/clients';
 
 export function AdminDashboardView() {
-  const { selectedClient, setSelectedClient, setActiveTab, openVerification } = useWorkspace();
+  const { selectedClient, setSelectedClient, setActiveTab, openVerification, openCardPage } = useWorkspace();
   const [summary, setSummary] = useState({ total: 0, pending: 0, authQueue: 0, error: 0, approved: 0 });
   const [recentVobs, setRecentVobs] = useState([]);
   const [specialists, setSpecialists] = useState([]);
@@ -52,10 +53,6 @@ export function AdminDashboardView() {
     });
   }, [selectedClient, reloadKey]);
 
-  const handleCardClick = (targetStatus) => {
-    setActiveTab('records');
-  };
-
   return (
     <div className="admin-dashboard-view">
       <DataError message={loadError} onRetry={() => setReloadKey(k => k + 1)} />
@@ -77,37 +74,13 @@ export function AdminDashboardView() {
           </div>
         </div>
 
-        <div className="kpi-cards-grid">
-          <div className="kpi-card" onClick={() => handleCardClick('all')} title="Click to view all records">
-            <div className="kpi-label">Total Volume</div>
-            <div className="kpi-number">{loading ? '…' : loadError ? '—' : summary.total}</div>
-            <div className="kpi-meta">All client requests</div>
-          </div>
-
-          <div className="kpi-card kpi-pending" onClick={() => handleCardClick('pending')} title="Click to view pending records">
-            <div className="kpi-label">Pending Verification</div>
-            <div className="kpi-number">{loading ? '…' : loadError ? '—' : summary.pending}</div>
-            <div className="kpi-meta">Assigned & In Progress</div>
-          </div>
-
-          <div className="kpi-card kpi-auth" onClick={() => handleCardClick('auth_queue')} title="Click to view auth queue">
-            <div className="kpi-label">Auth Queue</div>
-            <div className="kpi-number">{loading ? '…' : loadError ? '—' : summary.authQueue}</div>
-            <div className="kpi-meta">Awaiting prior auth determination</div>
-          </div>
-
-          <div className="kpi-card kpi-approved" onClick={() => handleCardClick('approved')} title="Click to view approved records">
-            <div className="kpi-label">Saved Records (Approved)</div>
-            <div className="kpi-number">{loading ? '…' : loadError ? '—' : summary.approved}</div>
-            <div className="kpi-meta">Validated & complete</div>
-          </div>
-
-          <div className="kpi-card kpi-error" onClick={() => handleCardClick('error')} title="Click to view validation errors">
-            <div className="kpi-label">Validation Error</div>
-            <div className="kpi-number">{loading ? '…' : loadError ? '—' : summary.error}</div>
-            <div className="kpi-meta">Requires specialist correction</div>
-          </div>
-        </div>
+        <KpiCardGrid
+          role="admin"
+          summary={summary}
+          loading={loading}
+          loadError={loadError}
+          onOpen={openCardPage}
+        />
       </section>
 
       {/* Two-column middle layout: Client Breakdown & Specialist Workload */}

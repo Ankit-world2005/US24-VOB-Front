@@ -5,9 +5,10 @@ import { dashboardApi } from '../../api/dashboard';
 import { vobsApi } from '../../api/vobs';
 import { StatusBadge } from '../../components/vob/StatusBadge';
 import { ClientBadge } from '../../components/vob/ClientBadge';
+import { KpiCardGrid } from '../../components/vob/KpiCardGrid';
 
 export function SpecialistDashboardView() {
-  const { currentUser, openVerification, setActiveTab } = useWorkspace();
+  const { currentUser, openVerification, openCardPage } = useWorkspace();
   const [summary, setSummary] = useState({ total: 0, pending: 0, authQueue: 0, error: 0, approved: 0 });
   const [myVobs, setMyVobs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -71,38 +72,14 @@ export function SpecialistDashboardView() {
         </div>
       </section>
 
-      {/* KPI Cards (Scoped only to current user FR-13) */}
-      <section className="kpi-cards-grid">
-        <div className="kpi-card" onClick={() => setActiveTab('verification')}>
-          <div className="kpi-label">Assigned to Me</div>
-          <div className="kpi-number">{loading ? '…' : loadError ? '—' : summary.total}</div>
-          <div className="kpi-meta">Across your assigned clients</div>
-        </div>
-
-        <div className="kpi-card kpi-pending" onClick={() => setActiveTab('verification')}>
-          <div className="kpi-label">Pending Verifications</div>
-          <div className="kpi-number">{loading ? '…' : loadError ? '—' : summary.pending}</div>
-          <div className="kpi-meta">Assigned or In Progress</div>
-        </div>
-
-        <div className="kpi-card kpi-auth" onClick={() => setActiveTab('auth_queue')}>
-          <div className="kpi-label">My Auth Queue</div>
-          <div className="kpi-number">{loading ? '…' : loadError ? '—' : summary.authQueue}</div>
-          <div className="kpi-meta">Awaiting prior auth numbers</div>
-        </div>
-
-        <div className="kpi-card kpi-error" onClick={() => setActiveTab('error_queue')}>
-          <div className="kpi-label">Validation Errors</div>
-          <div className="kpi-number">{loading ? '…' : loadError ? '—' : summary.error}</div>
-          <div className="kpi-meta">Failing rules to correct</div>
-        </div>
-
-        <div className="kpi-card kpi-approved" onClick={() => setActiveTab('saved_records')}>
-          <div className="kpi-label">Saved (Approved)</div>
-          <div className="kpi-number">{loading ? '…' : loadError ? '—' : summary.approved}</div>
-          <div className="kpi-meta">Completed today</div>
-        </div>
-      </section>
+      {/* KPI Cards (Scoped only to current user FR-13); each opens its own page */}
+      <KpiCardGrid
+        role={currentUser.role}
+        summary={summary}
+        loading={loading}
+        loadError={loadError}
+        onOpen={openCardPage}
+      />
 
       {/* My Active Tasks Table */}
       <section className="panel-card">
