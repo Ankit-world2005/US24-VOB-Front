@@ -1,6 +1,13 @@
 import React, { useState, useRef } from 'react';
 import { vobsApi } from '../../api/vobs';
 
+/**
+ * The API's limit (MAX_TRANSCRIPT_CHARS in the backend's
+ * src/features/vobs/extraction.ts), checked here so a transcript over it gets a
+ * clear message instead of the API's generic 400.
+ */
+const MAX_TRANSCRIPT_CHARS = 300000;
+
 /** What went wrong, in the specialist's terms. Never a guess in place of an answer. */
 function describeFailure(err) {
   switch (err?.status) {
@@ -31,6 +38,10 @@ export function AiTranscriptDrawer({ isOpen, onClose, vobId, onApplyFields }) {
 
   if (!isOpen) return null;
 
+  // The API trims before it counts, so this does too.
+  const length = transcript.trim().length;
+  const tooLong = length > MAX_TRANSCRIPT_CHARS;
+
   const handleFileUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -53,7 +64,7 @@ export function AiTranscriptDrawer({ isOpen, onClose, vobId, onApplyFields }) {
   // payer's words in it, and answers. If it cannot, the specialist is told so —
   // nothing is guessed in its place.
   const handleExtract = async () => {
-    if (!transcript.trim()) return;
+    if (!transcript.trim() || tooLong) return;
     setIsProcessing(true);
     setResult(null);
     setError('');
@@ -153,6 +164,17 @@ export function AiTranscriptDrawer({ isOpen, onClose, vobId, onApplyFields }) {
               placeholder="Paste raw conversation notes, drag & drop transcript file, or click 'Upload Transcript File' above..."
             />
           </div>
+          <div style={{ fontSize: '11px', textAlign: 'right', marginTop: '4px', color: tooLong ? 'var(--danger, #dc2626)' : 'var(--ink-soft)' }}>
+            {length.toLocaleString()} / {MAX_TRANSCRIPT_CHARS.toLocaleString()} characters
+          </div>
+
+          {tooLong && (
+            <div className="extracted-preview-box" role="alert" style={{ borderColor: 'var(--danger, #dc2626)' }}>
+              <span className="extracted-note" style={{ color: 'var(--danger, #dc2626)', fontWeight: 600 }}>
+                This transcript is {length.toLocaleString()} characters; the limit is {MAX_TRANSCRIPT_CHARS.toLocaleString()}. Remove repeated hold messages or split the call.
+              </span>
+            </div>
+          )}
 
           {isProcessing && (
             <div className="ai-progress-wrap">
@@ -271,7 +293,7 @@ export function AiTranscriptDrawer({ isOpen, onClose, vobId, onApplyFields }) {
               type="button"
               className="btn"
               onClick={handleExtract}
-              disabled={isProcessing || !transcript.trim()}
+              disabled={isProcessing || !transcript.trim() || tooLong}
             >
               {isProcessing ? 'Reading with AI ' : error ? 'Try Again' : 'Extract & Preview'}
             </button>

@@ -152,6 +152,9 @@ export const apiClient = {
 
   /**
    * Sends HTTP request directly to the backend API.
+   *
+   * `timeout` aborts the request after that many ms (default 20 s). `null` sets
+   * no limit, for a call the backend bounds itself (vobsApi.extract).
    */
   async request({ path, method = 'GET', data = null, params = null, headers = null, timeout = 20000, _retried = false }) {
     const token = this.getToken();
@@ -197,9 +200,12 @@ export const apiClient = {
       }
     }
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
-    options.signal = controller.signal;
+    let timeoutId = null;
+    if (timeout > 0) {
+      const controller = new AbortController();
+      timeoutId = setTimeout(() => controller.abort(), timeout);
+      options.signal = controller.signal;
+    }
 
     try {
       const res = await fetch(url, options);
@@ -260,6 +266,8 @@ export const apiClient = {
     } catch (err) {
       console.warn(`[API Client] ${method} ${url} failed:`, err.message);
       throw err;
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 };

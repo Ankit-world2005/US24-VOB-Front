@@ -240,47 +240,16 @@ export const vobsApi = {
    * nothing: the specialist applies, reviews and saves.
    */
   async extract(id, text, { channel } = {}) {
-    const executeExtract = async (useDelegation = false) => {
-      let headers = undefined;
-      if (useDelegation) {
-        try {
-          const specLogin = await apiClient.request({
-            path: '/api/v1/auth/login',
-            method: 'POST',
-            data: { email: 'user@us24.test', password: 'DevPassword123!' }
-          });
-          const specToken = specLogin?.access_token || specLogin?.token;
-          if (specToken) {
-            headers = { Authorization: `Bearer ${specToken}` };
-          }
-        } catch (e) {
-          console.warn('[extract] Delegation login failed:', e);
-        }
-      }
-
-      return await apiClient.request({
-        path: `/api/v1/vobs/${id}/extract`,
-        method: 'POST',
-        headers,
-        timeout: 60000,
-        data: channel ? { text, channel } : { text }
-      });
-    };
-
-    try {
-      const res = await executeExtract(false);
-      return normalizeExtraction(res);
-    } catch (err) {
-      if (err?.status === 403 || err?.status === 404) {
-        try {
-          const res = await executeExtract(true);
-          return normalizeExtraction(res);
-        } catch (delegationErr) {
-          console.warn('[extract] Delegation fallback failed:', delegationErr);
-        }
-      }
-      throw err;
-    }
+    const res = await apiClient.request({
+      path: `/api/v1/vobs/${id}/extract`,
+      method: 'POST',
+      // No limit here: the backend ends every extract within EXTRACTION_BUDGET_MS
+      // (100 s) with proposals or a 503 that says why. A shorter limit here would
+      // abort a slow call that was about to succeed.
+      timeout: null,
+      data: channel ? { text, channel } : { text }
+    });
+    return normalizeExtraction(res);
   },
 
   /**
