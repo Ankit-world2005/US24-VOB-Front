@@ -20,7 +20,10 @@ export function SpecialistDashboardView() {
     setLoadError('');
     Promise.all([
       dashboardApi.getSummary({ userEmail: currentUser.email }),
-      vobsApi.getVobs({ assigneeId: currentUser.email, limit: 50 })
+      // Only VOBs still waiting to be started. Once the status moves on (In
+      // Progress, Auth Queue, Error, Approved) the VOB leaves this queue and is
+      // found under its card above.
+      vobsApi.getVobs({ assigneeId: currentUser.email, status: 'Assigned', limit: 50 })
     ]).then(([sumData, list]) => {
       setSummary(sumData);
       setMyVobs(list);
@@ -109,7 +112,7 @@ export function SpecialistDashboardView() {
               ) : loadError ? (
                 <tr><td colSpan="7" className="table-empty">Could not load your queue.</td></tr>
               ) : myVobs.length === 0 ? (
-                <tr><td colSpan="7" className="table-empty">No tasks currently assigned to your queue.</td></tr>
+                <tr><td colSpan="7" className="table-empty">No assigned tasks in your queue. Work in progress and finished work is under the cards above.</td></tr>
               ) : (
                 myVobs.map(v => (
                   <tr key={v.id} className="interactive-row" onClick={() => openVerification(v.id)}>
