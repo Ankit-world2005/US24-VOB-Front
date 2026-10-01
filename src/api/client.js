@@ -153,7 +153,7 @@ export const apiClient = {
   /**
    * Sends HTTP request directly to the backend API.
    */
-  async request({ path, method = 'GET', data = null, params = null, headers = null, _retried = false }) {
+  async request({ path, method = 'GET', data = null, params = null, headers = null, timeout = 20000, _retried = false }) {
     const token = this.getToken();
 
     // Live HTTP fetch implementation routing through proxy or direct API
@@ -198,7 +198,7 @@ export const apiClient = {
     }
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20000);
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
     options.signal = controller.signal;
 
     try {
@@ -210,7 +210,7 @@ export const apiClient = {
       if (res.status === 401 && !isCredentialRoute && !_retried) {
         const renewed = await this.refreshSession();
         if (renewed) {
-          return this.request({ path, method, data, params, _retried: true });
+          return this.request({ path, method, data, params, headers, timeout, _retried: true });
         }
         this.clearToken();
         if (typeof window !== 'undefined') {
