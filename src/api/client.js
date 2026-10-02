@@ -22,6 +22,21 @@ let refreshInFlight = null;
 // Why the last refresh was refused, for the sign-in page to explain.
 let refreshRefusal = null;
 
+// A read the server could not serve for a moment — busy (503), or a gateway
+// error — is tried again after these waits, or after the server's Retry-After.
+// Only reads: a 503 to a write may follow a write that happened, so writes are
+// never replayed.
+const READ_RETRY_DELAYS_MS = [600, 1800];
+const MAX_RETRY_WAIT_MS = 5000;
+
+/** A failure worth one more try: the server was busy, or the network dropped. */
+function isTransient(err) {
+  // fetch() rejects with a TypeError when the request never got a response.
+  return [502, 503, 504].includes(err?.status) || err instanceof TypeError;
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 /** The account this tab signed in as (saved by useAuth), or null. */
 function signedInUserId() {
   try {
@@ -151,12 +166,28 @@ export const apiClient = {
   },
 
   /**
-   * Sends HTTP request directly to the backend API.
+   * Sends a request to the backend API, trying a read again when the server
+   * could not serve it for a moment (see READ_RETRY_DELAYS_MS).
+   */
+  async request(opts) {
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        return await this.send(opts);
+      } catch (err) {
+        const delay = READ_RETRY_DELAYS_MS[attempt];
+        if ((opts.method || 'GET') !== 'GET' || delay === undefined || !isTransient(err)) throw err;
+        await sleep(Math.min(err.retryAfterMs || delay, MAX_RETRY_WAIT_MS));
+      }
+    }
+  },
+
+  /**
+   * Sends one HTTP request directly to the backend API.
    *
    * `timeout` aborts the request after that many ms (default 20 s). `null` sets
    * no limit, for a call the backend bounds itself (vobsApi.extract).
    */
-  async request({ path, method = 'GET', data = null, params = null, headers = null, timeout = 20000, _retried = false }) {
+  async send({ path, method = 'GET', data = null, params = null, headers = null, timeout = 20000, _retried = false }) {
     const token = this.getToken();
 
     // Live HTTP fetch implementation routing through proxy or direct API
@@ -250,6 +281,8 @@ export const apiClient = {
         err.data = errorBody;
         err.unreachable = unreachable;
         err.generic = !serverMessage;
+        const retryAfter = Number(res.headers.get('retry-after'));
+        if (retryAfter > 0) err.retryAfterMs = retryAfter * 1000;
         throw err;
       }
 
