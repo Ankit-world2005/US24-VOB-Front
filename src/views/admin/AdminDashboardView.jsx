@@ -1,61 +1,81 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { DataError } from '../../components/DataError';
+import { LiveIndicator } from '../../components/LiveIndicator';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { dashboardApi } from '../../api/dashboard';
+import { uiClientFor } from '../../api/clientIds';
 import { vobsApi } from '../../api/vobs';
-import { usersApi } from '../../api/users';
+import { usePolling } from '../../hooks/usePolling';
+import { useNow } from '../../hooks/useNow';
 import { StatusBadge } from '../../components/vob/StatusBadge';
 import { ClientBadge } from '../../components/vob/ClientBadge';
 import { RecordDetailModal } from '../../components/vob/RecordDetailModal';
 import { KpiCardGrid } from '../../components/vob/KpiCardGrid';
 import { CLIENTS } from '../../data/clients';
 
+const POLL_MS = 30000;
+const EMPTY_BREAKDOWN = { totalVobs: 0, clients: [], specialists: [], needsAssignment: 0 };
+
+/** A specialist's load from the work still on their plate: open plus errors to fix. */
+function loadOf(sp) {
+  const work = sp.open + sp.error;
+  return work > 10 ? 'High' : work > 5 ? 'Medium' : 'Optimal';
+}
+
+function initials(name) {
+  return name.split(/\s+/).filter(Boolean).map(p => p[0]).join('').slice(0, 2).toUpperCase();
+}
+
 export function AdminDashboardView() {
-  const { selectedClient, setSelectedClient, setActiveTab, openVerification, openCardPage } = useWorkspace();
+  const { selectedClient, setSelectedClient, setActiveTab, openCardPage } = useWorkspace();
   const [summary, setSummary] = useState({ total: 0, pending: 0, authQueue: 0, error: 0, approved: 0 });
   const [recentVobs, setRecentVobs] = useState([]);
-  const [specialists, setSpecialists] = useState([]);
+  const [breakdown, setBreakdown] = useState(EMPTY_BREAKDOWN);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
-  const [reloadKey, setReloadKey] = useState(0);
   const [inspectVobId, setInspectVobId] = useState(null);
+  const now = useNow(5000);
 
-  useEffect(() => {
-    setLoading(true);
-    setLoadError('');
-    Promise.all([
-      dashboardApi.getSummary({ clientId: selectedClient }),
-      vobsApi.getVobs({ clientId: selectedClient, limit: 50 }),
-      usersApi.getUsers().catch(() => [])
-    ]).then(([sumData, vobsList, userList]) => {
+  // Every count on the page, re-read every 30s and when the tab comes back into
+  // view. Only the first load shows placeholders; refreshes swap numbers in place.
+  const { lastUpdated, refreshing, refresh } = usePolling(async (isCurrent) => {
+    try {
+      const [sumData, vobsList, breakdownData] = await Promise.all([
+        dashboardApi.getSummary({ clientId: selectedClient }),
+        vobsApi.getVobs({ clientId: selectedClient, limit: 50 }),
+        dashboardApi.getBreakdown({ clientId: selectedClient })
+      ]);
+      if (!isCurrent()) return;
       setSummary(sumData);
       setRecentVobs(vobsList);
-      const specs = (userList || [])
-        .filter(u => u.role === 'user' && u.active !== false)
-        .map(u => {
-          const assignedCount = vobsList.filter(v => v.assignedTo === u.email || v.assignedTo === u.id).length;
-          const completedCount = vobsList.filter(v => (v.assignedTo === u.email || v.assignedTo === u.id) && (v.vobStatus === 'Approved' || v.status === 'approved')).length;
-          return {
-            id: u.id,
-            name: u.name,
-            email: u.email,
-            count: assignedCount,
-            complete: completedCount,
-            capacity: assignedCount > 10 ? 'High' : assignedCount > 5 ? 'Medium' : 'Optimal'
-          };
-        });
-      setSpecialists(specs);
-      setLoading(false);
-    }).catch((err) => {
-      console.error(err);
-      setLoadError(err?.message || 'Could not load this data.');
-      setLoading(false);
-    });
-  }, [selectedClient, reloadKey]);
+      setBreakdown(breakdownData);
+      setLoadError('');
+    } catch (err) {
+      if (isCurrent()) setLoadError(err?.message || 'Could not load this data.');
+      throw err;
+    } finally {
+      if (isCurrent()) setLoading(false);
+    }
+  }, POLL_MS, [selectedClient]);
+
+  // Each server client with the UI's slug (the workspace filter's value) and colour.
+  const clientRows = breakdown.clients.map(c => {
+    const ui = uiClientFor(c.name);
+    return { ...c, key: ui?.id ?? c.id, color: ui?.color ?? 'var(--ink-soft)' };
+  });
+  const scopeName = selectedClient && selectedClient !== 'all'
+    ? (clientRows.find(c => c.key === selectedClient)?.name
+      ?? CLIENTS.find(c => c.id === selectedClient)?.name
+      ?? selectedClient)
+    : 'All clients';
+  const specialists = [...breakdown.specialists].sort(
+    (a, b) => (b.open + b.error) - (a.open + a.error) || a.name.localeCompare(b.name)
+  );
+  const showPlaceholder = loading && !lastUpdated;
 
   return (
     <div className="admin-dashboard-view">
-      <DataError message={loadError} onRetry={() => setReloadKey(k => k + 1)} />
+      <DataError message={loadError} onRetry={refresh} />
 
       {/* KPI Overview Metrics */}
       <section className="dashboard-section">
@@ -65,6 +85,7 @@ export function AdminDashboardView() {
             <p className="dashboard-sub">Live volume and queue statuses across healthcare client organizations</p>
           </div>
           <div className="quick-actions-row">
+            <LiveIndicator lastUpdated={lastUpdated} refreshing={refreshing} onRefresh={refresh} now={now} />
             <button type="button" className="btn btn-sm" onClick={() => setActiveTab('upload_assign')}>
               + Upload & Assign Intake
             </button>
@@ -84,58 +105,99 @@ export function AdminDashboardView() {
       <section className="dashboard-grid-2">
         <div className="panel-card">
           <div className="panel-header">
-            <h3>Volume by Client Sheet (8 Clients)</h3>
-            <span className="panel-sub">VOB_format.xlsx canonical distribution</span>
+            <h3>Volume by Client{showPlaceholder ? '' : ` (${clientRows.length} clients)`}</h3>
+            <span className="panel-sub">All VOBs · {breakdown.totalVobs} total · click a client to filter</span>
           </div>
           <div className="client-volume-list">
-            {CLIENTS.map(c => {
-              const count = recentVobs.filter(v => v.client === c.id).length;
-              const pct = recentVobs.length ? Math.round((count / recentVobs.length) * 100) : 0;
-              return (
-                <div key={c.id} className="client-vol-row" onClick={() => setSelectedClient(c.id)}>
-                  <div className="vol-client-meta">
-                    <span className="vol-color-dot" style={{ background: c.color }} />
-                    <span className="vol-client-name">{c.name}</span>
+            {showPlaceholder ? (
+              <div className="panel-empty">Loading client volumes…</div>
+            ) : clientRows.length === 0 ? (
+              <div className="panel-empty">No clients found.</div>
+            ) : (
+              clientRows.map(c => {
+                const pct = breakdown.totalVobs ? Math.round((c.total / breakdown.totalVobs) * 100) : 0;
+                const isSelected = selectedClient === c.key;
+                const toggle = () => setSelectedClient(isSelected ? 'all' : c.key);
+                return (
+                  <div
+                    key={c.id}
+                    className={`client-vol-row${isSelected ? ' selected' : ''}`}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={isSelected}
+                    title={isSelected ? 'Show all clients' : `Show only ${c.name}`}
+                    onClick={toggle}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        toggle();
+                      }
+                    }}
+                  >
+                    <div className="vol-client-meta">
+                      <span className="vol-color-dot" style={{ background: c.color }} />
+                      <span className="vol-client-name">{c.name}</span>
+                    </div>
+                    <div className="vol-bar-track">
+                      <div className="vol-bar-fill" style={{ width: `${pct}%`, background: c.color }} />
+                    </div>
+                    <div className="vol-count">
+                      <strong>{c.total}</strong> <span className="vol-pct">({pct}%)</span>
+                    </div>
+                    <div className="vol-status-line">
+                      {c.open} open · {c.authQueue} auth · {c.error} errors · {c.approved} approved
+                    </div>
                   </div>
-                  <div className="vol-bar-track">
-                    <div className="vol-bar-fill" style={{ width: `${pct}%`, background: c.color }} />
-                  </div>
-                  <div className="vol-count">
-                    <strong>{count}</strong> <span className="vol-pct">({pct}%)</span>
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </div>
 
         <div className="panel-card">
           <div className="panel-header">
             <h3>Specialist Allocation & Velocity</h3>
-            <span className="panel-sub">Active staff workload</span>
+            <span className="panel-sub">Active specialists · {scopeName}</span>
           </div>
           <div className="specialist-workload-list">
-            {specialists.length === 0 ? (
-              <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
-                No active specialists found.
-              </div>
+            {showPlaceholder ? (
+              <div className="panel-empty">Loading specialist workload…</div>
+            ) : specialists.length === 0 ? (
+              <div className="panel-empty">No active specialists found.</div>
             ) : (
-              specialists.map(sp => (
-                <div key={sp.email} className="spec-row">
-                  <div className="spec-info">
-                    <div className="spec-avatar">{sp.name.split(' ').map(p => p[0]).join('')}</div>
-                    <div>
-                      <div className="spec-name">{sp.name}</div>
-                      <div className="spec-email">{sp.email}</div>
+              specialists.map(sp => {
+                const load = loadOf(sp);
+                return (
+                  <div key={sp.id} className="spec-row">
+                    <div className="spec-info">
+                      <div className="spec-avatar">{initials(sp.name)}</div>
+                      <div>
+                        <div className="spec-name">{sp.name}</div>
+                        <div className="spec-email">{sp.email}</div>
+                      </div>
+                    </div>
+                    <div className="spec-stats">
+                      <div title="Assigned + In Progress"><span>Open:</span> <strong>{sp.open}</strong></div>
+                      {sp.error > 0 && (
+                        <div title="Validation errors to fix"><span>Errors:</span> <strong className="spec-stat-error">{sp.error}</strong></div>
+                      )}
+                      <div title="Approved today"><span>Done today:</span> <strong className="spec-stat-done">{sp.approvedToday}</strong></div>
+                      <div title="Approved in the last 7 days"><span>This week:</span> <strong className="spec-stat-done">{sp.approved7d}</strong></div>
+                      <span className={`capacity-pill load-${load.toLowerCase()}`}>{load} load</span>
                     </div>
                   </div>
-                  <div className="spec-stats">
-                    <div><span>Assigned:</span> <strong>{sp.count}</strong></div>
-                    <div><span>Completed:</span> <strong className="green">{sp.complete}</strong></div>
-                    <span className="capacity-pill">{sp.capacity} load</span>
-                  </div>
-                </div>
-              ))
+                );
+              })
+            )}
+            {!showPlaceholder && breakdown.needsAssignment > 0 && (
+              <div className="spec-footer">
+                <span>
+                  <strong>{breakdown.needsAssignment}</strong> VOB{breakdown.needsAssignment === 1 ? '' : 's'} need assignment
+                </span>
+                <button type="button" className="btn btn-sm ghost" onClick={() => setActiveTab('upload_assign')}>
+                  Assign →
+                </button>
+              </div>
             )}
           </div>
         </div>

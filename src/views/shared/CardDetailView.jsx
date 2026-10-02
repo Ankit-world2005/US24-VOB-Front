@@ -4,7 +4,9 @@ import { useWorkspace } from '../../context/WorkspaceContext';
 import { dashboardApi } from '../../api/dashboard';
 import { vobsApi } from '../../api/vobs';
 import { usePolling } from '../../hooks/usePolling';
+import { useNow } from '../../hooks/useNow';
 import { useTaskLogs } from '../../hooks/useTaskLogs';
+import { LiveIndicator } from '../../components/LiveIndicator';
 import { cardFor, cardsFor } from '../../data/dashboardCards';
 import { timeAgo } from '../../utils/timeAgo';
 import { formKeyFor } from '../../utils/vobAdapter';
@@ -21,30 +23,6 @@ const TASK_POLL_MS = 10000;
 const LIST_LIMIT = 200;
 // Newest events shown in the all-tasks feed.
 const FEED_LIMIT = 150;
-
-/** The current time, re-read every `ms`, so "5s ago" labels keep counting. */
-function useNow(ms) {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), ms);
-    return () => clearInterval(timer);
-  }, [ms]);
-  return now;
-}
-
-function LiveIndicator({ lastUpdated, refreshing, onRefresh, now }) {
-  return (
-    <div className="live-indicator">
-      <span className="live-dot" aria-hidden="true" />
-      <span>
-        Live · {lastUpdated ? `updated ${timeAgo(lastUpdated, now)}` : 'connecting…'}
-      </span>
-      <button type="button" className="btn btn-sm ghost" onClick={onRefresh} disabled={refreshing}>
-        {refreshing ? 'Refreshing…' : '↻ Refresh'}
-      </button>
-    </div>
-  );
-}
 
 /**
  * The page a dashboard KPI card opens: the VOBs that card counts, kept live by

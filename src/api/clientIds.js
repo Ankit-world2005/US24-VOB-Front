@@ -27,6 +27,15 @@ async function serverClients() {
 }
 
 /**
+ * The UI's client (slug, colour) for a client the API names, matched by name;
+ * undefined for a client the UI does not list.
+ */
+export function uiClientFor(serverName) {
+  const target = normalize(serverName);
+  return CLIENTS.find((c) => normalize(c.name) === target || normalize(c.id) === target);
+}
+
+/**
  * The API's id for a client picked in the UI.
  *
  * The UI names clients by slug ('sugarland'); the API takes the client's UUID
