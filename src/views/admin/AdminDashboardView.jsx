@@ -26,6 +26,11 @@ function initials(name) {
   return name.split(/\s+/).filter(Boolean).map(p => p[0]).join('').slice(0, 2).toUpperCase();
 }
 
+/** A count in the specialist table: muted at zero, in `tone` otherwise. */
+function SpecNum({ value, tone = '' }) {
+  return <td className={`spec-num${value === 0 ? ' zero' : tone ? ` ${tone}` : ''}`}>{value}</td>;
+}
+
 export function AdminDashboardView() {
   const { selectedClient, setSelectedClient, setActiveTab, openCardPage } = useWorkspace();
   const [summary, setSummary] = useState({ total: 0, pending: 0, authQueue: 0, error: 0, approved: 0 });
@@ -159,47 +164,72 @@ export function AdminDashboardView() {
             <h3>Specialist Allocation & Velocity</h3>
             <span className="panel-sub">Active specialists · {scopeName}</span>
           </div>
-          <div className="specialist-workload-list">
-            {showPlaceholder ? (
-              <div className="panel-empty">Loading specialist workload…</div>
-            ) : specialists.length === 0 ? (
-              <div className="panel-empty">No active specialists found.</div>
-            ) : (
-              specialists.map(sp => {
-                const load = loadOf(sp);
-                return (
-                  <div key={sp.id} className="spec-row">
-                    <div className="spec-info">
-                      <div className="spec-avatar">{initials(sp.name)}</div>
-                      <div>
-                        <div className="spec-name">{sp.name}</div>
-                        <div className="spec-email">{sp.email}</div>
-                      </div>
-                    </div>
-                    <div className="spec-stats">
-                      <div title="Assigned + In Progress"><span>Open:</span> <strong>{sp.open}</strong></div>
-                      {sp.error > 0 && (
-                        <div title="Validation errors to fix"><span>Errors:</span> <strong className="spec-stat-error">{sp.error}</strong></div>
-                      )}
-                      <div title="Approved today"><span>Done today:</span> <strong className="spec-stat-done">{sp.approvedToday}</strong></div>
-                      <div title="Approved in the last 7 days"><span>This week:</span> <strong className="spec-stat-done">{sp.approved7d}</strong></div>
-                      <span className={`capacity-pill load-${load.toLowerCase()}`}>{load} load</span>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-            {!showPlaceholder && breakdown.needsAssignment > 0 && (
-              <div className="spec-footer">
-                <span>
-                  <strong>{breakdown.needsAssignment}</strong> VOB{breakdown.needsAssignment === 1 ? '' : 's'} need assignment
-                </span>
-                <button type="button" className="btn btn-sm ghost" onClick={() => setActiveTab('upload_assign')}>
-                  Assign →
-                </button>
-              </div>
-            )}
-          </div>
+          {showPlaceholder ? (
+            <div className="panel-empty">Loading specialist workload…</div>
+          ) : specialists.length === 0 ? (
+            <div className="panel-empty">No active specialists found.</div>
+          ) : (
+            <div className="table-responsive">
+              <table className="spec-table">
+                <colgroup>
+                  <col />
+                  <col className="spec-col-num" />
+                  <col className="spec-col-num" />
+                  <col className="spec-col-num" />
+                  <col className="spec-col-num" />
+                  <col className="spec-col-load" />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th rowSpan={2}>Specialist</th>
+                    <th rowSpan={2} className="spec-num" title="Assigned + In Progress">Open</th>
+                    <th rowSpan={2} className="spec-num" title="Validation errors to fix">Errors</th>
+                    <th colSpan={2} className="spec-group">Approved</th>
+                    <th rowSpan={2} className="spec-load">Load</th>
+                  </tr>
+                  <tr>
+                    <th className="spec-num" title="Approved today">Today</th>
+                    <th className="spec-num" title="Approved in the last 7 days, including today">7 days</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {specialists.map(sp => {
+                    const load = loadOf(sp);
+                    return (
+                      <tr key={sp.id}>
+                        <td>
+                          <div className="spec-info">
+                            <div className="spec-avatar" aria-hidden="true">{initials(sp.name)}</div>
+                            <div className="spec-ident">
+                              <div className="spec-name" title={sp.name}>{sp.name}</div>
+                              <div className="spec-email" title={sp.email}>{sp.email}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <SpecNum value={sp.open} />
+                        <SpecNum value={sp.error} tone="spec-stat-error" />
+                        <SpecNum value={sp.approvedToday} tone="spec-stat-done" />
+                        <SpecNum value={sp.approved7d} tone="spec-stat-done" />
+                        <td className="spec-load">
+                          <span className={`capacity-pill load-${load.toLowerCase()}`}>{load}</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {!showPlaceholder && breakdown.needsAssignment > 0 && (
+            <div className="spec-footer">
+              <span>
+                <strong>{breakdown.needsAssignment}</strong> VOB{breakdown.needsAssignment === 1 ? '' : 's'} need assignment
+              </span>
+              <button type="button" className="btn btn-sm ghost" onClick={() => setActiveTab('upload_assign')}>
+                Assign →
+              </button>
+            </div>
+          )}
         </div>
       </section>
 

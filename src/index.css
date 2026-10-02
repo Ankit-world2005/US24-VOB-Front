@@ -1532,41 +1532,109 @@ body::before {
   color: var(--ink-soft);
 }
 
-/* Specialist Workload */
-.specialist-workload-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+/* Specialist Workload: one aligned row per specialist */
+.spec-table {
+  width: 100%;
+  min-width: 480px;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 13.5px;
 }
 
-.spec-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px;
+.spec-col-num {
+  width: 64px;
+}
+
+.spec-col-load {
+  width: 88px;
+}
+
+.spec-table th {
+  padding: 8px 10px;
   background: var(--surface-2);
-  border: 1px solid var(--rule-soft);
-  border-radius: var(--r-md);
-  gap: 12px;
-  flex-wrap: wrap;
+  border-bottom: 1px solid var(--rule);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--ink-soft);
+  text-align: left;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+.spec-table th.spec-group {
+  text-align: center;
+  border-bottom-color: var(--rule-soft);
+}
+
+.spec-table td {
+  padding: 10px;
+  border-bottom: 1px solid var(--rule-soft);
+  color: var(--ink);
+  vertical-align: middle;
+}
+
+.spec-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.spec-table .spec-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.spec-table td.spec-num {
+  font-weight: 600;
+}
+
+.spec-table td.spec-num.zero {
+  color: var(--ink-soft);
+  font-weight: 400;
+}
+
+.spec-table td.spec-stat-done {
+  color: #15803d;
+}
+
+.spec-table td.spec-stat-error {
+  color: var(--danger);
+}
+
+.spec-table .spec-load {
+  text-align: center;
 }
 
 .spec-info {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
+}
+
+.spec-ident {
+  min-width: 0;
 }
 
 .spec-avatar {
-  width: 34px;
-  height: 34px;
+  flex: none;
+  width: 30px;
+  height: 30px;
   border-radius: var(--r-sm);
   background: var(--navy);
   color: #fff;
   display: grid;
   place-items: center;
   font-family: var(--serif);
-  font-size: 13px;
+  font-size: 12px;
+}
+
+.spec-name,
+.spec-email {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .spec-name {
@@ -1578,13 +1646,6 @@ body::before {
 .spec-email {
   font-size: 12px;
   color: var(--ink-soft);
-}
-
-.spec-stats {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  font-size: 13px;
 }
 
 .capacity-pill {
@@ -1614,19 +1675,12 @@ body::before {
   background: var(--danger-bg);
 }
 
-.spec-stat-done {
-  color: #15803d;
-}
-
-.spec-stat-error {
-  color: var(--danger);
-}
-
 .spec-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 12px;
+  margin-top: 14px;
   padding: 10px 12px;
   border: 1px dashed var(--rule);
   border-radius: var(--r-md);
