@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { vobsApi } from '../../api/vobs';
 
 /**
@@ -34,7 +34,17 @@ export function AiTranscriptDrawer({ isOpen, onClose, vobId, onApplyFields }) {
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [isDragging, setIsDragging] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
   const fileInputRef = useRef(null);
+
+  // Seconds since Extract was pressed, so a long read shows as working, not stuck.
+  useEffect(() => {
+    if (!isProcessing) return undefined;
+    const startedAt = Date.now();
+    setElapsed(0);
+    const id = setInterval(() => setElapsed(Math.floor((Date.now() - startedAt) / 1000)), 1000);
+    return () => clearInterval(id);
+  }, [isProcessing]);
 
   if (!isOpen) return null;
 
@@ -179,7 +189,7 @@ export function AiTranscriptDrawer({ isOpen, onClose, vobId, onApplyFields }) {
           {isProcessing && (
             <div className="ai-progress-wrap">
               <div className="ai-progress-bar" style={{ width: '100%' }} />
-              <span className="ai-progress-text">Reading transcript with  AI… verifying quotes & payer statements.</span>
+              <span className="ai-progress-text">Reading transcript with  AI… verifying quotes & payer statements. {elapsed} s</span>
             </div>
           )}
 
