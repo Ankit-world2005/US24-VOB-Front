@@ -19,7 +19,7 @@ const data = JSON.stringify({
 const req = https.request('https://api.groq.com/openai/v1/chat/completions', {
   method: 'POST',
   headers: {
-    'Authorization': 'Bearer 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',
+    'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
     'Content-Type': 'application/json'
   }
 }, res => {
