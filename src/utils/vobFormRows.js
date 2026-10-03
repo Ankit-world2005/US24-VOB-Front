@@ -18,6 +18,16 @@ export const shownValue = ({ value, fallback }) => (value === 0 || value ? value
 /** The document date: the one the specialist entered, else today. */
 export const formTodayDate = (f) => f.todayDate || new Date().toISOString().split('T')[0];
 
+/**
+ * The PRIMARY line names the primary insurance ("PRIMARY: BCBS"), as the
+ * specialists write it. Coverage order holds "Primary" for a primary plan, so
+ * that, or nothing, shows the insurance name.
+ */
+export const formPrimary = (f) => {
+  const order = String(f.primary ?? '').trim();
+  return !order || /^primary$/i.test(order) ? f.insurance : order;
+};
+
 /** Each row's cells, left to right; each cell's lines, top to bottom. */
 export function vobFormRows(f) {
   return [
@@ -69,7 +79,7 @@ export function vobFormRows(f) {
       ]
     },
     // 7
-    { cells: [[line('Visit Limitations:', f.visitsLimitation)], [line('Used Visit:', f.visitsUsed, { fallback: 'NO' })]] },
+    { cells: [[line('Visit Limitations:', f.visitsLimitation)], [line('Used Visit:', f.visitsUsed, { fallback: '00' })]] },
     // 8
     {
       cells: [
@@ -95,7 +105,7 @@ export function vobFormRows(f) {
     // 10
     {
       cells: [
-        [line('PRIMARY:', f.primary, { fallback: 'YES' }), line('SECONDARY:', f.secondary, { fallback: 'NO' })],
+        [line('PRIMARY:', formPrimary(f), { fallback: 'YES' }), line('SECONDARY:', f.secondary, { fallback: 'NO' })],
         [line('Insurance Rep Name:', f.insuranceRep), line('Call Reference:', f.callReference, { mono: true })]
       ]
     },
