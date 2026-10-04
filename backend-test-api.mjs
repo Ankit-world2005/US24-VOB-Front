@@ -1,4 +1,5 @@
 import http from 'node:http';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -233,6 +234,26 @@ function transformToBackendVob(item, statusKey, idx) {
 
 loadSeedData();
 
+// Password reset tokens, keyed by the token's SHA-256 so the raw token exists
+// only in the link (printed to the console here, emailed by the real backend).
+const RESET_TTL_MS = 30 * 60 * 1000;
+const MIN_PASSWORD_LENGTH = 15;
+const FRONTEND_URL = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/+$/, '');
+const resetTokens = new Map();
+
+const hashResetToken = (token) => crypto.createHash('sha256').update(String(token)).digest('hex');
+
+function lookupResetToken(token) {
+  const entry = token ? resetTokens.get(hashResetToken(token)) : null;
+  if (!entry) {
+    return { error: { code: 'invalid_token', message: 'This reset link is invalid or has already been used.' } };
+  }
+  if (entry.expiresAt <= Date.now()) {
+    return { error: { code: 'expired_token', message: 'This reset link has expired.' } };
+  }
+  return { entry };
+}
+
 // Helper to parse JSON body
 function parseJsonBody(req) {
   return new Promise((resolve, reject) => {
@@ -356,6 +377,66 @@ const server = http.createServer(async (req, res) => {
 
     if (pathname === '/api/v1/auth/logout' && method === 'POST') {
       sendJson(res, 200, { success: true });
+      logDone(200);
+      return;
+    }
+
+    // Same answer whether or not the email has an account, so the response
+    // reveals nothing about who is registered.
+    if (pathname === '/api/v1/auth/password/forgot' && method === 'POST') {
+      const body = await parseJsonBody(req);
+      const email = String(body.email || '').trim().toLowerCase();
+      const user = usersDb.find(u => u.email.toLowerCase() === email && u.status === 'active');
+      if (user) {
+        // A new link replaces any earlier one for this user.
+        for (const [hash, entry] of resetTokens) {
+          if (entry.userId === user.id) resetTokens.delete(hash);
+        }
+        const token = crypto.randomBytes(32).toString('base64url');
+        resetTokens.set(hashResetToken(token), { userId: user.id, email: user.email, expiresAt: Date.now() + RESET_TTL_MS });
+        console.log(`[Backend Test API] Password reset link for ${user.email} (stands in for the email):`);
+        console.log(`   ${FRONTEND_URL}/reset-password#token=${token}`);
+      }
+      sendJson(res, 202, { message: 'If an account exists for this email, we sent a reset link.' });
+      logDone(202);
+      return;
+    }
+
+    if (pathname === '/api/v1/auth/password/verify' && method === 'POST') {
+      const body = await parseJsonBody(req);
+      const { entry, error } = lookupResetToken(body.token);
+      if (error) {
+        sendJson(res, 400, { error });
+        logDone(400);
+        return;
+      }
+      sendJson(res, 200, { email: entry.email });
+      logDone(200);
+      return;
+    }
+
+    if (pathname === '/api/v1/auth/password/reset' && method === 'POST') {
+      const body = await parseJsonBody(req);
+      const { entry, error } = lookupResetToken(body.token);
+      if (error) {
+        sendJson(res, 400, { error });
+        logDone(400);
+        return;
+      }
+      const password = String(body.new_password || '');
+      if (password.length < MIN_PASSWORD_LENGTH) {
+        sendJson(res, 422, {
+          error: { code: 'weak_password', message: `Use at least ${MIN_PASSWORD_LENGTH} characters.` }
+        });
+        logDone(422);
+        return;
+      }
+      // Single use. This mock does not check passwords at login, so the new
+      // password is kept only to show where the real backend would save it.
+      resetTokens.delete(hashResetToken(body.token));
+      const user = usersDb.find(u => u.id === entry.userId);
+      if (user) user.password = password;
+      sendJson(res, 200, { message: 'Password updated.' });
       logDone(200);
       return;
     }

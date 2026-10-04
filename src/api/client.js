@@ -243,7 +243,9 @@ export const apiClient = {
       clearTimeout(timeoutId);
 
       // Rotate expired token and replay request if 401 received
-      const isCredentialRoute = ['login', 'refresh', 'logout'].some((r) => path.endsWith('/auth/' + r) || path.endsWith('/' + r));
+      const isCredentialRoute = [
+        'login', 'refresh', 'logout', 'password/forgot', 'password/verify', 'password/reset'
+      ].some((r) => path.endsWith('/auth/' + r) || path.endsWith('/' + r));
       if (res.status === 401 && !isCredentialRoute && !_retried) {
         const renewed = await this.refreshSession();
         if (renewed) {

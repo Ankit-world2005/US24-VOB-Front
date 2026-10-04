@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from './hooks/useAuth';
 import { LoginPage } from './pages/LoginPage';
 import { HomePage } from './pages/HomePage';
+import { resetTokenFromLink } from './utils/passwordReset';
 
 export function App() {
   const {
@@ -17,7 +18,16 @@ export function App() {
     secondsRemaining
   } = useAuth();
 
-  if (session) {
+  // A reset link opens the reset screen even in a tab that is signed in.
+  const [resetToken, setResetToken] = useState(resetTokenFromLink);
+
+  const leaveReset = (passwordChanged) => {
+    setResetToken(null);
+    // The server signs the account out everywhere once the password changes.
+    if (passwordChanged && session) logout();
+  };
+
+  if (session && !resetToken) {
     return (
       <HomePage
         session={session}
@@ -40,6 +50,8 @@ export function App() {
       login={login}
       isLocked={isLocked}
       secondsRemaining={secondsRemaining}
+      resetToken={resetToken}
+      onLeaveReset={leaveReset}
     />
   );
 }

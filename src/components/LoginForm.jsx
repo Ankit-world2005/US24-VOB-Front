@@ -1,15 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { FormAlert } from './FormAlert';
 
 export function LoginForm({
   rememberedEmail,
+  initialEmail,
   loading,
   error,
+  notice,
   onError,
   onClearError,
   onSubmit,
+  onForgot,
   isLocked
 }) {
-  const [email, setEmail] = useState(rememberedEmail || '');
+  const [email, setEmail] = useState(initialEmail || rememberedEmail || '');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(Boolean(rememberedEmail));
   const [showPassword, setShowPassword] = useState(false);
@@ -19,9 +23,10 @@ export function LoginForm({
   const emailInputRef = useRef(null);
   const passwordInputRef = useRef(null);
 
-  // Sync remembered email if it changes
+  // Sync remembered email if it changes, unless the user arrived with an email
+  // already typed (back from resetting a password)
   useEffect(() => {
-    if (rememberedEmail) {
+    if (rememberedEmail && !initialEmail) {
       setEmail(rememberedEmail);
       setRemember(true);
     }
@@ -67,7 +72,7 @@ export function LoginForm({
   };
 
   const handleForgot = () => {
-    onError('Please contact your administrator (saurabh@us24solutions.com) to reset your password.');
+    onForgot(email.trim());
   };
 
   return (
@@ -75,24 +80,8 @@ export function LoginForm({
       <h2>Sign in</h2>
       <p className="sub">Enter your company email and password.</p>
 
-      {error && (
-        <div className="alert show" role="alert">
-          <svg
-            width="17"
-            height="17"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            style={{ flexShrink: 0, marginTop: '1px' }}
-          >
-            <circle cx="12" cy="12" r="10" />
-            <line x1="12" y1="8" x2="12" y2="12" />
-            <line x1="12" y1="16" x2="12.01" y2="16" />
-          </svg>
-          <span>{error}</span>
-        </div>
-      )}
+      <FormAlert>{error}</FormAlert>
+      {!error && <FormAlert tone="success">{notice}</FormAlert>}
 
       <form onSubmit={handleSubmit} noValidate>
         <div className="field">

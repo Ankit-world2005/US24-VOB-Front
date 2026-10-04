@@ -24,7 +24,7 @@ export default defineConfig(({ mode }) => {
         configureServer(server) {
           server.middlewares.use(async (req, res, next) => {
             const url = req.url ? req.url.split('?')[0] : '';
-            if (url === '/' || url === '/index.html' || url === '/login.html' || url === '/login') {
+            if (url === '/' || url === '/index.html' || url === '/login.html' || url === '/login' || url === '/reset-password') {
               const indexPath = path.resolve(__dirname, 'public/index.html');
               let html = fs.readFileSync(indexPath, 'utf-8');
               html = await server.transformIndexHtml(req.url, html);

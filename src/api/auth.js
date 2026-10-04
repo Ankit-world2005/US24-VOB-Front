@@ -34,5 +34,38 @@ export const authApi = {
       path: '/api/v1/auth/refresh',
       method: 'POST'
     });
+  },
+
+  // POST /api/v1/auth/password/forgot
+  //
+  // Answers the same way whether or not the email has an account, so a success
+  // here does not mean an email was sent.
+  requestPasswordReset({ email }) {
+    return apiClient.request({
+      path: '/api/v1/auth/password/forgot',
+      method: 'POST',
+      data: { email }
+    });
+  },
+
+  // POST /api/v1/auth/password/verify
+  //
+  // Checks the emailed token before asking for a new password. Resolves to
+  // { email } for the account it belongs to.
+  verifyResetToken(token) {
+    return apiClient.request({
+      path: '/api/v1/auth/password/verify',
+      method: 'POST',
+      data: { token }
+    });
+  },
+
+  // POST /api/v1/auth/password/reset
+  resetPassword({ token, newPassword }) {
+    return apiClient.request({
+      path: '/api/v1/auth/password/reset',
+      method: 'POST',
+      data: { token, new_password: newPassword }
+    });
   }
 };

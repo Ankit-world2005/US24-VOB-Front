@@ -4,23 +4,29 @@ import { useWorkspace } from '../../context/WorkspaceContext';
 import { vobsApi } from '../../api/vobs';
 import { ClientBadge } from '../../components/vob/ClientBadge';
 import { DocumentGeneratorModal } from '../../components/vob/DocumentGeneratorModal';
+import { QueueFilterBar } from '../../components/vob/QueueFilterBar';
+import { useRecordFilters, QUEUE_LIMIT } from '../../hooks/useRecordFilters';
 
 export function SavedRecordsView() {
   const { currentUser, openVerification } = useWorkspace();
   const [approvedVobs, setApprovedVobs] = useState([]);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
   const [docVob, setDocVob] = useState(null);
+  const { filtered, ...filterBar } = useRecordFilters(approvedVobs);
 
   useEffect(() => {
     setLoading(true);
     setLoadError('');
     vobsApi.getVobs({
       status: 'Approved',
-      userEmail: currentUser.role === 'admin' ? undefined : currentUser.email
+      userEmail: currentUser.role === 'admin' ? undefined : currentUser.email,
+      limit: QUEUE_LIMIT
     }).then(list => {
       setApprovedVobs(list);
+      setHasMore(Boolean(list.page?.has_more));
       setLoading(false);
     }).catch((err) => {
       console.error(err);
@@ -44,6 +50,8 @@ export function SavedRecordsView() {
           </div>
         </div>
 
+        <QueueFilterBar {...filterBar} shown={filtered.length} total={approvedVobs.length} />
+
         <div className="table-responsive">
           <table className="data-table">
             <thead>
@@ -65,11 +73,18 @@ export function SavedRecordsView() {
                 <tr><td colSpan="8" className="table-empty">Could not load this data.</td></tr>
               ) : approvedVobs.length === 0 ? (
                 <tr><td colSpan="8" className="table-empty">No approved records completed yet.</td></tr>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td colSpan="8" className="table-empty">
+                    No records match your search and filters.{' '}
+                    <button type="button" className="btn-action-link" onClick={filterBar.clear}>Clear filters</button>
+                  </td>
+                </tr>
               ) : (
-                approvedVobs.map(v => (
+                filtered.map(v => (
                   <tr key={v.id}>
                     <td className="mono">{v.id}</td>
-                    <td><ClientBadge clientId={v.client} /></td>
+                    <td><ClientBadge clientId={v.clientName || v.client} /></td>
                     <td>
                       <div className="bold">{v.patientName}</div>
                       <div className="patient-sub-cell">ID: {v.idCard}</div>
@@ -103,6 +118,9 @@ export function SavedRecordsView() {
             </tbody>
           </table>
         </div>
+        {hasMore && (
+          <p className="card-detail-footnote">Showing the {QUEUE_LIMIT} most recent records; search and filters cover these.</p>
+        )}
       </div>
 
       <DocumentGeneratorModal
