@@ -185,7 +185,7 @@ function CardRecords({ card, isAdmin }) {
                         }
                       }}
                     >
-                      <td className="mono" title={v.id}>{v.id.slice(0, 8)}</td>
+                      <td className="mono" title={v.id}>{/^[A-Z]+-\d+$/.test(v.id) ? v.id : v.id.slice(0, 8)}</td>
                       <td><ClientBadge clientId={v.clientName || v.client} /></td>
                       <td className="bold">{v.patientName}</td>
                       <td>{v.dos || '—'}</td>

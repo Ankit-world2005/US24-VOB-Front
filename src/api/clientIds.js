@@ -2,7 +2,8 @@ import { apiClient } from './client';
 import { authApi } from './auth';
 import { CLIENTS } from '../data/clients';
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// A server client id: CLIENT-01, … (a UUID before the readable-id migration).
+const SERVER_CLIENT_ID = /^(CLIENT-\d{2,}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
 const normalize = (text) => String(text).toLowerCase().replace(/[^a-z0-9]/g, '');
 
 // The caller's clients from /auth/me, fetched once per sign-in: a different
@@ -38,17 +39,17 @@ export function uiClientFor(serverName) {
 /**
  * The API's id for a client picked in the UI.
  *
- * The UI names clients by slug ('sugarland'); the API takes the client's UUID
- * and answers 400 to anything else. Matched by name against the clients the
- * caller holds, per /auth/me.
+ * The UI names clients by slug ('sugarland'); the API takes the client's id
+ * (CLIENT-01, …) and answers 400 to anything else. Matched by name against the
+ * clients the caller holds, per /auth/me.
  *
- * Resolves to the UUID; to `undefined` for no filter ('all' or empty); and to
+ * Resolves to the id; to `undefined` for no filter ('all' or empty); and to
  * `null` when the server holds no such client for this caller, which means the
  * answer is an empty list.
  */
 export async function toServerClientId(value) {
   if (!value || value === 'all') return undefined;
-  if (UUID.test(value)) return value;
+  if (SERVER_CLIENT_ID.test(value)) return value;
 
   const name = CLIENTS.find((c) => c.id === value)?.name ?? value;
   const match = (await serverClients()).find(
