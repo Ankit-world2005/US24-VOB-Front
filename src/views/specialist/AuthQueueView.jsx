@@ -5,23 +5,37 @@ import { vobsApi } from '../../api/vobs';
 import { ClientBadge } from '../../components/vob/ClientBadge';
 import { ReassignModal } from '../../components/vob/ReassignModal';
 import { StatusBadge } from '../../components/vob/StatusBadge';
+import { QueueFilterBar } from '../../components/vob/QueueFilterBar';
+import { useRecordFilters, QUEUE_LIMIT } from '../../hooks/useRecordFilters';
+
+// The Auth Queue's own filter: whether the payer's auth number is in yet.
+const AUTH_FILTERS = {
+  auth: {
+    initial: 'all',
+    match: (v, value) => (value === 'received') === Boolean(v.authDetails?.authNumber)
+  }
+};
 
 export function AuthQueueView() {
   const { currentUser, openVerification } = useWorkspace();
   const [authVobs, setAuthVobs] = useState([]);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
   const [reassignVob, setReassignVob] = useState(null);
+  const { filtered, ...filterBar } = useRecordFilters(authVobs, AUTH_FILTERS);
 
   const loadAuthQueue = () => {
     setLoading(true);
     setLoadError('');
     vobsApi.getVobs({
       status: 'Auth Queue',
-      userEmail: currentUser.role === 'admin' ? undefined : currentUser.email
+      userEmail: currentUser.role === 'admin' ? undefined : currentUser.email,
+      limit: QUEUE_LIMIT
     }).then(list => {
       setAuthVobs(list);
+      setHasMore(Boolean(list.page?.has_more));
       setLoading(false);
     }).catch((err) => {
       console.error(err);
@@ -49,6 +63,24 @@ export function AuthQueueView() {
           </div>
         </div>
 
+        <QueueFilterBar
+          {...filterBar}
+          shown={filtered.length}
+          total={authVobs.length}
+          placeholder="Search patient, record ID, insurance or auth number…"
+        >
+          <select
+            className="select-input"
+            aria-label="Auth number"
+            value={filterBar.filters.auth}
+            onChange={(e) => filterBar.setFilter('auth', e.target.value)}
+          >
+            <option value="all">Any auth status</option>
+            <option value="awaiting">Awaiting auth number</option>
+            <option value="received">Auth number received</option>
+          </select>
+        </QueueFilterBar>
+
         <div className="table-responsive">
           <table className="data-table">
             <thead>
@@ -70,11 +102,18 @@ export function AuthQueueView() {
                 <tr><td colSpan="8" className="table-empty">Could not load this data.</td></tr>
               ) : authVobs.length === 0 ? (
                 <tr><td colSpan="8" className="table-empty">No pending prior authorizations in your queue. Great job!</td></tr>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td colSpan="8" className="table-empty">
+                    No records match your search and filters.{' '}
+                    <button type="button" className="btn-action-link" onClick={filterBar.clear}>Clear filters</button>
+                  </td>
+                </tr>
               ) : (
-                authVobs.map(v => (
+                filtered.map(v => (
                   <tr key={v.id}>
                     <td className="mono">{v.id}</td>
-                    <td><ClientBadge clientId={v.client} /></td>
+                    <td><ClientBadge clientId={v.clientName || v.client} /></td>
                     <td>
                       <div className="bold">{v.patientName}</div>
                       <div className="patient-sub-cell">{v.appointmentType}</div>
@@ -116,6 +155,9 @@ export function AuthQueueView() {
             </tbody>
           </table>
         </div>
+        {hasMore && (
+          <p className="card-detail-footnote">Showing the {QUEUE_LIMIT} most recent records; search and filters cover these.</p>
+        )}
       </div>
 
       {/* Reassign Modal */}

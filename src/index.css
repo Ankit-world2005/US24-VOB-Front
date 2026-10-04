@@ -3700,6 +3700,51 @@ body.print-frame::before {
   height: 38px;
 }
 
+/* ---- Queue search and filters (Auth Queue, Error Queue, Saved Records) ---- */
+.queue-filters .search-field {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 240px;
+}
+
+.queue-filters .search-field svg {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--ink-soft);
+  pointer-events: none;
+}
+
+.queue-filters .search-input {
+  padding-left: 34px;
+}
+
+.date-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--ink-soft);
+}
+
+.date-filter .select-input {
+  font-family: var(--sans);
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.filter-count {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
 /* =========================================================
    INLINE VOCABULARY — avatars, pills, tags, action links
 
