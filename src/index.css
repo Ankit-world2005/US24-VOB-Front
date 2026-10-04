@@ -4304,7 +4304,7 @@ body.print-frame::before {
   to { background: transparent; }
 }
 
-/* ---- All-tasks log feed and per-row latest activity (admins) ---- */
+/* ---- Per-row latest activity (admins) ---- */
 .latest-activity-cell {
   min-width: 170px;
   font-size: 12.5px;
@@ -4316,39 +4316,4 @@ body.print-frame::before {
 
 .latest-activity-cell .log-entry-new {
   border-radius: var(--r-sm);
-}
-
-.task-feed .task-log {
-  max-height: 560px;
-}
-
-.task-log-task {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-  margin-bottom: 2px;
-  padding: 0;
-  border: 0;
-  background: none;
-  font-family: var(--sans);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--cobalt);
-  text-align: left;
-  cursor: pointer;
-}
-
-.task-log-task:hover {
-  text-decoration: underline;
-}
-
-.task-log-task:focus-visible {
-  outline: 2px solid var(--cobalt);
-  outline-offset: 2px;
-}
-
-.task-log-task .mono {
-  font-size: 11px;
-  font-weight: 400;
-  color: var(--ink-soft);
 }
