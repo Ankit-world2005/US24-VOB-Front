@@ -21,6 +21,8 @@
   --focus: rgba(6, 72, 192, .16);
   --danger: #c9192e;
   --danger-bg: #fdf0f1;
+  --success: #166534;
+  --success-bg: #effaf3;
   --warn: #b7791f;
   --shadow: 0 1px 0 rgba(255,255,255,.7) inset, 0 28px 60px -28px rgba(11, 13, 16, .18);
 
@@ -520,6 +522,31 @@ body::before {
   display: block;
 }
 
+.hint {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  margin-top: 8px;
+}
+
+.hint.met {
+  color: var(--success);
+}
+
+.form-back {
+  text-align: center;
+  margin-top: 20px;
+  font-size: 14px;
+  font-weight: 300;
+  color: var(--ink-soft);
+}
+
+.reset-checking {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .row {
   display: flex;
   justify-content: space-between;
@@ -621,6 +648,11 @@ body::before {
   }
 }
 
+.spinner.dark {
+  border-color: var(--rule-soft);
+  border-top-color: var(--navy);
+}
+
 .alert {
   display: flex;
   align-items: flex-start;
@@ -635,6 +667,13 @@ body::before {
   margin-bottom: 20px;
   line-height: 1.45;
   animation: shake .35s;
+}
+
+.alert.success {
+  background: var(--success-bg);
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 28%, transparent);
+  animation: none;
 }
 
 @keyframes shake {
