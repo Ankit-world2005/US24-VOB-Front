@@ -35,7 +35,10 @@ export function useAuth() {
     if (raw) {
       try {
         const parsed = JSON.parse(raw);
-        if (parsed?.token) {
+        // The token saved here is the one from sign-in. apiClient stores each
+        // renewed token itself, so restoring this one over it would send an
+        // expired token on every reload (a burst of 401s, then another renewal).
+        if (parsed?.token && !apiClient.getToken()) {
           apiClient.setToken(parsed.token);
         }
         return parsed;
