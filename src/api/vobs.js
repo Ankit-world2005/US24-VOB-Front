@@ -8,6 +8,23 @@ import {
   STATUS_MAP_TO_BACKEND
 } from '../utils/vobAdapter';
 
+/** The most VOBs one getAudits() call may ask for: the API's limit. */
+export const AUDIT_BATCH_LIMIT = 50;
+
+// The API sends { occurred_at, actor, old_value, … }; the audit table reads the
+// camelCase shape below.
+const toAuditEntry = (e) => ({
+  id: e.id,
+  timestamp: e.occurred_at,
+  user: e.actor?.name || 'System',
+  action: e.action,
+  field: e.field,
+  oldValue: e.old_value,
+  newValue: e.new_value,
+  detail: e.detail || {},
+  notes: e.detail && Object.keys(e.detail).length ? JSON.stringify(e.detail) : ''
+});
+
 /** An empty result in the shape getVobs() returns. */
 function emptyPage() {
   const list = [];
@@ -259,19 +276,21 @@ export const vobsApi = {
     const res = await apiClient.request({
       path: `/api/v1/vobs/${id}/audit`
     });
-    // The API sends { data: [{ occurred_at, actor, old_value, … }] }; the audit
-    // table reads the camelCase shape below.
-    return (res?.data || []).map((e) => ({
-      id: e.id,
-      timestamp: e.occurred_at,
-      user: e.actor?.name || 'System',
-      action: e.action,
-      field: e.field,
-      oldValue: e.old_value,
-      newValue: e.new_value,
-      detail: e.detail || {},
-      notes: e.detail && Object.keys(e.detail).length ? JSON.stringify(e.detail) : ''
-    }));
+    return (res?.data || []).map(toAuditEntry);
+  },
+
+  /**
+   * GET /api/v1/vobs/audit?ids=… - the histories of up to AUDIT_BATCH_LIMIT VOBs
+   * in one request, as { [vobId]: entries }. A VOB the admin cannot see is left out.
+   */
+  async getAudits(ids) {
+    const res = await apiClient.request({
+      path: '/api/v1/vobs/audit',
+      params: { ids: ids.join(',') }
+    });
+    return Object.fromEntries(
+      Object.entries(res?.data || {}).map(([id, entries]) => [id, entries.map(toAuditEntry)])
+    );
   },
 
   /**
