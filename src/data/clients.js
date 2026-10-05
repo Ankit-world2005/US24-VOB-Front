@@ -18,9 +18,6 @@ export {
 // Fast O(1) client lookup map
 export const CLIENTS_BY_ID = new Map((CLIENTS || []).map(c => [c.id, c]));
 
-// Fast O(1) form field lookup map
-export const CANONICAL_FIELDS_BY_KEY = new Map((CANONICAL_FIELDS || []).map(f => [f.key, f]));
-
 // All 24 tracked fields in Call Verification
 export const ALL_VERIFIED_TRACKED_FIELDS = [
   ...CORE_VERIFICATION_FIELDS,
