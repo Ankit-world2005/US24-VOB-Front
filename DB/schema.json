@@ -174,17 +174,17 @@
         {
           "name": "serviceType",
           "label": "Service Type",
-          "type": "select",
+          "type": "text",
           "required": true,
-          "options": ["PT", "OT", "ST", "Chiropractic", "Acupuncture"],
+          "placeholder": "Enter service type…",
           "documentRow": 4
         },
         {
           "name": "planType",
           "label": "Plan Type",
-          "type": "select",
+          "type": "text",
           "required": true,
-          "options": ["PPO", "HMO", "EPO", "POS", "Indemnity", "Medicare", "Medicaid"],
+          "placeholder": "Enter plan type…",
           "documentRow": 4
         },
         {
