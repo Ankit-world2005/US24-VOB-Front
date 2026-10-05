@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { vobsApi } from '../../api/vobs';
 import { StatusBadge } from '../../components/vob/StatusBadge';
@@ -12,6 +12,26 @@ import { formKeyFor } from '../../utils/vobAdapter';
 
 /** The form's Authorization & Referral section: all an Auth Queue VOB can still change. */
 const AUTH_FIELD_KEYS = CANONICAL_FIELDS.filter(f => f.group === 'auth').map(f => f.key);
+
+/** Fast O(1) canonical fields lookup */
+const CANONICAL_FIELDS_BY_KEY = new Map(CANONICAL_FIELDS.map(f => [f.key, f]));
+
+/**
+ * One section per block of the Parker document, in the order it reads.
+ * Computed statically once at module load to avoid 10 array filters on every keystroke.
+ */
+const FIELD_GROUPS = [
+  { id: 'patient', title: 'I. Patient (rows 1–2)', fields: CANONICAL_FIELDS.filter(f => f.group === 'patient') },
+  { id: 'insurance', title: 'II. Insurance & Policy (row 3)', fields: CANONICAL_FIELDS.filter(f => f.group === 'insurance') },
+  { id: 'coverage', title: 'III. Plan, Network & Dates (row 4)', fields: CANONICAL_FIELDS.filter(f => f.group === 'coverage') },
+  { id: 'costshare', title: 'IV. Co-pay & Deductible (row 5)', fields: CANONICAL_FIELDS.filter(f => f.group === 'costshare') },
+  { id: 'oop', title: 'V. Co-insurance & Out of Pocket (row 6)', fields: CANONICAL_FIELDS.filter(f => f.group === 'oop') },
+  { id: 'visits', title: 'VI. Visits (row 7)', fields: CANONICAL_FIELDS.filter(f => f.group === 'visits') },
+  { id: 'auth', title: 'VII. Authorization & Referral (rows 8–9)', fields: CANONICAL_FIELDS.filter(f => f.group === 'auth') },
+  { id: 'rep', title: 'VIII. Coordination & Rep (row 10)', fields: CANONICAL_FIELDS.filter(f => f.group === 'rep') },
+  { id: 'claims', title: 'IX. Claim Filing (row 11)', fields: CANONICAL_FIELDS.filter(f => f.group === 'claims') },
+  { id: 'secondary', title: 'X. Secondary Insurance (rows 12–15)', fields: CANONICAL_FIELDS.filter(f => f.group === 'secondary') }
+];
 
 export function VerificationFormView() {
   const { activeVobId, setActiveVobId, showToast, setActiveTab, currentUser } = useWorkspace();
@@ -27,19 +47,24 @@ export function VerificationFormView() {
   const [layoutMode, setLayoutMode] = useState('split'); // 'split' | 'form' | 'preview'
 
   useEffect(() => {
+    let isCurrent = true;
     vobsApi.getVobs({ userEmail: currentUser.email }).then(list => {
+      if (!isCurrent) return;
       setMyVobsList(list);
       if (!activeVobId && list.length > 0) {
         setActiveVobId(list[0].id);
       }
     });
+    return () => { isCurrent = false; };
   }, [currentUser.email]);
 
   useEffect(() => {
     if (activeVobId) {
+      let isCurrent = true;
       setLoading(true);
       setFailingRules([]);
       vobsApi.getVobById(activeVobId).then(data => {
+        if (!isCurrent) return;
         setVob(data);
         setFormData(data);
         setProvenance(data.provenance || {});
@@ -50,27 +75,26 @@ export function VerificationFormView() {
         setLoading(false);
       }).catch(err => {
         console.error(err);
-        setLoading(false);
+        if (isCurrent) setLoading(false);
       });
+      return () => { isCurrent = false; };
     }
   }, [activeVobId]);
 
-  const handleFieldChange = (key, value) => {
+  const handleFieldChange = useCallback((key, value) => {
     setFormData(prev => ({ ...prev, [key]: value }));
     // Update provenance to manual for edited fields
     setProvenance(prev => ({
       ...prev,
       [key]: { source: 'manual' }
     }));
-    // Clear failing error if field is updated
-    setFailingRules(prev => prev.filter(r => r.field !== key));
-  };
+    // Clear failing error if field is updated (mapping backend field name if present)
+    setFailingRules(prev => prev.filter(r => (formKeyFor(r.field) || r.field) !== key && r.field !== key));
+  }, []);
 
-  const handleSelectField = (fieldKey) => {
+  const handleSelectField = useCallback((fieldKey) => {
     // If preview-only mode is active, switch to split to show the form
-    if (layoutMode === 'preview') {
-      setLayoutMode('split');
-    }
+    setLayoutMode(mode => (mode === 'preview' ? 'split' : mode));
     setTimeout(() => {
       const el = document.getElementById(fieldKey);
       if (el) {
@@ -80,53 +104,62 @@ export function VerificationFormView() {
         setTimeout(() => el.classList.remove('field-highlight-pulse'), 1800);
       }
     }, 50);
-  };
+  }, []);
 
-  const handleApplyAiFields = (extracted) => {
-    const nextFormData = { ...formData };
-    const nextProv = { ...provenance };
-    let filledCount = 0;
-
-    for (const [k, val] of Object.entries(extracted)) {
-      // FR-6: Only fill EMPTY fields! Never overwrite existing user values
-      if (!nextFormData[k] || nextFormData[k] === '') {
-        nextFormData[k] = val;
-        nextProv[k] = { source: 'ai' };
-        filledCount++;
+  const handleApplyAiFields = useCallback((extracted) => {
+    setFormData(prevForm => {
+      const nextFormData = { ...prevForm };
+      let count = 0;
+      for (const [k, val] of Object.entries(extracted)) {
+        if (!nextFormData[k] || nextFormData[k] === '') {
+          nextFormData[k] = val;
+          count++;
+        }
       }
-    }
+      showToast(`AI auto-filled ${count} empty fields with [AI Transcript] tags!`, "success");
+      return nextFormData;
+    });
 
-    setFormData(nextFormData);
-    setProvenance(nextProv);
+    setProvenance(prevProv => {
+      const nextProv = { ...prevProv };
+      for (const [k] of Object.entries(extracted)) {
+        if (!formData[k] || formData[k] === '') {
+          nextProv[k] = { source: 'ai' };
+        }
+      }
+      return nextProv;
+    });
+
     setHasTranscript(true);
-    showToast(`AI auto-filled ${filledCount} empty fields with [AI Transcript] tags!`, "success");
-  };
+  }, [formData, showToast]);
 
-  // A 409 is either a stale version or an edit the API won't take in this
-  // status (an Auth Queue VOB takes its auth fields only). Reload either way; say which.
-  const reloadAfterConflict = (err) => {
+  const reloadAfterConflict = useCallback((err) => {
     showToast(
       err?.data?.error?.code === 'invalid_transition'
         ? "This VOB's status changed and it can't be edited here. Reloading."
         : "Conflict 409: Record was updated by someone else. Reloading.",
       "error"
     );
-    vobsApi.getVobById(activeVobId).then(data => {
-      setVob(data);
-      setFormData(data);
-    });
-  };
+    if (activeVobId) {
+      vobsApi.getVobById(activeVobId).then(data => {
+        setVob(data);
+        setFormData(data);
+      });
+    }
+  }, [activeVobId, showToast]);
 
-  // In the Auth Queue only the authorization section is open, so only it is sent.
-  const saveForm = () => vobsApi.patchVob(
-    activeVobId,
-    { ...formData, provenance },
-    vob.version,
-    currentUser.email,
-    vob.status === 'auth_queue' ? { only: AUTH_FIELD_KEYS } : {}
-  );
+  const saveForm = useCallback(() => {
+    if (!vob) return Promise.resolve(null);
+    return vobsApi.patchVob(
+      activeVobId,
+      { ...formData, provenance },
+      vob.version,
+      currentUser.email,
+      vob.status === 'auth_queue' ? { only: AUTH_FIELD_KEYS } : {}
+    );
+  }, [activeVobId, formData, provenance, vob, currentUser.email]);
 
-  const handleSaveDraft = async () => {
+  const handleSaveDraft = useCallback(async () => {
     try {
       const patchRes = await saveForm();
       if (patchRes?.version) {
@@ -140,19 +173,17 @@ export function VerificationFormView() {
         showToast("Error saving draft", "error");
       }
     }
-  };
+  }, [saveForm, reloadAfterConflict, showToast]);
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
+    if (!vob) return;
     setIsSubmitting(true);
     try {
-      // Save latest form edits first
       const patchRes = await saveForm();
       const currentVersion = patchRes?.version || (vob.version ? vob.version + 1 : 1);
       setVob(prev => ({ ...prev, version: currentVersion }));
 
-      // Run submission validation
       const result = await vobsApi.submitVob(activeVobId, currentVersion, currentUser.email);
-
       const status = (result.status || '').toLowerCase();
       if (status === 'error') {
         setFailingRules(result.failingRules || []);
@@ -161,7 +192,7 @@ export function VerificationFormView() {
       } else if (status === 'auth_queue' || status === 'auth queue') {
         const pending = (result.awaiting || []).map(field => {
           const key = formKeyFor(field) || field;
-          return CANONICAL_FIELDS.find(f => f.key === key)?.label || field;
+          return CANONICAL_FIELDS_BY_KEY.get(key)?.label || field;
         });
         const shown = pending.slice(0, 3).join(', ') + (pending.length > 3 ? ` +${pending.length - 3} more` : '');
         showToast(
@@ -185,7 +216,18 @@ export function VerificationFormView() {
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [vob, activeVobId, currentUser.email, saveForm, reloadAfterConflict, showToast, setActiveTab]);
+
+  // Fast memoized progress and errors map
+  const { filledCount, totalCount } = useMemo(() => getVerificationProgress(formData), [formData]);
+  const failingRuleMap = useMemo(() => {
+    const map = new Map();
+    for (const r of failingRules) {
+      const key = formKeyFor(r.field) || r.field;
+      map.set(key, r.message);
+    }
+    return map;
+  }, [failingRules]);
 
   if (loading) {
     return <div className="panel-card"><div className="loading-spinner-wrap">Loading VOB Verification Form…</div></div>;
@@ -201,50 +243,7 @@ export function VerificationFormView() {
     );
   }
 
-  const { filledCount, totalCount } = getVerificationProgress(formData);
-  // In the Auth Queue only the authorization section is open: the API takes edits
-  // to those fields alone, and a submit with all of them filled saves the VOB.
   const inAuthQueue = vob.status === 'auth_queue';
-
-  // One section per block of the Parker document, in the order it reads, so
-  // working down the form works down the document. The row numbers are the
-  // document's own table rows — see CANONICAL_FIELDS.
-  const fieldGroups = [
-    { id: 'patient', title: 'I. Patient (rows 1–2)', fields: CANONICAL_FIELDS.filter(f => f.group === 'patient') },
-    { id: 'insurance', title: 'II. Insurance & Policy (row 3)', fields: CANONICAL_FIELDS.filter(f => f.group === 'insurance') },
-    { id: 'coverage', title: 'III. Plan, Network & Dates (row 4)', fields: CANONICAL_FIELDS.filter(f => f.group === 'coverage') },
-    { id: 'costshare', title: 'IV. Co-pay & Deductible (row 5)', fields: CANONICAL_FIELDS.filter(f => f.group === 'costshare') },
-    { id: 'oop', title: 'V. Co-insurance & Out of Pocket (row 6)', fields: CANONICAL_FIELDS.filter(f => f.group === 'oop') },
-    { id: 'visits', title: 'VI. Visits (row 7)', fields: CANONICAL_FIELDS.filter(f => f.group === 'visits') },
-    { id: 'auth', title: 'VII. Authorization & Referral (rows 8–9)', fields: CANONICAL_FIELDS.filter(f => f.group === 'auth') },
-    { id: 'rep', title: 'VIII. Coordination & Rep (row 10)', fields: CANONICAL_FIELDS.filter(f => f.group === 'rep') },
-    { id: 'claims', title: 'IX. Claim Filing (row 11)', fields: CANONICAL_FIELDS.filter(f => f.group === 'claims') },
-    { id: 'secondary', title: 'X. Secondary Insurance (rows 12–15)', fields: CANONICAL_FIELDS.filter(f => f.group === 'secondary') }
-  ];
-
-  if (loading && !vob) {
-    return (
-      <div className="verification-form-view" style={{ padding: '48px', textAlign: 'center' }}>
-        <div className="spinner" style={{ margin: '0 auto 16px' }} />
-        <p style={{ color: 'var(--text-muted)' }}>Loading verification record…</p>
-      </div>
-    );
-  }
-
-  if (!vob) {
-    return (
-      <div className="verification-form-view" style={{ padding: '64px 24px', textAlign: 'center' }}>
-        <div style={{ fontSize: '40px', marginBottom: '16px' }}>📋</div>
-        <h3 style={{ marginBottom: '8px' }}>No VOB Record Selected</h3>
-        <p style={{ color: 'var(--text-muted)', maxWidth: '460px', margin: '0 auto 20px' }}>
-          There are no pending verification tasks currently assigned to your queue.
-        </p>
-        <button type="button" className="btn btn-sm" onClick={() => setActiveTab('my_dashboard')}>
-          Go to My Dashboard
-        </button>
-      </div>
-    );
-  }
 
   return (
     <div className="verification-form-view">
@@ -357,7 +356,7 @@ export function VerificationFormView() {
                   <ul className="error-fields-list">
                     {failingRules.map((err, i) => {
                       const matchedKey = formKeyFor(err.field) || err.field;
-                      const fieldLabel = CANONICAL_FIELDS.find(f => f.key === matchedKey || f.key === err.field)?.label || err.field;
+                      const fieldLabel = CANONICAL_FIELDS_BY_KEY.get(matchedKey)?.label || CANONICAL_FIELDS_BY_KEY.get(err.field)?.label || err.field;
                       return (
                         <li key={i}>
                           <strong>{fieldLabel}:</strong> {err.message}
@@ -371,14 +370,15 @@ export function VerificationFormView() {
 
             {/* Form Sections */}
             <div className="form-sections-grid">
-              {fieldGroups.map(grp => {
+              {FIELD_GROUPS.map(grp => {
                 const locked = inAuthQueue && grp.id !== 'auth';
                 return (
                 <div key={grp.id} className="form-section-card">
                   <h3 className="group-heading">{grp.title}</h3>
                   <div className="group-fields-layout">
                     {grp.fields.map(f => {
-                      const hasError = failingRules.some(r => (formKeyFor(r.field) || r.field) === f.key || r.field === f.key);
+                      const errorMsg = failingRuleMap.get(f.key);
+                      const hasError = Boolean(errorMsg);
                       const prov = provenance[f.key];
 
                       return (
@@ -412,12 +412,14 @@ export function VerificationFormView() {
                               placeholder={f.placeholder || `Enter ${f.label.toLowerCase()}…`}
                               onChange={(e) => handleFieldChange(f.key, e.target.value)}
                               disabled={locked}
+                              autoComplete="off"
+                              spellCheck="false"
                             />
                           )}
 
                           {hasError && (
                             <span className="field-error-msg">
-                              {failingRules.find(r => r.field === f.key)?.message}
+                              {errorMsg}
                             </span>
                           )}
                         </div>

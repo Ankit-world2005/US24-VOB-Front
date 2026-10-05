@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useMemo, useCallback, memo } from 'react';
 import { vobFormRows, shownValue } from '../../utils/vobFormRows';
 import { printElement } from '../../utils/printElement';
 
@@ -12,7 +12,7 @@ import { printElement } from '../../utils/printElement';
  */
 
 /** One `Label: value` line inside a cell. */
-function Line({ label, value, fallback = '—', mono = false, bold = false }) {
+const Line = memo(function Line({ label, value, fallback = '—', mono = false, bold = false }) {
   const shown = shownValue({ value, fallback });
   return (
     <div className="p-line">
@@ -20,17 +20,17 @@ function Line({ label, value, fallback = '—', mono = false, bold = false }) {
       <span className={`p-val${mono ? ' font-mono' : ''}${bold ? ' font-semibold' : ''}`}>{shown}</span>
     </div>
   );
-}
+});
 
 /** Print / Save PDF for a rendered preview: its sheet alone, as the document. */
 export function printVobSheet(root) {
   printElement(root?.querySelector('.parker-sheet-container'), 'Pre-Authorization & Benefits Determination');
 }
 
-export function ParkerLivePreview({ formData = {} }) {
-  const f = formData;
+export const ParkerLivePreview = memo(function ParkerLivePreview({ formData = {} }) {
   const cardRef = useRef(null);
-  const handlePrint = () => printVobSheet(cardRef.current);
+  const handlePrint = useCallback(() => printVobSheet(cardRef.current), []);
+  const rows = useMemo(() => vobFormRows(formData), [formData]);
 
   return (
     <div className="parker-preview-card" ref={cardRef}>
@@ -60,11 +60,10 @@ export function ParkerLivePreview({ formData = {} }) {
                 <span className="brand-navy">US24</span>
                 <span className="brand-blue"> SOLUTIONS</span>
               </div>
-              <div className="parker-brand-sub">Innovative Technology Driven</div>
               <div className="brand-orange-bar"></div>
             </div>
 
-            <div className="parker-pat-box">PAT: {f.pat || '—'}</div>
+            <div className="parker-pat-box">PAT: {formData.pat || '—'}</div>
           </div>
 
           <div className="parker-doc-title-row">
@@ -72,7 +71,7 @@ export function ParkerLivePreview({ formData = {} }) {
           </div>
 
           <div className="parker-table">
-            {vobFormRows(f).map((row, i) => (
+            {rows.map((row, i) => (
               <div key={i} className={`p-row${row.full ? ' p-row-full' : ''}`}>
                 {row.cells.map((lines, j) => (
                   <div key={j} className={row.full ? 'p-cell' : `p-cell ${j === 0 ? 'p-cell-left' : 'p-cell-right'}`}>
@@ -90,4 +89,5 @@ export function ParkerLivePreview({ formData = {} }) {
       </div>
     </div>
   );
-}
+});
+

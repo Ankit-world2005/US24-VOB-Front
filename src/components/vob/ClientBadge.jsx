@@ -1,8 +1,8 @@
-import React from 'react';
-import { CLIENTS } from '../../data/clients';
+import React, { memo } from 'react';
+import { CLIENTS_BY_ID } from '../../data/clients';
 
-export function ClientBadge({ clientId }) {
-  const client = CLIENTS.find(c => c.id === clientId) || { name: clientId, color: '#0a2463' };
+export const ClientBadge = memo(function ClientBadge({ clientId }) {
+  const client = CLIENTS_BY_ID.get(clientId) || { name: clientId, color: '#0a2463' };
 
   return (
     <span
@@ -17,4 +17,5 @@ export function ClientBadge({ clientId }) {
       {client.name}
     </span>
   );
-}
+});
+

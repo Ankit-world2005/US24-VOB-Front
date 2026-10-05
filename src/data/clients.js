@@ -15,6 +15,9 @@ export {
   CORE_VERIFICATION_FIELDS
 };
 
+// Fast O(1) client lookup map
+export const CLIENTS_BY_ID = new Map((CLIENTS || []).map(c => [c.id, c]));
+
 // All 24 tracked fields in Call Verification
 export const ALL_VERIFIED_TRACKED_FIELDS = [
   ...CORE_VERIFICATION_FIELDS,

@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { memo } from 'react';
 
-export function ProvenanceBadge({ provenance }) {
+export const ProvenanceBadge = memo(function ProvenanceBadge({ provenance }) {
   if (!provenance || !provenance.source) return null;
 
   const { source, date } = provenance;
@@ -37,4 +37,5 @@ export function ProvenanceBadge({ provenance }) {
       Manual Entry
     </span>
   );
-}
+});
+
