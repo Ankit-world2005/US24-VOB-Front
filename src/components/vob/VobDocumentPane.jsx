@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { StatusBadge } from './StatusBadge';
 import { ACCEPTED_DOCUMENT_TYPES } from '../../utils/vobDocumentParser';
+import { ParkerLivePreview } from './ParkerLivePreview';
 
 /**
  * A .docx drawn in the page by docx-preview, loaded the first time one opens:
@@ -52,7 +53,7 @@ function DocxView({ file }) {
   );
 }
 
-const DOC_ICONS = { pdf: '📕', docx: '📘', text: '📋' };
+const DOC_ICONS = { pdf: '📄', docx: '📝', text: '📋', preview: '📋' };
 
 const recordLabel = (r) => `${r.id} · DOS ${r.dos || '—'} · ${r.vobStatus}`;
 
@@ -291,6 +292,11 @@ export function VobDocumentPane({
             </div>
           )}
 
+          {doc.kind === 'preview' && (
+            <div className="queue-vob-preview-pane" style={{ marginTop: '16px' }}>
+              <ParkerLivePreview formData={doc.fields} />
+            </div>
+          )}
           {doc.kind === 'pdf' && <iframe className="queue-pdf" src={doc.url} title={`VOB: ${doc.name}`} />}
           {doc.kind === 'docx' && <DocxView file={doc.file} />}
           {doc.kind === 'text' && <pre className="queue-vob-text">{doc.text}</pre>}

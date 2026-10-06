@@ -185,27 +185,111 @@ export function QueueView() {
     return () => window.removeEventListener('paste', onPaste);
   }, [loadDocument]);
 
+  // --- The VOB's record, found from the patient it names.
+  const readable = doc?.status === 'ready' && doc.readable;
+  const [lookup, setLookup] = useState({ status: 'idle' });
+  const [records, setRecords] = useState([]);
+  const [recordId, setRecordId] = useState(null);
+  const [allRecords, setAllRecords] = useState([]);
+  const [manualRecord, setManualRecord] = useState(null);
+  const [manualConfirmed, setManualConfirmed] = useState(false);
+  const [ignoredCheck, setIgnoredCheck] = useState(null);
+  const [lookupRun, setLookupRun] = useState(0);
+
+  const record = manualRecord || records.find(r => r.id === recordId) || null;
+
+  // --- The transcript extraction state
+  const extraction = useTranscriptExtraction(record?.id ?? null, { allFields: true });
+  const [localReading, setLocalReading] = useState(null);
+  const result = extraction.result || localReading;
+
   // When navigated with a specific VOB record (e.g. from Audit Specialist dashboard)
   useEffect(() => {
     if (!queueTargetVobId) return;
     let current = true;
     vobsApi.getVobById(queueTargetVobId).then(recordData => {
       if (!current) return;
+      const rawFields = recordData.fields || {};
+      const rawExtra = recordData.extra || {};
+      const formFields = {
+        patientName: recordData.patientName || recordData.patient?.name || '',
+        dob: recordData.dob || recordData.patient?.dob || '',
+        dos: recordData.dos || rawFields.dos || '',
+        todayDate: recordData.todayDate || new Date().toISOString().split('T')[0],
+        additionalInfo: recordData.additionalInfo || rawExtra.additional_info || '',
+        insurance: recordData.insurance || rawFields.insurance || '',
+        insurancePhone: recordData.insurancePhone || rawFields.insurance_phone || '',
+        idCard: recordData.idCard || rawFields.id_card_ref || '',
+        groupNo: recordData.groupNo || rawFields.group_no || '',
+        serviceType: recordData.serviceType || rawFields.appointment_type || 'Physical Therapy',
+        planType: recordData.planType || rawFields.plan_type_and_name || '',
+        networkStatus: recordData.networkStatus || rawFields.network_status || '',
+        coverageStatus: recordData.coverageStatus || rawFields.coverage_status || '',
+        effectiveDate: recordData.effectiveDate || rawExtra.effective_date || '',
+        terminationDate: recordData.terminationDate || rawExtra.termination_date || '',
+        hsaHraAmt: recordData.hsaHraAmt || rawExtra.hsa_hra_amt || '',
+        copay: recordData.copay || rawExtra.copay || (rawFields.copay_coins ? 'YES' : 'NO'),
+        copayAmount: recordData.copayAmount || rawFields.copay_coins || '',
+        copayCoinsurance: recordData.copayCoinsurance || rawExtra.coinsurance || 'NO',
+        coinsuranceCovered: recordData.coinsuranceCovered || rawExtra.coinsurance_covered || '',
+        deductibleApplicable: recordData.deductibleApplicable || rawFields.deductible_applicable || '',
+        deductibleIndividual: recordData.deductibleIndividual || rawExtra.deductible_individual || '',
+        deductibleMet: recordData.deductibleMet || rawExtra.deductible_met || '',
+        deductibleRemaining: recordData.deductibleRemaining || rawExtra.deductible_remaining || '',
+        outOfPocket: recordData.outOfPocket || rawExtra.out_of_pocket || '',
+        oopMet: recordData.oopMet || rawExtra.oop_met || '',
+        oopRemaining: recordData.oopRemaining || rawExtra.oop_remaining || '',
+        visitsLimitation: recordData.visitsLimitation || rawFields.visits_limitation || '',
+        visitsUsed: recordData.visitsUsed || rawExtra.visits_used || '',
+        authInitialEval: recordData.authInitialEval || rawExtra.auth_initial_eval || 'NO',
+        authTreatment: recordData.authTreatment || (rawFields.authorization_required ? 'YES' : 'NO'),
+        referral: recordData.referral || (rawFields.referral_required ? 'YES' : 'NO'),
+        pcpReferral: recordData.pcpReferral || rawExtra.pcp_referral || 'NO',
+        howToObtainAuth: recordData.howToObtainAuth || rawExtra.how_to_obtain_auth || '',
+        authRequestTat: recordData.authRequestTat || rawFields.auth_request_tat || '',
+        authNumber: recordData.authNumber || rawFields.auth_number || '',
+        authCoverageDates: recordData.authCoverageDates || rawExtra.auth_coverage_dates || '',
+        primary: recordData.primary || rawFields.coverage_order || 'Primary',
+        secondary: recordData.secondary || rawExtra.secondary || 'NO',
+        insuranceRep: recordData.insuranceRep || rawExtra.insurance_rep || '',
+        callReference: recordData.callReference || rawExtra.call_reference || '',
+        claimMailingAddress: recordData.claimMailingAddress || rawExtra.claim_mailing_address || '',
+        payerId: recordData.payerId || rawFields.payer_id_claims || '',
+        tflDaysClaims: recordData.tflDaysClaims || rawExtra.tfl_days_claims || '',
+        tflCorrectedClaims: recordData.tflCorrectedClaims || rawExtra.tfl_corrected_claims || '',
+        secondaryYesNo: recordData.secondaryYesNo || rawExtra.secondary_yes_no || 'NO',
+        secondaryInsName: recordData.secondaryInsName || rawExtra.secondary_ins_name || '',
+        secondaryPlanName: recordData.secondaryPlanName || rawExtra.secondary_plan_name || '',
+        secondaryPolicyId: recordData.secondaryPolicyId || rawExtra.secondary_policy_id || '',
+        secondaryEffectiveDate: recordData.secondaryEffectiveDate || rawExtra.secondary_effective_date || '',
+        secondaryDeductible: recordData.secondaryDeductible || rawExtra.secondary_deductible || '',
+        secondaryVisitLimit: recordData.secondaryVisitLimit || rawExtra.secondary_visit_limit || '',
+        secondaryUsedLimit: recordData.secondaryUsedLimit || rawExtra.secondary_used_limit || '',
+      };
+
       setManualRecord(recordData);
       setManualConfirmed(true);
+      setRecords([recordData]);
+      setRecordId(recordData.id);
+      setLookup({ status: 'done', namesPatient: true });
+
       setDoc({
         id: recordData.id,
-        name: `${recordData.patient?.name || recordData.patientName} (${recordData.id})`,
-        kind: 'text',
-        text: `Record ${recordData.id} loaded for Audit Verification`,
-        fields: recordData.fields || {},
+        name: `${formFields.patientName || recordData.id} (${recordData.id})`,
+        kind: 'preview',
+        fields: formFields,
         status: 'ready',
         readable: true,
-        found: Object.keys(recordData.fields || {}).length,
-        total: Object.keys(recordData.fields || {}).length,
+        found: Object.keys(formFields).length,
+        total: Object.keys(formFields).length,
       });
+
       if (recordData.transcript) {
         extraction.setTranscript(recordData.transcript);
+        const local = readTranscriptLocally(recordData.transcript);
+        if (local && Object.keys(local.callValues || {}).length > 0) {
+          setLocalReading(local);
+        }
       }
     }).catch(err => {
       console.error('Failed to load target audit record:', err);
@@ -213,32 +297,33 @@ export function QueueView() {
     return () => { current = false; };
   }, [queueTargetVobId]);
 
-  // --- The VOB's record, found from the patient it names.
-  const readable = doc?.status === 'ready' && doc.readable;
-  const [lookup, setLookup] = useState({ status: 'idle' });
-  const [records, setRecords] = useState([]);
-  const [recordId, setRecordId] = useState(null);
-  // With no record found from the patient, one picked by hand, which the
-  // specialist confirms is this VOB's patient before submitting to it.
-  const [allRecords, setAllRecords] = useState([]);
-  const [manualRecord, setManualRecord] = useState(null);
-  const [manualConfirmed, setManualConfirmed] = useState(false);
-  // A submit the server routed without applying the check: { record, routedTo }.
-  const [ignoredCheck, setIgnoredCheck] = useState(null);
-  // Bumped by Retry, to look the record up again after the lookup failed.
-  const [lookupRun, setLookupRun] = useState(0);
-
   useEffect(() => {
+    if (!readable) {
+      setRecords([]);
+      setRecordId(null);
+      setAllRecords([]);
+      setManualRecord(null);
+      setManualConfirmed(false);
+      setIgnoredCheck(null);
+      setLookup({ status: 'idle' });
+      return undefined;
+    }
+
+    // Preserve explicitly loaded audit verification record
+    if (doc?.id && manualRecord && manualRecord.id === doc.id) {
+      setRecords([manualRecord]);
+      setRecordId(manualRecord.id);
+      setManualConfirmed(true);
+      setLookup({ status: 'done', namesPatient: true });
+      return undefined;
+    }
+
     setRecords([]);
     setRecordId(null);
     setAllRecords([]);
     setManualRecord(null);
     setManualConfirmed(false);
     setIgnoredCheck(null);
-    if (!readable) {
-      setLookup({ status: 'idle' });
-      return undefined;
-    }
     let current = true;
     setLookup({ status: 'finding' });
     findPatientRecords(doc.fields)
@@ -253,21 +338,13 @@ export function QueueView() {
         if (current) setLookup({ status: 'failed', error: `Couldn’t look up the patient’s VOB record: ${err?.message || 'no answer from the server'}.` });
       });
     return () => { current = false; };
-  }, [readable, doc, lookupRun]);
+  }, [readable, doc, lookupRun, manualRecord]);
 
   const pickRecord = (picked) => {
     setManualRecord(picked);
     setManualConfirmed(false);
     setIgnoredCheck(null);
   };
-
-  const record = manualRecord || records.find(r => r.id === recordId) || null;
-
-  // --- The transcript, read for the call's values; nothing is written to any record.
-  // The AI reads it via backend extraction (using the same Gemini LLM as New Verification).
-  const extraction = useTranscriptExtraction(record?.id ?? null, { allFields: true });
-  const [localReading, setLocalReading] = useState(null);
-  const result = extraction.result || localReading;
 
   const extract = () => {
     setLocalReading(null);
