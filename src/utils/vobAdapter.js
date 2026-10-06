@@ -127,6 +127,15 @@ export const STATUS_MAP_TO_BACKEND = {
 };
 
 /**
+ * A VOB's failures as the screens read them: `{ field, message, code? }` each.
+ * A bare field name (as the mock API answers) means the field was required and empty.
+ */
+function toFailures(list) {
+  if (!Array.isArray(list)) return [];
+  return list.map(f => (typeof f === 'string' ? { field: f, message: 'Required' } : f));
+}
+
+/**
  * Normalizes a VOB row from GET /api/v1/vobs list response
  */
 export function normalizeVobListItem(item) {
@@ -155,6 +164,8 @@ export function normalizeVobListItem(item) {
     assignee: item.assignee,
     assignedTo: assigneeName || item.assignee_id || '',
     failureCount: item.failure_count || (item.failures?.length || 0),
+    // The Error Queue lists these as each row's failing rules and remarks.
+    failingRules: toFailures(item.failures ?? item.failingRules),
     updatedAt: item.updated_at || item.updatedAt,
     insurance: item.insurance || item.fields?.insurance || 'General Healthcare',
     appointmentType: item.appointment_type || item.appointmentType || item.fields?.service_type || item.serviceType || 'Physical Therapy',
@@ -265,8 +276,15 @@ export function formKeyFor(apiField) {
   return HIDDEN_FIELDS[key] ? key : null;
 }
 
+/** The API field a form field saves to (`group_no`, `extra.oop_met`), or null when it is not stored. */
+export function apiFieldFor(formKey) {
+  const spec = FORM_FIELDS[formKey];
+  if (!spec) return HIDDEN_FIELDS[formKey] ? formKey : null;
+  return spec.field || `extra.${spec.extra}`;
+}
+
 /** A value as a YES/NO select shows it; anything else is kept as it is. */
-function toYesNo(value) {
+export function toYesNo(value) {
   if (value === true) return 'YES';
   if (value === false) return 'NO';
   if (value === null || value === undefined) return '';
@@ -276,7 +294,7 @@ function toYesNo(value) {
   return value;
 }
 
-function toNetwork(value) {
+export function toNetwork(value) {
   const s = String(value ?? '').toUpperCase();
   if (s.includes('OUT')) return 'OUT-OF-NETWORK';
   if (s.includes('IN')) return 'IN-NETWORK';
@@ -340,7 +358,7 @@ export function normalizeSingleVob(raw) {
   const fields = raw.fields || {};
   const patient = raw.patient || {};
   const sources = raw.sources || {};
-  const failures = raw.failures || [];
+  const failures = toFailures(raw.failures);
 
   const backendStatus = (raw.status || 'in_progress').toLowerCase();
   const uiStatus = STATUS_MAP_TO_UI[backendStatus] || raw.vobStatus || 'In Progress';
@@ -449,6 +467,9 @@ export function normalizeSingleVob(raw) {
   return normalized;
 }
 
+/** Intake fields the form does not save, which a call can still confirm. */
+const CALL_ONLY_KEYS = { patient_name: 'patientName', dob: 'dob' };
+
 /**
  * The form's view of POST /api/v1/vobs/:id/extract.
  *
@@ -460,6 +481,14 @@ export function normalizeSingleVob(raw) {
  * `fields` is what applying writes; the rest is for the specialist to read:
  * each value's evidence and confidence, values that contradict the VOB, and
  * what the call did not answer.
+ *
+ * `callValues` is every value the call gave, by form field, whatever the VOB
+ * holds: what the Queue tab checks a pasted VOB against. An answer with
+ * `extracted` lists every field the call answered. Without it the values come
+ * from `proposed` (fields the VOB has empty), `conflicts` (fields where the
+ * call says something else) and any skipped field that carries the call's
+ * value, so a field where the call agrees with the VOB's saved value is left
+ * out; `callValuesComplete` says which it is.
  */
 export function normalizeExtraction(res) {
   const formKey = formKeyFor;
@@ -495,12 +524,29 @@ export function normalizeExtraction(res) {
     };
   });
 
+  const callValues = {};
+  const addCallValue = (item) => {
+    const key = CALL_ONLY_KEYS[item.field] || formKey(item.field);
+    if (!key || callValues[key] || item.value === null || item.value === undefined || item.value === '') return;
+    callValues[key] = { value: formatSelectVal(key, item.value), evidence: item.evidence || '', confidence: item.confidence };
+  };
+  const callValuesComplete = Array.isArray(res?.extracted);
+  if (callValuesComplete) {
+    res.extracted.forEach(addCallValue);
+  } else {
+    (res?.proposed || []).forEach(addCallValue);
+    (res?.conflicts || []).forEach(addCallValue);
+    (res?.skipped || []).filter((s) => s.reason !== 'not_found').forEach(addCallValue);
+  }
+
   return {
     provider: res?.provider || 'unknown',
     failovers: res?.failovers || [],
     quality: res?.quality || { classification: 'human', warning: null },
     proposed,
     fields: Object.fromEntries(proposed.map((p) => [p.key, p.value])),
+    callValues,
+    callValuesComplete,
     conflicts: ownFields(res?.conflicts).map((c) => ({
       key: formKey(c.field),
       label: c.label,

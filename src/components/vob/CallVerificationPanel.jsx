@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useCallback, memo } from 'react';
 import {
   REP_VERIFICATION_FIELDS,
   OURS_VERIFICATION_FIELDS,
@@ -6,7 +6,7 @@ import {
   isFieldFilled
 } from '../../data/clients';
 
-export function CallVerificationPanel({
+export const CallVerificationPanel = memo(function CallVerificationPanel({
   formData = {},
   hasTranscript = false,
   onOpenTranscript,
@@ -19,13 +19,13 @@ export function CallVerificationPanel({
     stillToFillCount,
     stillToAsk,
     stillToFill
-  } = getVerificationProgress(formData);
+  } = useMemo(() => getVerificationProgress(formData), [formData]);
 
-  const handlePillClick = (fieldKey) => {
+  const handlePillClick = useCallback((fieldKey) => {
     if (onSelectField) {
       onSelectField(fieldKey);
     }
-  };
+  }, [onSelectField]);
 
   return (
     <div className="call-verification-card">
@@ -158,4 +158,5 @@ export function CallVerificationPanel({
       </div>
     </div>
   );
-}
+});
+

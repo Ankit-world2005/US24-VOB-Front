@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { memo } from 'react';
 
-export function StatusBadge({ status }) {
+export const StatusBadge = memo(function StatusBadge({ status }) {
   const s = (status || "").toLowerCase();
   let className = "status-badge ";
   let label = status;
@@ -28,4 +28,5 @@ export function StatusBadge({ status }) {
       {label}
     </span>
   );
-}
+});
+

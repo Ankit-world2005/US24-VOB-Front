@@ -134,9 +134,16 @@ export const vobsApi = {
 
   /**
    * POST /api/v1/vobs/:id/submit - User (the assignee) only. Checks VOB and routes it.
-   * Body: { version }
+   * Body: { version, document_check? }
+   *
+   * `documentCheck` is the Queue tab's check of a pasted VOB against a call
+   * transcript ({ filename, source, remark, results: [{ field, status,
+   * vob_value, transcript_value, remark }] }, status being match, wrong,
+   * missing or not_mentioned). A wrong or missing field comes back as a
+   * failure with code 'document_mismatch' and its remark as the message; the
+   * specialist's remark, as one with code 'reviewer_remark'.
    */
-  async submitVob(id, versionOrEmail, optionalVersion) {
+  async submitVob(id, versionOrEmail, optionalVersion, { documentCheck } = {}) {
     // Handle both submitVob(id, version) and legacy submitVob(id, userEmail)
     let version = 1;
     let userEmail = null;
@@ -154,7 +161,7 @@ export const vobsApi = {
       const res = await apiClient.request({
         path: `/api/v1/vobs/${id}/submit`,
         method: 'POST',
-        data: { version, userEmail }
+        data: documentCheck ? { version, userEmail, document_check: documentCheck } : { version, userEmail }
       });
       return res;
     } catch (err) {
@@ -256,17 +263,28 @@ export const vobsApi = {
    * for the VOB's empty fields, each with the payer's words it came from. Saves
    * nothing: the specialist applies, reviews and saves.
    */
-  async extract(id, text, { channel } = {}) {
+  async extract(id, text, { channel, allFields = false } = {}) {
+    const data = { text };
+    if (channel) data.channel = channel;
+    if (allFields) data.allFields = true;
+    const requestPath = id ? `/api/v1/vobs/${id}/extract` : '/api/v1/vobs/extract';
     const res = await apiClient.request({
-      path: `/api/v1/vobs/${id}/extract`,
+      path: requestPath,
       method: 'POST',
       // No limit here: the backend ends every extract within EXTRACTION_BUDGET_MS
       // (100 s) with proposals or a 503 that says why. A shorter limit here would
       // abort a slow call that was about to succeed.
       timeout: null,
-      data: channel ? { text, channel } : { text }
+      data
     });
     return normalizeExtraction(res);
+  },
+
+  /**
+   * Standalone transcript extraction with Gemini LLM (no VOB ID required).
+   */
+  async extractDirect(text, { channel } = {}) {
+    return this.extract(null, text, { channel, allFields: true });
   },
 
   /**
@@ -300,11 +318,27 @@ export const vobsApi = {
    * POST /api/v1/vobs/:id/reassign - Reassign an assigned/error/auth task
    * Body: { assignee_id, reason, version }
    */
-  async reassignVob(id, { assignee_id, assigneeId, reason, version = 1 } = {}) {
+  /**
+   * POST /api/v1/vobs/:id/audit-approve - Audit Specialist marks VOB verified and approved
+   */
+  async auditApprove(id, version = 1) {
+    return apiClient.request({
+      path: `/api/v1/vobs/${id}/audit-approve`,
+      method: 'POST',
+      data: { version: version || 1 }
+    });
+  },
+
+  /**
+   * POST /api/v1/vobs/:id/reassign - Reassign an assigned/error/auth task
+   * Body: { assignee_id, reason, version, status }
+   */
+  async reassignVob(id, { assignee_id, assigneeId, reason, version = 1, status } = {}) {
     const payload = {
       assignee_id: assignee_id || assigneeId,
       reason: reason || undefined,
-      version: version || 1
+      version: version || 1,
+      ...(status ? { status } : {})
     };
 
     try {
