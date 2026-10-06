@@ -48,6 +48,15 @@ export function useTranscriptExtraction(vobId) {
     return () => clearInterval(id);
   }, [isProcessing]);
 
+  // A reading belongs to the VOB it was made on: another VOB starts without
+  // one, and an answer that comes back after the VOB changed is dropped.
+  const currentVob = useRef(vobId);
+  useEffect(() => {
+    currentVob.current = vobId;
+    setResult(null);
+    setError('');
+  }, [vobId]);
+
   // The API trims before it counts, so this does too.
   const length = transcript.trim().length;
   const tooLong = length > MAX_TRANSCRIPT_CHARS;
@@ -69,14 +78,16 @@ export function useTranscriptExtraction(vobId) {
   // payer's words in it, and answers. If it cannot, the specialist is told so —
   // nothing is guessed in its place.
   const extract = async () => {
-    if (!transcript.trim() || tooLong) return;
+    if (!vobId || !transcript.trim() || tooLong) return;
+    const askedFor = vobId;
     setIsProcessing(true);
     setResult(null);
     setError('');
     try {
-      setResult(await vobsApi.extract(vobId, transcript));
+      const reading = await vobsApi.extract(askedFor, transcript);
+      if (currentVob.current === askedFor) setResult(reading);
     } catch (err) {
-      setError(describeFailure(err));
+      if (currentVob.current === askedFor) setError(describeFailure(err));
     } finally {
       setIsProcessing(false);
     }
@@ -85,8 +96,12 @@ export function useTranscriptExtraction(vobId) {
   return { transcript, setTranscript, isProcessing, result, error, elapsed, length, tooLong, readTranscriptFile, clear, extract };
 }
 
-/** The transcript box and the values read from it, for useTranscriptExtraction's state. */
-export function TranscriptExtractBody({ extraction }) {
+/**
+ * The transcript box and the values read from it, for useTranscriptExtraction's
+ * state. A screen that uses what was read its own way passes its own
+ * `description` and `showResult={false}` to leave out the result list.
+ */
+export function TranscriptExtractBody({ extraction, showResult = true, description }) {
   const { transcript, setTranscript, isProcessing, result, error, elapsed, length, tooLong, readTranscriptFile, clear } = extraction;
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef(null);
@@ -101,7 +116,9 @@ export function TranscriptExtractBody({ extraction }) {
   return (
     <>
       <p className="drawer-description">
-        Paste the payer call transcript or portal eligibility text. The AI proposes values for <strong>empty fields only</strong>, each with the payer's words it came from. Nothing is saved until you save the form.
+        {description ?? (
+          <>Paste the payer call transcript or portal eligibility text. The AI proposes values for <strong>empty fields only</strong>, each with the payer's words it came from. Nothing is saved until you save the form.</>
+        )}
       </p>
 
       <div className="transcript-input-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
@@ -181,7 +198,7 @@ export function TranscriptExtractBody({ extraction }) {
         </div>
       )}
 
-      {result && (
+      {showResult && result && (
         <div className="extracted-preview-box">
           {result.quality?.warning && (
             <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: '6px', padding: '10px 14px', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>

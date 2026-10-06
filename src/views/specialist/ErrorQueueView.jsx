@@ -3,17 +3,13 @@ import { DataError } from '../../components/DataError';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { vobsApi } from '../../api/vobs';
 import { ClientBadge } from '../../components/vob/ClientBadge';
-import { CANONICAL_FIELDS } from '../../data/clients';
-import { formKeyFor } from '../../utils/vobAdapter';
+import { failureLabel } from '../../data/clients';
 import { ReassignModal } from '../../components/vob/ReassignModal';
 import { QueueFilterBar } from '../../components/vob/QueueFilterBar';
 import { useRecordFilters, QUEUE_LIMIT } from '../../hooks/useRecordFilters';
 
-/** A VOB sent here by the Queue tab's cross-check is corrected there, against its document. */
-const failedCrossCheck = (v) => (v.failingRules || []).some(r => r.code === 'document_mismatch');
-
 export function ErrorQueueView() {
-  const { currentUser, openVerification, openQueue } = useWorkspace();
+  const { currentUser, openVerification } = useWorkspace();
   const [errorVobs, setErrorVobs] = useState([]);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -98,15 +94,11 @@ export function ErrorQueueView() {
                     <td>
                       <div className="failing-reasons-cell">
                         {v.failingRules && v.failingRules.length > 0 ? (
-                          v.failingRules.map((r, i) => {
-                            const matchedKey = formKeyFor(r.field) || r.field;
-                            const fieldLabel = CANONICAL_FIELDS.find(f => f.key === matchedKey || f.key === r.field)?.label || r.field;
-                            return (
-                              <div key={i} className="failing-reason-tag">
-                                <strong>{fieldLabel}:</strong> {r.message}
-                              </div>
-                            );
-                          })
+                          v.failingRules.map((r, i) => (
+                            <div key={i} className="failing-reason-tag">
+                              <strong>{failureLabel(r)}:</strong> {r.message}
+                            </div>
+                          ))
                         ) : (
                           <div className="failing-reason-tag">Required client fields incomplete</div>
                         )}
@@ -117,8 +109,7 @@ export function ErrorQueueView() {
                         <button
                           type="button"
                           className="btn btn-sm btn-danger-action"
-                          onClick={() => (failedCrossCheck(v) ? openQueue(v.id) : openVerification(v.id))}
-                          title={failedCrossCheck(v) ? 'Opens the Queue tab to correct it against the VOB document' : undefined}
+                          onClick={() => openVerification(v.id)}
                         >
                           Correct & Resubmit &rarr;
                         </button>

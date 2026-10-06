@@ -592,15 +592,26 @@ const server = http.createServer(async (req, res) => {
         required('id_card_ref', f.id_card || f.id_card_ref);
         required('copay_coins', f.copay_coins || f.copay_amount);
 
-        // The Queue tab's cross-check against the existing VOB document: each wrong
-        // or blank answer is a failure, with its remark as the message.
+        // The Queue tab's check of a pasted VOB against a call transcript: each
+        // wrong or missing answer is a failure, with its remark as the message.
+        // The specialist's own remark is kept with the check and, when the VOB
+        // fails, goes with the failures so the Error Queue shows it too.
         const check = body.document_check;
         if (check && Array.isArray(check.results)) {
-          vob.document_check = { filename: check.filename || null, checked_at: new Date().toISOString(), results: check.results };
+          vob.document_check = {
+            filename: check.filename || null,
+            source: check.source || null,
+            remark: check.remark || null,
+            checked_at: new Date().toISOString(),
+            results: check.results
+          };
           for (const r of check.results) {
             if (r.status === 'wrong' || r.status === 'missing') {
-              failures.push({ field: r.field, code: 'document_mismatch', message: r.remark || 'Does not match the VOB document' });
+              failures.push({ field: r.field, code: 'document_mismatch', message: r.remark || 'Does not match the transcript' });
             }
+          }
+          if (failures.length > 0 && check.remark) {
+            failures.push({ field: 'remark', code: 'reviewer_remark', message: check.remark });
           }
         }
 

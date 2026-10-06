@@ -185,16 +185,30 @@ export function documentKind(file) {
   throw new Error('Drop the VOB as a .docx or .pdf file.');
 }
 
-/**
- * What a dropped VOB says: its fields by form key, how many of the template's
- * labels were found, and whether that is enough to cross-check against.
- */
+/** A reading as the Queue tab keeps it: fields, labels found, and whether that is enough to check. */
+const asReading = (kind, { values, found }) => ({ kind, fields: values, found, total: LAYOUT.length, readable: found >= MIN_LABELS_FOUND });
+
+/** What a dropped or imported VOB file says. */
 export async function readVobDocument(file) {
   const kind = documentKind(file);
   if (file.size > MAX_DOCUMENT_BYTES) {
     throw new Error('This file is over 10 MB, too big to be a VOB. Check it is the right file.');
   }
   const bytes = new Uint8Array(await file.arrayBuffer());
-  const { values, found } = kind === 'docx' ? readVobDocx(bytes) : readVobText(await pdfText(bytes));
-  return { kind, fields: values, found, total: LAYOUT.length, readable: found >= MIN_LABELS_FOUND };
+  return asReading(kind, kind === 'docx' ? readVobDocx(bytes) : readVobText(await pdfText(bytes)));
+}
+
+/** What a VOB's pasted text says (copied out of Word or a PDF). */
+export function readPastedVob(text) {
+  return asReading('text', readVobText(text));
+}
+
+/** Whether a pasted file is one the Queue tab reads, without the explanation documentKind() gives. */
+export function isVobFile(file) {
+  try {
+    documentKind(file);
+    return true;
+  } catch {
+    return false;
+  }
 }

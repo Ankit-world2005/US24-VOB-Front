@@ -8,6 +8,41 @@ import { formKeyFor } from '../utils/vobAdapter';
 const AUTH_FIELD_KEYS = CANONICAL_FIELDS.filter(f => f.group === 'auth').map(f => f.key);
 
 /**
+ * Tells the specialist where submit sent the VOB, and opens that tab: the
+ * Error Queue (with how many fields failed the Queue tab's transcript check,
+ * when any did), the Auth Queue, or Saved Records.
+ */
+export function followSubmitResult(result, showToast, setActiveTab) {
+  const status = (result.status || '').toLowerCase();
+  if (status === 'error') {
+    const mismatches = (result.failingRules || []).filter(f => f.code === 'document_mismatch').length;
+    showToast(
+      mismatches > 0
+        ? `${mismatches} VOB field${mismatches === 1 ? '' : 's'} didn’t match the transcript — moved to Error Queue with remarks.`
+        : "Validation failed. Incomplete fields moved to Error Queue.",
+      "error"
+    );
+    setActiveTab('error_queue');
+  } else if (status === 'auth_queue' || status === 'auth queue') {
+    const pending = (result.awaiting || []).map(field => {
+      const key = formKeyFor(field) || field;
+      return CANONICAL_FIELDS_BY_KEY.get(key)?.label || field;
+    });
+    const shown = pending.slice(0, 3).join(', ') + (pending.length > 3 ? ` +${pending.length - 3} more` : '');
+    showToast(
+      pending.length > 0
+        ? `Authorization section incomplete (${shown}). VOB moved to Auth Queue.`
+        : "VOB moved to Auth Queue.",
+      "info"
+    );
+    setActiveTab('auth_queue');
+  } else {
+    showToast("VOB validated and approved! Saved to Approved Records.", "success");
+    setActiveTab('saved_records');
+  }
+}
+
+/**
  * The VOB fill screen's state and actions: the open VOB, its form values and
  * provenance, failing rules, the layout, and save / submit with conflict
  * handling. New Verification and New VOB Verification both run on this, so the
@@ -163,10 +198,9 @@ export function useVobForm() {
   }, [saveForm, reloadAfterConflict, showToast]);
 
   /**
-   * Saves, submits and follows the VOB to where the API routed it. The Queue
-   * tab passes `documentCheck`: its cross-check against the existing VOB.
+   * Saves, submits and follows the VOB to where the API routed it.
    */
-  const handleSubmit = useCallback(async ({ documentCheck } = {}) => {
+  const handleSubmit = useCallback(async () => {
     if (!vob) return;
     setIsSubmitting(true);
     try {
@@ -174,36 +208,11 @@ export function useVobForm() {
       const currentVersion = patchRes?.version || (vob.version ? vob.version + 1 : 1);
       setVob(prev => ({ ...prev, version: currentVersion }));
 
-      const result = await vobsApi.submitVob(activeVobId, currentVersion, currentUser.email, { documentCheck });
-      const status = (result.status || '').toLowerCase();
-      if (status === 'error') {
-        const failures = result.failingRules || [];
-        const mismatches = failures.filter(f => f.code === 'document_mismatch').length;
-        setFailingRules(failures);
-        showToast(
-          mismatches > 0
-            ? `${mismatches} field${mismatches === 1 ? '' : 's'} didn’t match the document — moved to Error Queue with remarks.`
-            : "Validation failed. Incomplete fields moved to Error Queue.",
-          "error"
-        );
-        setActiveTab('error_queue');
-      } else if (status === 'auth_queue' || status === 'auth queue') {
-        const pending = (result.awaiting || []).map(field => {
-          const key = formKeyFor(field) || field;
-          return CANONICAL_FIELDS_BY_KEY.get(key)?.label || field;
-        });
-        const shown = pending.slice(0, 3).join(', ') + (pending.length > 3 ? ` +${pending.length - 3} more` : '');
-        showToast(
-          pending.length > 0
-            ? `Authorization section incomplete (${shown}). VOB moved to Auth Queue.`
-            : "VOB moved to Auth Queue.",
-          "info"
-        );
-        setActiveTab('auth_queue');
-      } else {
-        showToast("VOB validated and approved! Saved to Approved Records.", "success");
-        setActiveTab('saved_records');
+      const result = await vobsApi.submitVob(activeVobId, currentVersion, currentUser.email);
+      if ((result.status || '').toLowerCase() === 'error') {
+        setFailingRules(result.failingRules || []);
       }
+      followSubmitResult(result, showToast, setActiveTab);
     } catch (err) {
       console.error(err);
       if (err.status === 409) {

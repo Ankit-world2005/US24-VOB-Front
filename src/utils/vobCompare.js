@@ -1,31 +1,51 @@
-import { CANONICAL_FIELDS_BY_KEY } from '../data/clients';
+import { CANONICAL_FIELDS_BY_KEY, fieldLabel } from '../data/clients';
 import { FORM_FIELDS, apiFieldFor, toYesNo, toNetwork } from './vobAdapter';
-import { vobFormRows, formPrimary } from './vobFormRows';
+import { vobFormRows } from './vobFormRows';
 
 /**
- * The Queue tab's cross-check: the VOB form, as the transcript and the
- * specialist filled it, against what an existing VOB document says.
+ * The Queue tab's validation: a pasted or uploaded VOB checked against a call
+ * transcript. The VOB's answers are what is checked; the values the AI read
+ * from the transcript are what they are checked against. The VOB record's
+ * saved values play no part.
  *
- * Each field the document prints and the form stores ends up as one of:
- *   correct   — both say the same
- *   wrong     — both filled, but they differ
- *   missing   — the form has a value, the document is blank
- *   unchecked — only the document has a value, so there is nothing to check it against
- *   empty     — neither has a value
+ * Each field the VOB prints ends up as one of:
+ *   match         — the call gives the same value as the VOB
+ *   wrong         — the call gives a different value
+ *   missing       — the call gives a value; the VOB has none
+ *   not_mentioned — the call gives none: neutral, whatever the VOB says
  * Wrong and missing are errors: on submit they send the VOB to the Error Queue,
  * each with its remark.
  */
 
-/** The document's lines the form stores, in document order. Name and DOB are the patient check instead. */
-const CHECKED_LINES = vobFormRows({}).flatMap(row => row.cells.flat()).filter(l => FORM_FIELDS[l.field]);
+/** The VOB's lines checked against the call, in document order. Today's Date is when the VOB was made. */
+const CHECKED_LINES = vobFormRows({}).flatMap(row => row.cells.flat()).filter(l => l.field !== 'todayDate');
 
-const labelOf = (line) => CANONICAL_FIELDS_BY_KEY.get(line.field)?.label || line.label.replace(/[\s:?#-]+$/, '');
+const labelOf = (line) => (CANONICAL_FIELDS_BY_KEY.has(line.field) ? fieldLabel(line.field) : line.label.replace(/[\s:?#-]+$/, ''));
 
 /** The template's stand-ins for "no value". */
 const EMPTY = /^(?:—|–|-|n\/?a)?$/i;
 
 /** Fields compared as codes: case, spaces and punctuation don't matter. */
 const ID_FIELDS = new Set(['idCard', 'groupNo', 'payerId', 'secondaryPolicyId', 'authNumber', 'callReference']);
+
+/** Fields compared by their number: "30 per year" is "30 visits per year". */
+const COUNT_FIELDS = new Set(['visitsLimitation', 'visitsUsed', 'secondaryVisitLimit', 'secondaryUsedLimit']);
+
+/** Fields compared as a length of time: "5 to 7 business days" is "5-7 days". */
+const DURATION_FIELDS = new Set(['authRequestTat', 'tflDaysClaims', 'tflCorrectedClaims']);
+
+/**
+ * Free text compared loosely: one naming the other is a match, since a call
+ * and a VOB word the same thing more or less fully ("Aetna" and "Aetna
+ * Commercial PPO", "Anthony" and "Anthony S").
+ */
+const LOOSE_TEXT_FIELDS = new Set([
+  'insurance', 'insuranceRep', 'planType', 'coverageStatus', 'claimMailingAddress',
+  'howToObtainAuth', 'secondaryInsName', 'secondaryPlanName', 'additionalInfo'
+]);
+
+/** The API's names for the intake fields the form does not save. */
+const INTAKE_API_FIELDS = { patientName: 'patient_name', dob: 'dob' };
 
 /** A date as YYYY-MM-DD when it is written as one (2026-09-28, 09/28/2026, 9-28-26); otherwise null. */
 function isoDate(s) {
@@ -42,6 +62,9 @@ function amount(s) {
   return m ? Number(m[1]).toFixed(2) : null;
 }
 
+/** A name's words, lowercase, in any order: "Vance, Eleanor" is "Eleanor Vance". */
+const nameWords = (v) => String(v ?? '').toLowerCase().split(/[^a-z]+/).filter(Boolean);
+
 /** A value reduced to what matters for comparing it: '' when it is blank. */
 export function comparable(field, value) {
   const s = String(value ?? '').trim();
@@ -49,6 +72,16 @@ export function comparable(field, value) {
   const spec = FORM_FIELDS[field] || {};
   if (spec.yesNo) return String(toYesNo(s)).toUpperCase();
   if (spec.network) return String(toNetwork(s));
+  if (field === 'patientName') return nameWords(s).sort().join(' ');
+  if (COUNT_FIELDS.has(field)) {
+    if (/unlimited|no\s+limit/i.test(s)) return 'unlimited';
+    const n = s.match(/\d+/);
+    if (n) return String(Number(n[0]));
+  }
+  if (DURATION_FIELDS.has(field)) {
+    const m = s.match(/(\d+)(?:\s*(?:-|–|to)\s*(\d+))?\s*(?:business\s+|working\s+|calendar\s+)?(day|month|year)s?/i);
+    if (m) return `${m[1]}${m[2] ? `-${m[2]}` : ''} ${m[3].toLowerCase()}`;
+  }
   if (field === 'insurancePhone') {
     const digits = s.replace(/\D/g, '');
     return digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
@@ -63,83 +96,91 @@ export function comparable(field, value) {
     .replace(/[.;,]$/, '');
 }
 
-/** PRIMARY prints the insurance name for a primary plan; a document may say YES instead. */
-const isPrimaryPlan = (f) => !String(f.primary ?? '').trim() || /^primary$/i.test(String(f.primary).trim());
+/**
+ * The VOB's PRIMARY line names the plan's insurance (or says YES) when the plan
+ * is primary, so a call saying the plan is primary agrees with either.
+ */
+const callSaysPrimary = (callValue) => /^(primary|yes)$/i.test(callValue);
 
-function remarkFor(status, formValue, docValue, fromTranscript) {
-  const source = fromTranscript ? 'transcript gave' : 'form has';
-  if (status === 'wrong') return `Document has "${docValue}"; ${source} "${formValue}"`;
-  if (status === 'missing') return `Blank in the document; ${source} "${formValue}"`;
+function remarkFor(status, vobValue, callValue) {
+  if (status === 'wrong') return `VOB has "${vobValue}"; transcript says "${callValue}"`;
+  if (status === 'missing') return `VOB is blank; transcript says "${callValue}"`;
   return '';
 }
 
 /**
- * Each checked field's result, in document order, with counts. `provenance`
- * says which values the AI read from the transcript, for the remarks.
+ * Each field of the VOB (`docFields`, from vobDocumentParser) against the
+ * values the call gave (`callValues`, from normalizeExtraction), in document
+ * order, with counts.
  */
-export function crossCheck(formData, docFields, provenance = {}) {
+export function compareVobWithCall(docFields, callValues) {
   const results = CHECKED_LINES.map(line => {
     const key = line.field;
-    const formValue = String((key === 'primary' ? formPrimary(formData) : formData[key]) ?? '').trim();
-    const docValue = String(docFields[key] ?? '').trim();
-    const a = comparable(key, formValue);
-    const b = comparable(key, docValue);
+    const vobValue = String(docFields[key] ?? '').trim();
+    const call = callValues[key];
+    const callValue = String(call?.value ?? '').trim();
+    const v = comparable(key, vobValue);
+    const c = comparable(key, callValue);
 
+    const [vTight, cTight] = [v.replace(/\s+/g, ''), c.replace(/\s+/g, '')];
+    const loose = LOOSE_TEXT_FIELDS.has(key) && Math.min(vTight.length, cTight.length) >= 3 && (vTight.includes(cTight) || cTight.includes(vTight));
     let status;
-    if (key === 'primary' && !String(formData.primary ?? '').trim()) {
-      // With no coverage order on the form, the PRIMARY line only repeats the
-      // insurance name; it is worth a result only when the document names another plan.
-      status = !b || b === 'yes' || b === comparable('insurance', formData.insurance) ? 'empty' : 'wrong';
-    } else if (!a && !b) status = 'empty';
-    else if (!b) status = 'missing';
-    else if (!a) status = 'unchecked';
-    else if (a === b || (key === 'primary' && b === 'yes' && isPrimaryPlan(formData))) status = 'correct';
+    if (!c) status = 'not_mentioned';
+    else if (!v) status = 'missing';
+    else if (v === c || loose || (key === 'primary' && callSaysPrimary(callValue) && !/^(no|secondary)$/.test(v))) status = 'match';
     else status = 'wrong';
 
     return {
       key,
       label: labelOf(line),
       status,
-      formValue,
-      docValue,
-      remark: remarkFor(status, formValue, docValue, provenance[key]?.source === 'ai')
+      vobValue: v ? vobValue : '',
+      callValue: c ? callValue : '',
+      evidence: call?.evidence || '',
+      remark: remarkFor(status, vobValue, callValue)
     };
   });
 
   const count = (status) => results.filter(r => r.status === status).length;
-  const counts = { correct: count('correct'), wrong: count('wrong'), missing: count('missing'), unchecked: count('unchecked') };
+  const counts = { match: count('match'), wrong: count('wrong'), missing: count('missing'), notMentioned: count('not_mentioned') };
   return { results, counts, errors: counts.wrong + counts.missing };
 }
 
-/** A name's words, lowercase, in any order: "Vance, Eleanor" is "Eleanor Vance". */
-const nameWords = (v) => String(v ?? '').toLowerCase().split(/[^a-z]+/).filter(Boolean);
-
-/**
- * Whether the document is for this VOB's patient: same date of birth, and the
- * shorter name's words all in the longer one (a middle initial may be left out).
- */
-export function samePatient(formData, docFields) {
-  const docName = nameWords(docFields.patientName);
-  const docDob = isoDate(String(docFields.dob ?? '').trim());
-  if (!docName.length || !docDob) return { ok: false, found: false };
-
-  const formName = nameWords(formData.patientName);
-  const [shorter, longer] = docName.length <= formName.length ? [docName, formName] : [formName, docName];
-  const ok = docDob === isoDate(String(formData.dob ?? '').trim()) && shorter.every(w => longer.includes(w));
-  return { ok, found: true, name: docFields.patientName, dob: docFields.dob };
+/** Whether two names are one person's: the shorter name's words all in the longer one (a middle initial may be left out). */
+export function namesMatch(a, b) {
+  const [x, y] = [nameWords(a), nameWords(b)];
+  if (!x.length || !y.length) return false;
+  const [shorter, longer] = x.length <= y.length ? [x, y] : [y, x];
+  return shorter.every(w => longer.includes(w));
 }
 
-/** The `document_check` submit sends: the file's name and every field with a value on either side. */
-export function documentCheckFor(filename, check) {
+/**
+ * Whether a VOB record (`{ patientName, dob }`) is the pasted VOB's patient:
+ * the same name, and the same date of birth when both have one (records
+ * uploaded without a DOB still match by name).
+ */
+export function samePatient(record, docFields) {
+  const docDob = isoDate(String(docFields.dob ?? '').trim());
+  const recordDob = isoDate(String(record.dob ?? '').trim());
+  return namesMatch(record.patientName, docFields.patientName) && (!docDob || !recordDob || docDob === recordDob);
+}
+
+/**
+ * The `document_check` submit sends: which VOB was checked, the specialist's
+ * remark, and every field with a value on either side.
+ */
+export function documentCheckFor({ name, kind }, check, remark) {
   return {
-    filename,
+    filename: name,
+    source: kind,
+    remark: remark.trim() || null,
     results: check.results
-      .filter(r => r.status !== 'empty')
+      .filter(r => r.vobValue || r.callValue)
       .map(r => ({
-        field: apiFieldFor(r.key),
+        field: apiFieldFor(r.key) || INTAKE_API_FIELDS[r.key] || r.key,
         status: r.status,
-        document_value: r.docValue || null,
-        vob_value: r.formValue || null,
+        vob_value: r.vobValue || null,
+        transcript_value: r.callValue || null,
         remark: r.remark || null
       }))
   };

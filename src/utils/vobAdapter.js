@@ -467,6 +467,9 @@ export function normalizeSingleVob(raw) {
   return normalized;
 }
 
+/** Intake fields the form does not save, which a call can still confirm. */
+const CALL_ONLY_KEYS = { patient_name: 'patientName', dob: 'dob' };
+
 /**
  * The form's view of POST /api/v1/vobs/:id/extract.
  *
@@ -478,6 +481,14 @@ export function normalizeSingleVob(raw) {
  * `fields` is what applying writes; the rest is for the specialist to read:
  * each value's evidence and confidence, values that contradict the VOB, and
  * what the call did not answer.
+ *
+ * `callValues` is every value the call gave, by form field, whatever the VOB
+ * holds: what the Queue tab checks a pasted VOB against. An answer with
+ * `extracted` lists every field the call answered. Without it the values come
+ * from `proposed` (fields the VOB has empty), `conflicts` (fields where the
+ * call says something else) and any skipped field that carries the call's
+ * value, so a field where the call agrees with the VOB's saved value is left
+ * out; `callValuesComplete` says which it is.
  */
 export function normalizeExtraction(res) {
   const formKey = formKeyFor;
@@ -513,12 +524,29 @@ export function normalizeExtraction(res) {
     };
   });
 
+  const callValues = {};
+  const addCallValue = (item) => {
+    const key = CALL_ONLY_KEYS[item.field] || formKey(item.field);
+    if (!key || callValues[key] || item.value === null || item.value === undefined || item.value === '') return;
+    callValues[key] = { value: formatSelectVal(key, item.value), evidence: item.evidence || '', confidence: item.confidence };
+  };
+  const callValuesComplete = Array.isArray(res?.extracted);
+  if (callValuesComplete) {
+    res.extracted.forEach(addCallValue);
+  } else {
+    (res?.proposed || []).forEach(addCallValue);
+    (res?.conflicts || []).forEach(addCallValue);
+    (res?.skipped || []).filter((s) => s.reason !== 'not_found').forEach(addCallValue);
+  }
+
   return {
     provider: res?.provider || 'unknown',
     failovers: res?.failovers || [],
     quality: res?.quality || { classification: 'human', warning: null },
     proposed,
     fields: Object.fromEntries(proposed.map((p) => [p.key, p.value])),
+    callValues,
+    callValuesComplete,
     conflicts: ownFields(res?.conflicts).map((c) => ({
       key: formKey(c.field),
       label: c.label,
