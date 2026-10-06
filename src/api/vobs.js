@@ -263,17 +263,28 @@ export const vobsApi = {
    * for the VOB's empty fields, each with the payer's words it came from. Saves
    * nothing: the specialist applies, reviews and saves.
    */
-  async extract(id, text, { channel } = {}) {
+  async extract(id, text, { channel, allFields = false } = {}) {
+    const data = { text };
+    if (channel) data.channel = channel;
+    if (allFields) data.allFields = true;
+    const requestPath = id ? `/api/v1/vobs/${id}/extract` : '/api/v1/vobs/extract';
     const res = await apiClient.request({
-      path: `/api/v1/vobs/${id}/extract`,
+      path: requestPath,
       method: 'POST',
       // No limit here: the backend ends every extract within EXTRACTION_BUDGET_MS
       // (100 s) with proposals or a 503 that says why. A shorter limit here would
       // abort a slow call that was about to succeed.
       timeout: null,
-      data: channel ? { text, channel } : { text }
+      data
     });
     return normalizeExtraction(res);
+  },
+
+  /**
+   * Standalone transcript extraction with Gemini LLM (no VOB ID required).
+   */
+  async extractDirect(text, { channel } = {}) {
+    return this.extract(null, text, { channel, allFields: true });
   },
 
   /**

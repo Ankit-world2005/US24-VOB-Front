@@ -235,17 +235,14 @@ export function QueueView() {
   const record = manualRecord || records.find(r => r.id === recordId) || null;
 
   // --- The transcript, read for the call's values; nothing is written to any record.
-  // The AI reads it on the VOB's record; without one, the browser's reader does.
-  const extraction = useTranscriptExtraction(record?.id ?? null);
+  // The AI reads it via backend extraction (using the same Gemini LLM as New Verification).
+  const extraction = useTranscriptExtraction(record?.id ?? null, { allFields: true });
   const [localReading, setLocalReading] = useState(null);
   const result = extraction.result || localReading;
 
   const extract = () => {
-    if (record) {
-      extraction.extract();
-    } else {
-      setLocalReading(readTranscriptLocally(extraction.transcript));
-    }
+    setLocalReading(null);
+    extraction.extract({ allFields: true });
   };
   const readInBrowser = () => setLocalReading(readTranscriptLocally(extraction.transcript));
   const newTranscript = () => {
@@ -374,7 +371,7 @@ export function QueueView() {
 
   const extractBlocked = extraction.isProcessing || !extraction.transcript.trim() || extraction.tooLong;
   // A browser reading can be read again by the AI once the VOB's record is found.
-  const canAskAi = Boolean(record && localReading && !extraction.result && !extraction.isProcessing);
+  const canAskAi = Boolean(localReading && !extraction.result && !extraction.isProcessing);
   const layoutClass = `queue-layout${transcriptOpen ? '' : ' transcript-hidden'}${documentOpen ? '' : ' document-hidden'}`;
 
   return (
@@ -408,8 +405,8 @@ export function QueueView() {
               <button
                 type="button"
                 className="btn btn-sm ghost"
-                onClick={extraction.extract}
-                title={`The AI reads the transcript on ${record.id}, the VOB’s record`}
+                onClick={() => extract()}
+                title="Read transcript with Gemini AI"
               >
                 Read with AI
               </button>
@@ -419,7 +416,7 @@ export function QueueView() {
               className="btn btn-sm"
               onClick={extract}
               disabled={extractBlocked}
-              title={record ? `The AI reads the transcript on ${record.id}, the VOB’s record` : 'Read in the browser: no VOB record found yet for the AI to read it on'}
+              title={record ? `The AI reads the transcript on ${record.id}, the VOB’s record` : 'The AI reads the transcript with Gemini'}
             >
               {extraction.isProcessing ? 'Reading with AI…' : result ? 'Extract again' : extraction.error ? 'Try again' : 'Extract'}
             </button>

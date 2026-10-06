@@ -32,7 +32,7 @@ const displayValue = (v) => (v === true ? 'Yes' : v === false ? 'No' : String(v 
  * A pasted transcript and what the API read from it. Kept by whoever shows the
  * panel, so the AI drawer keeps its text and result while it is closed.
  */
-export function useTranscriptExtraction(vobId) {
+export function useTranscriptExtraction(vobId, { allFields = false } = {}) {
   const [transcript, setTranscript] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState(null);
@@ -74,17 +74,17 @@ export function useTranscriptExtraction(vobId) {
 
   const clear = () => { setTranscript(''); setResult(null); setError(''); };
 
-  // One call: the API reads the transcript, checks every value against the
-  // payer's words in it, and answers. If it cannot, the specialist is told so —
-  // nothing is guessed in its place.
-  const extract = async () => {
-    if (!vobId || !transcript.trim() || tooLong) return;
+  // One call: the API reads the transcript with Gemini LLM, checks every value
+  // against the payer's words in it, and answers. Can run with or without a VOB ID.
+  const extract = async (options = {}) => {
+    if (!transcript.trim() || tooLong) return;
     const askedFor = vobId;
+    const shouldCheckAll = options.allFields !== undefined ? options.allFields : allFields;
     setIsProcessing(true);
     setResult(null);
     setError('');
     try {
-      const reading = await vobsApi.extract(askedFor, transcript);
+      const reading = await vobsApi.extract(askedFor, transcript, { allFields: shouldCheckAll });
       if (currentVob.current === askedFor) setResult(reading);
     } catch (err) {
       if (currentVob.current === askedFor) setError(describeFailure(err));
