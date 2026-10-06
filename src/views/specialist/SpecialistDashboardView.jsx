@@ -8,22 +8,25 @@ import { ClientBadge } from '../../components/vob/ClientBadge';
 import { KpiCardGrid } from '../../components/vob/KpiCardGrid';
 
 export function SpecialistDashboardView() {
-  const { currentUser, openVerification, openCardPage } = useWorkspace();
+  const { currentUser, openVerification, openCardPage, openQueueWithVob } = useWorkspace();
   const [summary, setSummary] = useState({ total: 0, pending: 0, authQueue: 0, error: 0, approved: 0 });
   const [myVobs, setMyVobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
 
+  const isAuditSpecialist = currentUser?.email === 'jitender.s@us24solutions.com';
+
   useEffect(() => {
     setLoading(true);
     setLoadError('');
     Promise.all([
       dashboardApi.getSummary({ userEmail: currentUser.email }),
-      // Only VOBs still waiting to be started. Once the status moves on (In
-      // Progress, Auth Queue, Error, Approved) the VOB leaves this queue and is
-      // found under its card above.
-      vobsApi.getVobs({ assigneeId: currentUser.email, status: 'Assigned', limit: 50 })
+      vobsApi.getVobs({
+        assigneeId: currentUser.email,
+        status: isAuditSpecialist ? ['Assigned', 'In Progress'] : 'Assigned',
+        limit: 100
+      })
     ]).then(([sumData, list]) => {
       setSummary(sumData);
       setMyVobs(list);
@@ -33,14 +36,26 @@ export function SpecialistDashboardView() {
       setLoadError(err?.message || 'Could not load this data.');
       setLoading(false);
     });
-  }, [currentUser.email, reloadKey]);
+  }, [currentUser.email, isAuditSpecialist, reloadKey]);
+
+  const auditTasks = isAuditSpecialist
+    ? myVobs.filter(v => v.audit_stage === 'pending_audit' || v.previous_assignee || v.previousAssigneeId)
+    : [];
+  const assignedTasks = isAuditSpecialist
+    ? myVobs.filter(v => !(v.audit_stage === 'pending_audit' || v.previous_assignee || v.previousAssigneeId))
+    : myVobs;
 
   const handleStartNext = () => {
-    const nextPending = myVobs.find(v => v.vobStatus === "Assigned" || v.vobStatus === "In Progress");
+    const listToPick = isAuditSpecialist && auditTasks.length > 0 ? auditTasks : assignedTasks;
+    const nextPending = listToPick.find(v => v.vobStatus === "Assigned" || v.vobStatus === "In Progress");
     if (nextPending) {
-      openVerification(nextPending.id);
-    } else if (myVobs.length > 0) {
-      openVerification(myVobs[0].id);
+      if (isAuditSpecialist && (nextPending.audit_stage === 'pending_audit' || nextPending.previous_assignee)) {
+        openQueueWithVob(nextPending.id);
+      } else {
+        openVerification(nextPending.id);
+      }
+    } else if (listToPick.length > 0) {
+      openVerification(listToPick[0].id);
     }
   };
 
@@ -84,7 +99,76 @@ export function SpecialistDashboardView() {
         onOpen={openCardPage}
       />
 
-      {/* My Active Tasks Table */}
+      {/* Awaiting Audit Verification Queue (Audit Specialist only) */}
+      {isAuditSpecialist && (
+        <section className="panel-card" style={{ marginBottom: '24px', borderLeft: '4px solid #6366f1' }}>
+          <div className="panel-header">
+            <div>
+              <h3>🔍 Awaiting Audit Verification ({auditTasks.length})</h3>
+              <span className="panel-sub">Tasks submitted by specialists requiring Quality Assurance verification</span>
+            </div>
+          </div>
+
+          <div className="table-responsive">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Record ID</th>
+                  <th>Client</th>
+                  <th>Patient Name</th>
+                  <th>Submitting Specialist</th>
+                  <th>Date of Service</th>
+                  <th>Insurance Carrier</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr><td colSpan="7" className="table-empty">Loading audit queue…</td></tr>
+                ) : auditTasks.length === 0 ? (
+                  <tr><td colSpan="7" className="table-empty">No tasks currently awaiting audit verification.</td></tr>
+                ) : (
+                  auditTasks.map(v => (
+                    <tr key={v.id} className="interactive-row" onClick={() => openQueueWithVob(v.id)}>
+                      <td className="mono">{v.id}</td>
+                      <td><ClientBadge clientId={v.client} /></td>
+                      <td>
+                        <div className="bold">{v.patientName}</div>
+                        <div className="patient-sub-cell">DOB: {v.dob}</div>
+                      </td>
+                      <td>
+                        <span className="badge badge-info" style={{ fontWeight: 600 }}>
+                          👤 {v.previous_assignee?.name || v.previousAssignee || 'Specialist'}
+                        </span>
+                      </td>
+                      <td>{v.dos}</td>
+                      <td>
+                        <div>{v.insurance}</div>
+                        <div className="patient-sub-cell">{v.planTypeAndName}</div>
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn-sm"
+                          style={{ backgroundColor: '#6366f1', color: '#fff', fontWeight: 600 }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openQueueWithVob(v.id);
+                          }}
+                        >
+                          Verify →
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {/* My Assigned Tasks Table */}
       <section className="panel-card">
         <div className="panel-header">
           <div>
@@ -111,10 +195,10 @@ export function SpecialistDashboardView() {
                 <tr><td colSpan="7" className="table-empty">Loading your tasks…</td></tr>
               ) : loadError ? (
                 <tr><td colSpan="7" className="table-empty">Could not load your queue.</td></tr>
-              ) : myVobs.length === 0 ? (
+              ) : assignedTasks.length === 0 ? (
                 <tr><td colSpan="7" className="table-empty">No assigned tasks in your queue. Work in progress and finished work is under the cards above.</td></tr>
               ) : (
-                myVobs.map(v => (
+                assignedTasks.map(v => (
                   <tr key={v.id} className="interactive-row" onClick={() => openVerification(v.id)}>
                     <td className="mono">{v.id}</td>
                     <td><ClientBadge clientId={v.client} /></td>

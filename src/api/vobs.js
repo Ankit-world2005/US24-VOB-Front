@@ -318,11 +318,27 @@ export const vobsApi = {
    * POST /api/v1/vobs/:id/reassign - Reassign an assigned/error/auth task
    * Body: { assignee_id, reason, version }
    */
-  async reassignVob(id, { assignee_id, assigneeId, reason, version = 1 } = {}) {
+  /**
+   * POST /api/v1/vobs/:id/audit-approve - Audit Specialist marks VOB verified and approved
+   */
+  async auditApprove(id, version = 1) {
+    return apiClient.request({
+      path: `/api/v1/vobs/${id}/audit-approve`,
+      method: 'POST',
+      data: { version: version || 1 }
+    });
+  },
+
+  /**
+   * POST /api/v1/vobs/:id/reassign - Reassign an assigned/error/auth task
+   * Body: { assignee_id, reason, version, status }
+   */
+  async reassignVob(id, { assignee_id, assigneeId, reason, version = 1, status } = {}) {
     const payload = {
       assignee_id: assignee_id || assigneeId,
       reason: reason || undefined,
-      version: version || 1
+      version: version || 1,
+      ...(status ? { status } : {})
     };
 
     try {

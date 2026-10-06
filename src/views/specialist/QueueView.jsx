@@ -131,7 +131,8 @@ function CallValuesList({ result }) {
  * from New Verification.
  */
 export function QueueView() {
-  const { currentUser, showToast, setActiveTab } = useWorkspace();
+  const { currentUser, showToast, setActiveTab, queueTargetVobId, setQueueTargetVobId } = useWorkspace();
+  const isAuditSpecialist = currentUser?.email === 'jitender.s@us24solutions.com';
   const [transcriptOpen, setTranscriptOpen] = useState(true);
   const [documentOpen, setDocumentOpen] = useState(true);
   const [remark, setRemark] = useState('');
@@ -183,6 +184,34 @@ export function QueueView() {
     window.addEventListener('paste', onPaste);
     return () => window.removeEventListener('paste', onPaste);
   }, [loadDocument]);
+
+  // When navigated with a specific VOB record (e.g. from Audit Specialist dashboard)
+  useEffect(() => {
+    if (!queueTargetVobId) return;
+    let current = true;
+    vobsApi.getVobById(queueTargetVobId).then(recordData => {
+      if (!current) return;
+      setManualRecord(recordData);
+      setManualConfirmed(true);
+      setDoc({
+        id: recordData.id,
+        name: `${recordData.patient?.name || recordData.patientName} (${recordData.id})`,
+        kind: 'text',
+        text: `Record ${recordData.id} loaded for Audit Verification`,
+        fields: recordData.fields || {},
+        status: 'ready',
+        readable: true,
+        found: Object.keys(recordData.fields || {}).length,
+        total: Object.keys(recordData.fields || {}).length,
+      });
+      if (recordData.transcript) {
+        extraction.setTranscript(recordData.transcript);
+      }
+    }).catch(err => {
+      console.error('Failed to load target audit record:', err);
+    });
+    return () => { current = false; };
+  }, [queueTargetVobId]);
 
   // --- The VOB's record, found from the patient it names.
   const readable = doc?.status === 'ready' && doc.readable;
@@ -364,6 +393,47 @@ export function QueueView() {
           : err?.message || 'Submission error',
         'error'
       );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleAuditReassign = async () => {
+    if (!record) return;
+    const targetUser = record.previous_assignee_id || record.previousAssignee?.id || record.previousAssignee;
+    if (!targetUser) {
+      showToast("No original specialist found to return this VOB to.", "error");
+      return;
+    }
+    const remarksToSend = remark.trim() || 'Discrepancies found during audit verification. Please correct and resubmit.';
+    setIsSubmitting(true);
+    try {
+      await vobsApi.reassignVob(record.id, {
+        assignee_id: targetUser,
+        reason: remarksToSend,
+        status: 'error',
+        version: record.version || 1
+      });
+      showToast(`VOB ${record.id} returned to specialist with remarks. Moved to Error Queue.`, "info");
+      setQueueTargetVobId?.(null);
+      setActiveTab('my_dashboard');
+    } catch (err) {
+      showToast(err?.message || "Failed to reassign VOB", "error");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleAuditApprove = async () => {
+    if (!record) return;
+    setIsSubmitting(true);
+    try {
+      await vobsApi.auditApprove(record.id, record.version || 1);
+      showToast(`VOB ${record.id} verified and approved! Moved to Saved Records.`, "success");
+      setQueueTargetVobId?.(null);
+      setActiveTab('saved_records');
+    } catch (err) {
+      showToast(err?.message || "Failed to approve VOB", "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -555,6 +625,30 @@ export function QueueView() {
                   ? `❌ ${check.errors} field${check.errors === 1 ? '' : 's'} wrong or missing: ${record.id} goes to the Error Queue with remarks`
                   : `✅ No wrong or missing fields: ${record.id} goes on as usual`}
             </span>
+          )}
+          {isAuditSpecialist && record && (
+            <div style={{ display: 'flex', gap: '8px', marginRight: 'auto' }}>
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-danger"
+                onClick={handleAuditReassign}
+                disabled={isSubmitting}
+                style={{ borderColor: '#ef4444', color: '#ef4444' }}
+                title="Return VOB to the original specialist with remarks in Error Queue"
+              >
+                ↩ Reassign to Specialist
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={handleAuditApprove}
+                disabled={isSubmitting}
+                style={{ backgroundColor: '#10b981', color: '#fff' }}
+                title="Approve and save VOB to Saved Records"
+              >
+                ✓ Verified
+              </button>
+            </div>
           )}
           <button
             type="button"

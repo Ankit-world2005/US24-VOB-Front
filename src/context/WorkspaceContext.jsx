@@ -62,9 +62,16 @@ export function WorkspaceProvider({ session, onLogout, children }) {
     }, 3500);
   };
 
+  const [queueTargetVobId, setQueueTargetVobId] = useState(null);
+
   const openVerification = (vobId) => {
     setActiveVobId(vobId);
     setActiveTab("verification");
+  };
+
+  const openQueueWithVob = (vobId) => {
+    setQueueTargetVobId(vobId);
+    setActiveTab("queue");
   };
 
   const openCardPage = (cardId) => {
@@ -85,6 +92,9 @@ export function WorkspaceProvider({ session, onLogout, children }) {
         activeVobId,
         setActiveVobId,
         openVerification,
+        queueTargetVobId,
+        setQueueTargetVobId,
+        openQueueWithVob,
         activeCard,
         openCardPage,
         showToast,
