@@ -2863,6 +2863,61 @@ body::before {
   }
 }
 
+/* New VOB Verification: transcript step on the left, existing document on the right */
+.doc-verify-step-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.doc-verify-step-head .group-heading {
+  margin-bottom: 2px;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.doc-verify-step-summary {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.doc-verify-step-body {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--rule-soft);
+}
+
+.doc-verify-step-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.doc-verify-pane-switch {
+  margin-bottom: 12px;
+}
+
+.doc-drop-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 40px 20px;
+  border: 1.5px dashed var(--rule);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  color: var(--ink-soft);
+  font-size: 13px;
+  text-align: center;
+}
+
+.doc-drop-placeholder strong {
+  color: var(--ink);
+}
+
 /* =========================================================
    CALL VERIFICATION CARD (Matches Image 1)
    ========================================================= */

@@ -4,6 +4,7 @@ import { UI_CONTENT } from '../DB';
 
 const SpecialistDashboardView = lazy(() => import('../views/specialist/SpecialistDashboardView').then(m => ({ default: m.SpecialistDashboardView })));
 const VerificationFormView = lazy(() => import('../views/specialist/VerificationFormView').then(m => ({ default: m.VerificationFormView })));
+const DocumentVerificationView = lazy(() => import('../views/specialist/DocumentVerificationView').then(m => ({ default: m.DocumentVerificationView })));
 const AuthQueueView = lazy(() => import('../views/specialist/AuthQueueView').then(m => ({ default: m.AuthQueueView })));
 const ErrorQueueView = lazy(() => import('../views/specialist/ErrorQueueView').then(m => ({ default: m.ErrorQueueView })));
 const SavedRecordsView = lazy(() => import('../views/specialist/SavedRecordsView').then(m => ({ default: m.SavedRecordsView })));
@@ -45,6 +46,7 @@ export function SpecialistLayout() {
         }>
           {activeTab === 'my_dashboard' && <SpecialistDashboardView />}
           {activeTab === 'verification' && <VerificationFormView />}
+          {activeTab === 'doc_verification' && <DocumentVerificationView />}
           {activeTab === 'auth_queue' && <AuthQueueView />}
           {activeTab === 'error_queue' && <ErrorQueueView />}
           {activeTab === 'saved_records' && <SavedRecordsView />}
