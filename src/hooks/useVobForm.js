@@ -162,7 +162,11 @@ export function useVobForm() {
     }
   }, [saveForm, reloadAfterConflict, showToast]);
 
-  const handleSubmit = useCallback(async () => {
+  /**
+   * Saves, submits and follows the VOB to where the API routed it. The Queue
+   * tab passes `documentCheck`: its cross-check against the existing VOB.
+   */
+  const handleSubmit = useCallback(async ({ documentCheck } = {}) => {
     if (!vob) return;
     setIsSubmitting(true);
     try {
@@ -170,11 +174,18 @@ export function useVobForm() {
       const currentVersion = patchRes?.version || (vob.version ? vob.version + 1 : 1);
       setVob(prev => ({ ...prev, version: currentVersion }));
 
-      const result = await vobsApi.submitVob(activeVobId, currentVersion, currentUser.email);
+      const result = await vobsApi.submitVob(activeVobId, currentVersion, currentUser.email, { documentCheck });
       const status = (result.status || '').toLowerCase();
       if (status === 'error') {
-        setFailingRules(result.failingRules || []);
-        showToast("Validation failed. Incomplete fields moved to Error Queue.", "error");
+        const failures = result.failingRules || [];
+        const mismatches = failures.filter(f => f.code === 'document_mismatch').length;
+        setFailingRules(failures);
+        showToast(
+          mismatches > 0
+            ? `${mismatches} field${mismatches === 1 ? '' : 's'} didn’t match the document — moved to Error Queue with remarks.`
+            : "Validation failed. Incomplete fields moved to Error Queue.",
+          "error"
+        );
         setActiveTab('error_queue');
       } else if (status === 'auth_queue' || status === 'auth queue') {
         const pending = (result.awaiting || []).map(field => {

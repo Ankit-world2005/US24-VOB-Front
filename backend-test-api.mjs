@@ -527,6 +527,8 @@ const server = http.createServer(async (req, res) => {
         status: v.status,
         assignee: v.assignee,
         failure_count: v.failures?.length || 0,
+        // The Error Queue lists each failure with its message (a cross-check's remark).
+        failures: v.failures || [],
         updated_at: v.updated_at
       }));
 
@@ -579,12 +581,28 @@ const server = http.createServer(async (req, res) => {
         // Validate mandatory fields
         const failures = [];
         const f = vob.fields || {};
-        if (!vob.patient?.name && !f.patient_name) failures.push('patient_name');
-        if (!vob.patient?.dob && !f.dob) failures.push('dob');
-        if (!f.dos) failures.push('dos');
-        if (!f.insurance) failures.push('insurance');
-        if (!f.id_card) failures.push('id_card');
-        if (!f.copay_coins && !f.copay_amount) failures.push('copay_coins');
+        const required = (field, present) => {
+          if (!present) failures.push({ field, code: 'required', message: 'Required' });
+        };
+        required('patient_name', vob.patient?.name || f.patient_name);
+        required('dob', vob.patient?.dob || f.dob);
+        required('dos', f.dos);
+        required('insurance', f.insurance);
+        // The form saves the member ID as id_card_ref.
+        required('id_card_ref', f.id_card || f.id_card_ref);
+        required('copay_coins', f.copay_coins || f.copay_amount);
+
+        // The Queue tab's cross-check against the existing VOB document: each wrong
+        // or blank answer is a failure, with its remark as the message.
+        const check = body.document_check;
+        if (check && Array.isArray(check.results)) {
+          vob.document_check = { filename: check.filename || null, checked_at: new Date().toISOString(), results: check.results };
+          for (const r of check.results) {
+            if (r.status === 'wrong' || r.status === 'missing') {
+              failures.push({ field: r.field, code: 'document_mismatch', message: r.remark || 'Does not match the VOB document' });
+            }
+          }
+        }
 
         if (failures.length > 0) {
           vob.status = 'error';
@@ -621,6 +639,7 @@ const server = http.createServer(async (req, res) => {
           ['extra.auth_coverage_dates', x.auth_coverage_dates || (f.auth_valid_from && f.auth_valid_to ? 'dates' : '')]
         ].filter(([, v]) => blank(v)).map(([k]) => k);
 
+        vob.failures = [];
         if (awaiting.length > 0) {
           vob.status = 'auth_queue';
           vob.version = (vob.version || 1) + 1;

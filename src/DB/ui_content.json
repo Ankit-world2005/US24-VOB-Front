@@ -28,7 +28,7 @@
     "specialistTabs": [
       { "id": "my_dashboard", "label": "⚡ My Dashboard" },
       { "id": "verification", "label": "📝 New Verification" },
-      { "id": "doc_verification", "label": "🧾 New VOB Verification" },
+      { "id": "queue", "label": "🧾 Queue" },
       { "id": "auth_queue", "label": "⏳ Auth Queue" },
       { "id": "error_queue", "label": "⚠️ Error Queue" },
       { "id": "saved_records", "label": "✓ Saved Records" }

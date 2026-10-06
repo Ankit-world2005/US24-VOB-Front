@@ -104,8 +104,8 @@ export function TranscriptExtractBody({ extraction }) {
         Paste the payer call transcript or portal eligibility text. The AI proposes values for <strong>empty fields only</strong>, each with the payer's words it came from. Nothing is saved until you save the form.
       </p>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-        <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--ink)' }}>
+      <div className="transcript-input-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+        <span className="transcript-input-label" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--ink)' }}>
           Transcript / Portal Inquiry Text:
         </span>
         <div style={{ display: 'flex', gap: '8px' }}>

@@ -67,6 +67,12 @@ export function WorkspaceProvider({ session, onLogout, children }) {
     setActiveTab("verification");
   };
 
+  // The Queue tab: the VOB cross-checked against its existing document.
+  const openQueue = (vobId) => {
+    setActiveVobId(vobId);
+    setActiveTab("queue");
+  };
+
   const openCardPage = (cardId) => {
     setActiveCard(cardId);
     setActiveTab("card_detail");
@@ -85,6 +91,7 @@ export function WorkspaceProvider({ session, onLogout, children }) {
         activeVobId,
         setActiveVobId,
         openVerification,
+        openQueue,
         activeCard,
         openCardPage,
         showToast,

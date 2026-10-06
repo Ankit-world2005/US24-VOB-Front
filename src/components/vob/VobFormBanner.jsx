@@ -3,10 +3,7 @@ import { StatusBadge } from './StatusBadge';
 import { ClientBadge } from './ClientBadge';
 import { getVerificationProgress } from '../../data/clients';
 
-/**
- * The layout toggle's modes, as the verification-split-layout's mode-* classes
- * name them. A screen whose right pane is not the preview relabels them.
- */
+/** The layout toggle's modes, as the verification-split-layout's mode-* classes name them. */
 const LAYOUT_MODES = [
   { id: 'split', label: '◫ Split View', title: 'Side-by-side: Form & Parker VOB Preview' },
   { id: 'form', label: '▤ Form Only', title: 'Form & Call Verification only' },
@@ -15,10 +12,10 @@ const LAYOUT_MODES = [
 
 /**
  * The fill screen's top card: the VOB's tags and patient line, the layout
- * toggle and the switcher to another assigned VOB. `children` are the screen's
- * own actions, shown last.
+ * toggle (for a screen that passes `onLayoutChange`) and the switcher to
+ * another assigned VOB. `children` are the screen's own actions, shown last.
  */
-export function VobFormBanner({ vob, formData, layoutMode, onLayoutChange, layoutModes = LAYOUT_MODES, myVobsList, activeVobId, onSwitchVob, children }) {
+export function VobFormBanner({ vob, formData, layoutMode, onLayoutChange, myVobsList, activeVobId, onSwitchVob, children }) {
   const { filledCount, totalCount } = useMemo(() => getVerificationProgress(formData), [formData]);
 
   return (
@@ -42,19 +39,21 @@ export function VobFormBanner({ vob, formData, layoutMode, onLayoutChange, layou
 
       <div className="vob-header-actions">
         {/* Layout Mode Segmented Control */}
-        <div className="layout-toggle-group">
-          {layoutModes.map(mode => (
-            <button
-              key={mode.id}
-              type="button"
-              className={`layout-btn ${layoutMode === mode.id ? 'active' : ''}`}
-              onClick={() => onLayoutChange(mode.id)}
-              title={mode.title}
-            >
-              {mode.label}
-            </button>
-          ))}
-        </div>
+        {onLayoutChange && (
+          <div className="layout-toggle-group">
+            {LAYOUT_MODES.map(mode => (
+              <button
+                key={mode.id}
+                type="button"
+                className={`layout-btn ${layoutMode === mode.id ? 'active' : ''}`}
+                onClick={() => onLayoutChange(mode.id)}
+                title={mode.title}
+              >
+                {mode.label}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Quick switcher to next task */}
         {myVobsList.length > 1 && (

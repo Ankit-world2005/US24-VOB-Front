@@ -134,9 +134,14 @@ export const vobsApi = {
 
   /**
    * POST /api/v1/vobs/:id/submit - User (the assignee) only. Checks VOB and routes it.
-   * Body: { version }
+   * Body: { version, document_check? }
+   *
+   * `documentCheck` is the Queue tab's cross-check against an existing VOB
+   * document ({ filename, results: [{ field, status, document_value, vob_value, remark }] }).
+   * A wrong or missing field comes back as a failure with code
+   * 'document_mismatch' and the remark as its message.
    */
-  async submitVob(id, versionOrEmail, optionalVersion) {
+  async submitVob(id, versionOrEmail, optionalVersion, { documentCheck } = {}) {
     // Handle both submitVob(id, version) and legacy submitVob(id, userEmail)
     let version = 1;
     let userEmail = null;
@@ -154,7 +159,7 @@ export const vobsApi = {
       const res = await apiClient.request({
         path: `/api/v1/vobs/${id}/submit`,
         method: 'POST',
-        data: { version, userEmail }
+        data: documentCheck ? { version, userEmail, document_check: documentCheck } : { version, userEmail }
       });
       return res;
     } catch (err) {

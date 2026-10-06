@@ -20,12 +20,25 @@ const FIELD_GROUPS = [
   { id: 'secondary', title: 'X. Secondary Insurance (rows 12–15)', fields: CANONICAL_FIELDS.filter(f => f.group === 'secondary') }
 ];
 
+/** What each cross-check result says under the field (see src/utils/vobCompare.js). */
+const CHECK_NOTES = {
+  correct: () => '✓ Matches the document',
+  wrong: (c) => `✗ Document has “${c.docValue}”`,
+  missing: () => '✗ Blank in the document',
+  unchecked: (c) => `? Only in the document: ${c.docValue}`
+};
+
 /**
  * The VOB form's fields, section by section, under the Auth Queue lock banner
  * and the failed-rules banner. In the Auth Queue only the authorization
  * section is open.
+ *
+ * `fieldStatus` (the Queue tab) maps a field to its cross-check result
+ * against the existing VOB document, shown beside the field's label.
  */
-export function VobFormSections({ formData, provenance, failingRules, inAuthQueue, onFieldChange }) {
+export function VobFormSections({ formData, provenance, failingRules, inAuthQueue, onFieldChange, fieldStatus }) {
+  // Failures from a cross-check (a document_mismatch each) carry their own remarks.
+  const fromDocument = failingRules.length > 0 && failingRules.every(r => r.code === 'document_mismatch');
   const failingRuleMap = useMemo(() => {
     const map = new Map();
     for (const r of failingRules) {
@@ -52,8 +65,17 @@ export function VobFormSections({ formData, provenance, failingRules, inAuthQueu
         <div className="validation-error-banner" role="alert">
           <div className="error-banner-icon">⚠️</div>
           <div className="error-banner-content">
-            <h4>Validation Error — {failingRules.length} Rule(s) Failed</h4>
-            <p>The Parker VOB format requires all mandatory fields to be verified before approval:</p>
+            {fromDocument ? (
+              <>
+                <h4>Cross-check — {failingRules.length} field(s) didn’t match the VOB document</h4>
+                <p>Correct each field, or drop the corrected VOB, then cross-check again:</p>
+              </>
+            ) : (
+              <>
+                <h4>Validation Error — {failingRules.length} Rule(s) Failed</h4>
+                <p>The Parker VOB format requires all mandatory fields to be verified before approval:</p>
+              </>
+            )}
             <ul className="error-fields-list">
               {failingRules.map((err, i) => {
                 const matchedKey = formKeyFor(err.field) || err.field;
@@ -81,9 +103,11 @@ export function VobFormSections({ formData, provenance, failingRules, inAuthQueu
                 const errorMsg = failingRuleMap.get(f.key);
                 const hasError = Boolean(errorMsg);
                 const prov = provenance[f.key];
+                const check = fieldStatus?.[f.key];
+                const checkNote = check && CHECK_NOTES[check.status];
 
                 return (
-                  <div key={f.key} className={`vob-field-wrap ${hasError ? 'field-has-error' : ''}`}>
+                  <div key={f.key} className={`vob-field-wrap ${hasError ? 'field-has-error' : ''}${checkNote ? ` field-check-${check.status}` : ''}`}>
                     <div className="vob-field-label-row">
                       <label htmlFor={f.key}>
                         {f.label} {f.required && <span className="req-star">*</span>}
@@ -121,6 +145,12 @@ export function VobFormSections({ formData, provenance, failingRules, inAuthQueu
                     {hasError && (
                       <span className="field-error-msg">
                         {errorMsg}
+                      </span>
+                    )}
+
+                    {checkNote && (
+                      <span className={`field-check-note ${check.status}`} title={check.remark || undefined}>
+                        {checkNote(check)}
                       </span>
                     )}
                   </div>

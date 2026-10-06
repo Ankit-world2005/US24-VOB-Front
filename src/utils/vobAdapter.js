@@ -127,6 +127,15 @@ export const STATUS_MAP_TO_BACKEND = {
 };
 
 /**
+ * A VOB's failures as the screens read them: `{ field, message, code? }` each.
+ * A bare field name (as the mock API answers) means the field was required and empty.
+ */
+function toFailures(list) {
+  if (!Array.isArray(list)) return [];
+  return list.map(f => (typeof f === 'string' ? { field: f, message: 'Required' } : f));
+}
+
+/**
  * Normalizes a VOB row from GET /api/v1/vobs list response
  */
 export function normalizeVobListItem(item) {
@@ -155,6 +164,8 @@ export function normalizeVobListItem(item) {
     assignee: item.assignee,
     assignedTo: assigneeName || item.assignee_id || '',
     failureCount: item.failure_count || (item.failures?.length || 0),
+    // The Error Queue lists these as each row's failing rules and remarks.
+    failingRules: toFailures(item.failures ?? item.failingRules),
     updatedAt: item.updated_at || item.updatedAt,
     insurance: item.insurance || item.fields?.insurance || 'General Healthcare',
     appointmentType: item.appointment_type || item.appointmentType || item.fields?.service_type || item.serviceType || 'Physical Therapy',
@@ -265,8 +276,15 @@ export function formKeyFor(apiField) {
   return HIDDEN_FIELDS[key] ? key : null;
 }
 
+/** The API field a form field saves to (`group_no`, `extra.oop_met`), or null when it is not stored. */
+export function apiFieldFor(formKey) {
+  const spec = FORM_FIELDS[formKey];
+  if (!spec) return HIDDEN_FIELDS[formKey] ? formKey : null;
+  return spec.field || `extra.${spec.extra}`;
+}
+
 /** A value as a YES/NO select shows it; anything else is kept as it is. */
-function toYesNo(value) {
+export function toYesNo(value) {
   if (value === true) return 'YES';
   if (value === false) return 'NO';
   if (value === null || value === undefined) return '';
@@ -276,7 +294,7 @@ function toYesNo(value) {
   return value;
 }
 
-function toNetwork(value) {
+export function toNetwork(value) {
   const s = String(value ?? '').toUpperCase();
   if (s.includes('OUT')) return 'OUT-OF-NETWORK';
   if (s.includes('IN')) return 'IN-NETWORK';
@@ -340,7 +358,7 @@ export function normalizeSingleVob(raw) {
   const fields = raw.fields || {};
   const patient = raw.patient || {};
   const sources = raw.sources || {};
-  const failures = raw.failures || [];
+  const failures = toFailures(raw.failures);
 
   const backendStatus = (raw.status || 'in_progress').toLowerCase();
   const uiStatus = STATUS_MAP_TO_UI[backendStatus] || raw.vobStatus || 'In Progress';

@@ -9,8 +9,11 @@ import { ReassignModal } from '../../components/vob/ReassignModal';
 import { QueueFilterBar } from '../../components/vob/QueueFilterBar';
 import { useRecordFilters, QUEUE_LIMIT } from '../../hooks/useRecordFilters';
 
+/** A VOB sent here by the Queue tab's cross-check is corrected there, against its document. */
+const failedCrossCheck = (v) => (v.failingRules || []).some(r => r.code === 'document_mismatch');
+
 export function ErrorQueueView() {
-  const { currentUser, openVerification } = useWorkspace();
+  const { currentUser, openVerification, openQueue } = useWorkspace();
   const [errorVobs, setErrorVobs] = useState([]);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -63,7 +66,7 @@ export function ErrorQueueView() {
                 <th>Patient Name</th>
                 <th>Date of Service</th>
                 <th>Insurance</th>
-                <th>Failing Validation Rule(s)</th>
+                <th>Failing Rule(s) / Remarks</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -114,7 +117,8 @@ export function ErrorQueueView() {
                         <button
                           type="button"
                           className="btn btn-sm btn-danger-action"
-                          onClick={() => openVerification(v.id)}
+                          onClick={() => (failedCrossCheck(v) ? openQueue(v.id) : openVerification(v.id))}
+                          title={failedCrossCheck(v) ? 'Opens the Queue tab to correct it against the VOB document' : undefined}
                         >
                           Correct & Resubmit &rarr;
                         </button>
