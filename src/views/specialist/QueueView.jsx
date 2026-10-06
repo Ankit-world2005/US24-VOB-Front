@@ -131,7 +131,7 @@ function CallValuesList({ result }) {
  * from New Verification.
  */
 export function QueueView() {
-  const { currentUser, showToast, setActiveTab, queueTargetVobId, setQueueTargetVobId } = useWorkspace();
+  const { currentUser, showToast, setActiveTab, queueTargetVobId, setQueueTargetVobId, activeVobId } = useWorkspace();
   const isAuditSpecialist = currentUser?.email === 'jitender.s@us24solutions.com';
   const [transcriptOpen, setTranscriptOpen] = useState(true);
   const [documentOpen, setDocumentOpen] = useState(true);
@@ -205,10 +205,10 @@ export function QueueView() {
 
   // When navigated with a specific VOB record (e.g. from Audit Specialist dashboard)
   useEffect(() => {
-    if (!queueTargetVobId) return;
     let current = true;
-    vobsApi.getVobById(queueTargetVobId).then(recordData => {
-      if (!current) return;
+    const targetId = queueTargetVobId || activeVobId;
+
+    const applyTargetRecord = (recordData) => {
       const rawFields = recordData.fields || {};
       const rawExtra = recordData.extra || {};
       const formFields = {
@@ -284,18 +284,60 @@ export function QueueView() {
         total: Object.keys(formFields).length,
       });
 
-      if (recordData.transcript) {
-        extraction.setTranscript(recordData.transcript);
-        const local = readTranscriptLocally(recordData.transcript);
+      const transcriptToLoad = recordData.transcript ||
+        recordData.extra?.transcript ||
+        recordData.extra?.call_transcript ||
+        recordData.extra?.transcript_text ||
+        (recordData.id ? sessionStorage.getItem(`us24_transcript_${recordData.id}`) : null) ||
+        localStorage.getItem('us24_last_transcript') || '';
+
+      if (transcriptToLoad) {
+        extraction.setTranscript(transcriptToLoad);
+        const local = readTranscriptLocally(transcriptToLoad);
         if (local && Object.keys(local.callValues || {}).length > 0) {
           setLocalReading(local);
         }
       }
-    }).catch(err => {
-      console.error('Failed to load target audit record:', err);
-    });
+    };
+
+    if (targetId) {
+      vobsApi.getVobById(targetId).then(recordData => {
+        if (!current) return;
+        applyTargetRecord(recordData);
+      }).catch(err => {
+        console.error('Failed to load target audit record:', err);
+      });
+    } else if (isAuditSpecialist) {
+      // Auto-load latest in-progress VOB for audit specialist review if none explicitly passed
+      vobsApi.getVobs({ status: 'in_progress', limit: 1 }).then(({ data }) => {
+        if (!current || !data || data.length === 0) return;
+        vobsApi.getVobById(data[0].id).then(recordData => {
+          if (!current) return;
+          applyTargetRecord(recordData);
+        });
+      }).catch(() => {});
+    }
+
     return () => { current = false; };
-  }, [queueTargetVobId]);
+  }, [queueTargetVobId, activeVobId, isAuditSpecialist]);
+
+  // Synchronize transcript when record changes
+  useEffect(() => {
+    const currentRec = manualRecord || record;
+    if (!currentRec) return;
+    const t = currentRec.transcript ||
+      currentRec.extra?.transcript ||
+      currentRec.extra?.call_transcript ||
+      (currentRec.id ? sessionStorage.getItem(`us24_transcript_${currentRec.id}`) : null) ||
+      localStorage.getItem('us24_last_transcript');
+    if (t && (!extraction.transcript || extraction.transcript !== t)) {
+      extraction.setTranscript(t);
+      const local = readTranscriptLocally(t);
+      if (local && Object.keys(local.callValues || {}).length > 0) {
+        setLocalReading(local);
+      }
+    }
+  }, [record?.id, record?.transcript, manualRecord?.id, manualRecord?.transcript]);
 
   useEffect(() => {
     if (!readable) {

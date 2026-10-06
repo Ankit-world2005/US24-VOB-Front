@@ -120,6 +120,9 @@ export const vobsApi = {
       };
     } else {
       payload = toBackendPatchPayload(edits, version, { only });
+      if (edits && edits.transcript !== undefined) {
+        payload.transcript = edits.transcript;
+      }
       if (payload.fields) {
         delete payload.fields.vob_completion_date;
       }
@@ -143,7 +146,7 @@ export const vobsApi = {
    * failure with code 'document_mismatch' and its remark as the message; the
    * specialist's remark, as one with code 'reviewer_remark'.
    */
-  async submitVob(id, versionOrEmail, optionalVersion, { documentCheck } = {}) {
+  async submitVob(id, versionOrEmail, optionalVersion, { documentCheck, transcript } = {}) {
     // Handle both submitVob(id, version) and legacy submitVob(id, userEmail)
     let version = 1;
     let userEmail = null;

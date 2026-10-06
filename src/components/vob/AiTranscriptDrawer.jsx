@@ -8,7 +8,15 @@ export function AiTranscriptDrawer({ isOpen, onClose, vobId, onApplyFields }) {
   if (!isOpen) return null;
 
   const handleApply = (fields) => {
-    onApplyFields(fields);
+    if (extraction.transcript) {
+      try {
+        localStorage.setItem('us24_last_transcript', extraction.transcript);
+        if (vobId) {
+          sessionStorage.setItem(`us24_transcript_${vobId}`, extraction.transcript);
+        }
+      } catch (e) {}
+    }
+    onApplyFields(fields, extraction.transcript);
     onClose();
   };
 

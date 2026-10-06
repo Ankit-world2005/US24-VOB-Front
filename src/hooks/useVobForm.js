@@ -179,7 +179,7 @@ export function useVobForm() {
     if (!vob) return Promise.resolve(null);
     return vobsApi.patchVob(
       activeVobId,
-      { ...formData, provenance },
+      { ...formData, provenance, transcript: formData.transcript || formData.transcriptText },
       vob.version,
       currentUser.email,
       vob.status === 'auth_queue' ? { only: AUTH_FIELD_KEYS } : {}

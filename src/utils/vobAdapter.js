@@ -607,5 +607,9 @@ export function toBackendPatchPayload(formData, version, { only } = {}) {
     fields.copay_coins = '$0.00';
   }
 
-  return { version, fields, extra, confirm: [] };
+  const payload = { version, fields, extra, confirm: [] };
+  if (data.transcript !== undefined) {
+    payload.transcript = data.transcript;
+  }
+  return payload;
 }
