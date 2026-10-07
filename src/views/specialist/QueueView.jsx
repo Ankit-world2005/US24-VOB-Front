@@ -133,6 +133,25 @@ function CallValuesList({ result }) {
 export function QueueView() {
   const { currentUser, showToast, setActiveTab, queueTargetVobId, setQueueTargetVobId, activeVobId } = useWorkspace();
   const isAuditSpecialist = currentUser?.email === 'jitender.s@us24solutions.com';
+
+  if (!isAuditSpecialist) {
+    return (
+      <div className="panel-card empty-state" style={{ margin: '40px auto', maxWidth: '560px', textAlign: 'center', padding: '36px' }}>
+        <h3>🔒 Access Restricted</h3>
+        <p style={{ marginTop: '8px', color: 'var(--ink-soft)' }}>
+          The Audit Queue is exclusively for the Audit Specialist (Quality Assurance verification).
+        </p>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={() => setActiveTab('my_dashboard')}
+          style={{ marginTop: '16px' }}
+        >
+          Return to My Dashboard
+        </button>
+      </div>
+    );
+  }
   const [transcriptOpen, setTranscriptOpen] = useState(true);
   const [documentOpen, setDocumentOpen] = useState(true);
   const [remark, setRemark] = useState('');
@@ -748,39 +767,34 @@ export function QueueView() {
                   : `✅ No wrong or missing fields: ${record.id} goes on as usual`}
             </span>
           )}
-          {isAuditSpecialist && record && (
-            <div style={{ display: 'flex', gap: '8px', marginRight: 'auto' }}>
+          {record ? (
+            <div style={{ display: 'flex', gap: '10px', marginLeft: 'auto' }}>
               <button
                 type="button"
                 className="btn btn-sm btn-outline-danger"
                 onClick={handleAuditReassign}
                 disabled={isSubmitting}
-                style={{ borderColor: '#ef4444', color: '#ef4444' }}
+                style={{ borderColor: '#ef4444', color: '#ef4444', fontWeight: 600, padding: '8px 16px' }}
                 title="Return VOB to the original specialist with remarks in Error Queue"
               >
-                ↩ Reassign to Specialist
+                {isSubmitting ? 'Processing…' : '↩ Return to Specialist with Remarks'}
               </button>
               <button
                 type="button"
                 className="btn btn-sm"
                 onClick={handleAuditApprove}
                 disabled={isSubmitting}
-                style={{ backgroundColor: '#10b981', color: '#fff' }}
-                title="Approve and save VOB to Saved Records"
+                style={{ backgroundColor: '#10b981', color: '#fff', fontWeight: 600, padding: '8px 18px' }}
+                title="Approve and save VOB to the specialist's Approved tab"
               >
-                ✓ Verified
+                {isSubmitting ? 'Processing…' : '✓ Audit Verified & Approve'}
               </button>
             </div>
+          ) : (
+            <span className="queue-submit-hint" style={{ marginLeft: 'auto', color: 'var(--ink-soft)' }}>
+              Select or load a record to verify or return.
+            </span>
           )}
-          <button
-            type="button"
-            className="btn btn-submit-vob"
-            onClick={submit}
-            disabled={isSubmitting || Boolean(blockedReason)}
-            title={blockedReason || 'Submit; wrong or missing fields go to the Error Queue with remarks'}
-          >
-            {isSubmitting ? 'Submitting…' : 'Submit →'}
-          </button>
         </div>
       </section>
     </div>

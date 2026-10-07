@@ -125,7 +125,7 @@ export function VerificationFormView() {
             onClick={handleSubmit}
             disabled={isSubmitting}
           >
-            {isSubmitting ? 'Validating against Client Rules…' : '✓ Submit VOB for Validation'}
+            {isSubmitting ? 'Submitting for Audit Verification…' : '✓ Submit VOB for Audit'}
           </button>
         </div>
       </div>

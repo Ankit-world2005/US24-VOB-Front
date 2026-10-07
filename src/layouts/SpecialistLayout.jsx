@@ -1,4 +1,4 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { UI_CONTENT } from '../DB';
 
@@ -11,8 +11,26 @@ const SavedRecordsView = lazy(() => import('../views/specialist/SavedRecordsView
 const CardDetailView = lazy(() => import('../views/shared/CardDetailView').then(m => ({ default: m.CardDetailView })));
 
 export function SpecialistLayout() {
-  const { activeTab, setActiveTab } = useWorkspace();
-  const tabs = UI_CONTENT.navigation.specialistTabs;
+  const { activeTab, setActiveTab, currentUser } = useWorkspace();
+  const isAuditSpecialist = currentUser?.email === 'jitender.s@us24solutions.com';
+
+  // Automatically redirect normal specialists if they land on the queue tab
+  useEffect(() => {
+    if (activeTab === 'queue' && !isAuditSpecialist) {
+      setActiveTab('my_dashboard');
+    }
+  }, [activeTab, isAuditSpecialist, setActiveTab]);
+
+  // Queue tab is strictly restricted to Audit Specialist (Jitendra)
+  const tabs = UI_CONTENT.navigation.specialistTabs
+    .filter(tab => tab.id !== 'queue' || isAuditSpecialist)
+    .map(tab => {
+      if (tab.id === 'queue') {
+        return { ...tab, label: '📋 Audit Queue' };
+      }
+      return tab;
+    });
+
   // A card's page belongs to the dashboard, so its tab stays highlighted there.
   const highlightedTab = activeTab === 'card_detail' ? 'my_dashboard' : activeTab;
 
@@ -46,7 +64,7 @@ export function SpecialistLayout() {
         }>
           {activeTab === 'my_dashboard' && <SpecialistDashboardView />}
           {activeTab === 'verification' && <VerificationFormView />}
-          {activeTab === 'queue' && <QueueView />}
+          {activeTab === 'queue' && isAuditSpecialist && <QueueView />}
           {activeTab === 'auth_queue' && <AuthQueueView />}
           {activeTab === 'error_queue' && <ErrorQueueView />}
           {activeTab === 'saved_records' && <SavedRecordsView />}
