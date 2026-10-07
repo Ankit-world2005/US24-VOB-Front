@@ -175,6 +175,17 @@ export function useVobForm() {
     }
   }, [activeVobId, showToast]);
 
+  /**
+   * A save refused for values on the form (patchVob's `failures`): marks each
+   * field and names them in the toast. False for any other error.
+   */
+  const showInvalidFields = useCallback((err) => {
+    if (!Array.isArray(err?.failures) || err.failures.length === 0) return false;
+    setFailingRules(err.failures);
+    showToast(err.message, "error");
+    return true;
+  }, [showToast]);
+
   const saveForm = useCallback(() => {
     if (!vob) return Promise.resolve(null);
     return vobsApi.patchVob(
@@ -196,11 +207,11 @@ export function useVobForm() {
     } catch (err) {
       if (err.status === 409) {
         reloadAfterConflict(err);
-      } else {
+      } else if (!showInvalidFields(err)) {
         showToast("Error saving draft", "error");
       }
     }
-  }, [saveForm, reloadAfterConflict, showToast]);
+  }, [saveForm, reloadAfterConflict, showInvalidFields, showToast]);
 
   /**
    * Saves, submits and follows the VOB to where the API routed it.
@@ -219,16 +230,16 @@ export function useVobForm() {
       }
       followSubmitResult(result, showToast, setActiveTab);
     } catch (err) {
-      console.error(err);
       if (err.status === 409) {
         reloadAfterConflict(err);
-      } else {
+      } else if (!showInvalidFields(err)) {
+        console.error(err);
         showToast(err?.message || "Submission error", "error");
       }
     } finally {
       setIsSubmitting(false);
     }
-  }, [vob, activeVobId, currentUser.email, saveForm, reloadAfterConflict, showToast, setActiveTab]);
+  }, [vob, activeVobId, currentUser.email, saveForm, reloadAfterConflict, showInvalidFields, showToast, setActiveTab]);
 
   return {
     vob,

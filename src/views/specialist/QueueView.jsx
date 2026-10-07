@@ -548,9 +548,9 @@ export function QueueView() {
     setIsSubmitting(true);
     try {
       await vobsApi.auditApprove(record.id, record.version || 1);
-      showToast(`VOB ${record.id} verified and approved! Moved to Saved Records.`, "success");
+      showToast(`VOB ${record.id} verified. Moved to the specialist's Approved tab.`, "success");
       setQueueTargetVobId?.(null);
-      setActiveTab('saved_records');
+      setActiveTab('my_dashboard');
     } catch (err) {
       showToast(err?.message || "Failed to approve VOB", "error");
     } finally {

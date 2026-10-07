@@ -1,10 +1,12 @@
 import { apiClient } from './client.js';
 import { toServerClientId } from './clientIds.js';
+import { failureLabel } from '../data/clients';
 import {
   normalizeVobListItem,
   normalizeSingleVob,
   normalizeExtraction,
   toBackendPatchPayload,
+  invalidPatchFields,
   STATUS_MAP_TO_BACKEND
 } from '../utils/vobAdapter';
 
@@ -24,6 +26,51 @@ const toAuditEntry = (e) => ({
   detail: e.detail || {},
   notes: e.detail && Object.keys(e.detail).length ? JSON.stringify(e.detail) : ''
 });
+
+/** What the API's schema rules mean for the specialist, by zod rule name. */
+const RULE_MESSAGES = {
+  invalid_string: 'Not in a format this field takes.',
+  invalid_date: 'Enter a real date as MM/DD/YYYY.',
+  invalid_type: 'Not a value this field takes.',
+  too_big: 'Too long for this field.',
+  unknown_field: 'Not a field this VOB has.'
+};
+
+/**
+ * A save refused for the fields in `failures` ({ field, message, code }), as
+ * one error whose message names them. `failures` lets the form mark each field.
+ */
+function invalidFieldsError(failures) {
+  const labels = [...new Set(failures.map(failureLabel))];
+  const err = new Error(
+    failures.length === 1
+      ? `${labels[0]}: ${failures[0].message}`
+      : `${labels.length} fields need fixing before saving: ${labels.join(', ')}.`
+  );
+  err.status = 400;
+  err.failures = failures;
+  return err;
+}
+
+/**
+ * A PATCH the API refused as schema_invalid, with its `details.issues` (paths
+ * and rule names, never values) as failures on the fields they name:
+ * `fields.dos` → `dos`, `extra.oop_met` as is. Anything else is returned as it came.
+ */
+function explainRejectedPatch(err) {
+  const issues = err?.status === 400 && err.data?.error?.code === 'schema_invalid'
+    ? err.data.error.details?.issues
+    : null;
+  if (!Array.isArray(issues) || issues.length === 0) return err;
+  const failures = issues.map((i) => ({
+    field: String(i.path || 'request').replace(/^fields\./, ''),
+    message: RULE_MESSAGES[i.rule] || 'Not a value this field takes.',
+    code: 'invalid_value'
+  }));
+  const explained = invalidFieldsError(failures);
+  explained.data = err.data;
+  return explained;
+}
 
 /** An empty result in the shape getVobs() returns. */
 function emptyPage() {
@@ -119,6 +166,10 @@ export const vobsApi = {
         confirm: edits.confirm || []
       };
     } else {
+      // A value the API would refuse is caught here, on the field it is in,
+      // rather than as a 400 for the whole save.
+      const invalid = invalidPatchFields(edits, { only });
+      if (invalid.length > 0) throw invalidFieldsError(invalid);
       payload = toBackendPatchPayload(edits, version, { only });
       if (edits && edits.transcript !== undefined) {
         payload.transcript = edits.transcript;
@@ -128,11 +179,15 @@ export const vobsApi = {
       }
     }
 
-    return apiClient.request({
-      path: `/api/v1/vobs/${id}`,
-      method: 'PATCH',
-      data: payload
-    });
+    try {
+      return await apiClient.request({
+        path: `/api/v1/vobs/${id}`,
+        method: 'PATCH',
+        data: payload
+      });
+    } catch (err) {
+      throw explainRejectedPatch(err);
+    }
   },
 
   /**

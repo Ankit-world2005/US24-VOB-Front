@@ -310,6 +310,42 @@ function toFormValue(spec, value) {
 
 const sameFormValue = (a, b) => String(a ?? '') === String(b ?? '');
 
+/** The longest text the API takes in one field, `fields` or `extra`. */
+const MAX_TEXT = 2000;
+
+/** `YYYY-MM-DD` for a day that exists, or undefined (2026-02-30, month 15). */
+function calendarDate(y, m, d) {
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d
+    ? dt.toISOString().slice(0, 10)
+    : undefined;
+}
+
+/**
+ * A typed date as `YYYY-MM-DD`: ISO, MM/DD/YYYY (the form's format; `-` and `.`
+ * also separate, a two-digit year is 20xx below 50), or a month written out
+ * ("Oct 7, 2026"). A date that does not exist — DD/MM typed as MM/DD gives
+ * month 15 — is undefined, never a wrong day.
+ */
+function toApiDate(value) {
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return undefined;
+    return calendarDate(value.getFullYear(), value.getMonth() + 1, value.getDate());
+  }
+  const s = String(value).trim();
+  const iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:$|[T\s])/);
+  if (iso) return calendarDate(+iso[1], +iso[2], +iso[3]);
+  const us = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4}|\d{2})$/);
+  if (us) {
+    const y = us[3].length === 2 ? (+us[3] < 50 ? 2000 : 1900) + +us[3] : +us[3];
+    return calendarDate(y, +us[1], +us[2]);
+  }
+  // Only with a month name: Date.parse reads a bare "7" as July 2001.
+  if (!/[a-z]{3}/i.test(s)) return undefined;
+  const parsed = new Date(s);
+  return toApiDate(parsed);
+}
+
 /**
  * A form value as the API takes it, or undefined when it cannot be sent as
  * that field's type — the whole save would be refused for one bad value.
@@ -323,26 +359,34 @@ function toApiValue(type, value) {
     }
     case 'yesNoText': {
       const yn = toYesNo(value);
-      return yn === 'YES' || yn === 'NO' ? yn : String(value);
+      const text = yn === 'YES' || yn === 'NO' ? yn : String(value);
+      return text.length <= MAX_TEXT ? text : undefined;
     }
-    case 'date': {
-      if (value instanceof Date) return value.toISOString().slice(0, 10);
+    case 'date':
+      return toApiDate(value);
+    case 'timestamp': {
+      // RFC 3339 UTC, as the API takes it; a time typed without a zone is local.
       const s = String(value).trim();
-      if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
-      const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-      if (m) return `${m[3]}-${m[1].padStart(2, '0')}-${m[2].padStart(2, '0')}`;
-      const parsed = Date.parse(s);
-      if (!Number.isNaN(parsed)) return new Date(parsed).toISOString().slice(0, 10);
-      return undefined;
-    }
-    case 'timestamp':
-      return /^\d{4}-\d{2}-\d{2}T/.test(String(value)) && !Number.isNaN(Date.parse(value))
-        ? String(value)
+      const t = Date.parse(s);
+      return /^\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}/.test(s) && !Number.isNaN(t)
+        ? new Date(t).toISOString()
         : undefined;
-    default:
-      return typeof value === 'string' ? value : String(value);
+    }
+    default: {
+      const text = typeof value === 'string' ? value : String(value);
+      return text.length <= MAX_TEXT ? text : undefined;
+    }
   }
 }
+
+/** What the specialist is told when a form value cannot be sent as its type. */
+const INVALID_MESSAGE = {
+  date: 'Enter a real date as MM/DD/YYYY.',
+  bool: 'Choose YES or NO.',
+  timestamp: 'Enter a date and time.',
+  yesNoText: `Keep this under ${MAX_TEXT.toLocaleString('en-US')} characters.`,
+  text: `Keep this under ${MAX_TEXT.toLocaleString('en-US')} characters.`
+};
 
 const specType = (spec) =>
   spec.date ? 'date' : spec.yesNo === 'bool' ? 'bool' : spec.yesNo === 'text' ? 'yesNoText' : 'text';
@@ -582,25 +626,8 @@ export function normalizeExtraction(res) {
  */
 export function toBackendPatchPayload(formData, version, { only } = {}) {
   const data = formData || {};
+  const { fields, extra } = collectPatch(data, only);
   const loaded = data.__loaded || {};
-  const changed = (key) =>
-    (!only || only.includes(key)) && data[key] !== undefined && !sameFormValue(data[key], loaded[key]);
-  const fields = {};
-  const extra = {};
-
-  for (const [formKey, spec] of Object.entries(FORM_FIELDS)) {
-    if (!changed(formKey)) continue;
-    const value = toApiValue(specType(spec), data[formKey]);
-    if (value === undefined) continue;
-    if (spec.field) fields[spec.field] = value;
-    else extra[spec.extra] = value;
-  }
-
-  for (const [key, type] of Object.entries(HIDDEN_FIELDS)) {
-    if (!changed(key)) continue;
-    const value = toApiValue(type, data[key]);
-    if (value !== undefined && value !== null) fields[key] = value;
-  }
 
   // Copay coinsurance safety: if copay is NO and no copay amount provided, ensure copay_coins is not empty
   if (!only && (data.copay === 'NO' || data.copay === 'no') && !fields.copay_coins && !loaded.copay_coins && !data.copayAmount) {
@@ -612,4 +639,45 @@ export function toBackendPatchPayload(formData, version, { only } = {}) {
     payload.transcript = data.transcript;
   }
   return payload;
+}
+
+/**
+ * The edited form fields toBackendPatchPayload() would leave out because their
+ * value cannot be sent as the field's type, as `{ field, message, code }`
+ * failures keyed like the API's (`dos`, `extra.oop_met`). Saving with any of
+ * these would quietly drop the specialist's value, so the save stops instead.
+ * Hidden fields are not listed: the form gives no way to fix one.
+ */
+export function invalidPatchFields(formData, { only } = {}) {
+  return collectPatch(formData || {}, only).invalid;
+}
+
+/** The changed fields as the API takes them, and the changed ones it would not take. */
+function collectPatch(data, only) {
+  const loaded = data.__loaded || {};
+  const changed = (key) =>
+    (!only || only.includes(key)) && data[key] !== undefined && !sameFormValue(data[key], loaded[key]);
+  const fields = {};
+  const extra = {};
+  const invalid = [];
+
+  for (const [formKey, spec] of Object.entries(FORM_FIELDS)) {
+    if (!changed(formKey)) continue;
+    const type = specType(spec);
+    const value = toApiValue(type, data[formKey]);
+    if (value === undefined) {
+      invalid.push({ field: apiFieldFor(formKey), message: INVALID_MESSAGE[type], code: 'invalid_value' });
+      continue;
+    }
+    if (spec.field) fields[spec.field] = value;
+    else extra[spec.extra] = value;
+  }
+
+  for (const [key, type] of Object.entries(HIDDEN_FIELDS)) {
+    if (!changed(key)) continue;
+    const value = toApiValue(type, data[key]);
+    if (value !== undefined && value !== null) fields[key] = value;
+  }
+
+  return { fields, extra, invalid };
 }

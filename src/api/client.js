@@ -13,6 +13,14 @@ export const SESSION_EXPIRED_EVENT = 'us24:session-expired';
 let memoryToken = null;
 let memoryRefresh = null;
 
+/**
+ * JSON.stringify replacer that drops NUL (`\u0000`) from every string. Text
+ * read out of a PDF or Word file can carry it unseen, and the database cannot
+ * store it: one in a transcript or a field failed the whole save.
+ */
+const withoutNul = (_key, value) =>
+  typeof value === 'string' && value.includes('\u0000') ? value.replaceAll('\u0000', '') : value;
+
 // One refresh at a time. Several views fetch on mount, so an expired token
 // produces a burst of 401s. The refresh token rotates on use, so concurrent
 // refreshes race: the first wins and the rest get a 401 for presenting a token
@@ -227,7 +235,7 @@ export const apiClient = {
         options.body = data;
         delete options.headers['Content-Type']; // Let browser set multipart boundary
       } else {
-        options.body = JSON.stringify(data);
+        options.body = JSON.stringify(data, withoutNul);
       }
     }
 
