@@ -309,7 +309,7 @@ export function AddSpecialistModal({ isOpen, onClose, onSuccess, clients = [] })
                       onChange={() => setRole('auth')}
                       disabled={submitting}
                     />
-                    <strong style={{ fontSize: '13px', color: 'var(--ink)' }}>Auth Spec</strong>
+                    <strong style={{ fontSize: '13px', color: 'var(--ink)' }}>Auth Specialist</strong>
                   </div>
                   <span style={{ fontSize: '11px', color: 'var(--ink-soft)', marginTop: '4px' }}>
                     Pre-authorization queue

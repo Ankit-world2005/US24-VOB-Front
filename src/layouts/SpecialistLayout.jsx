@@ -12,7 +12,7 @@ const CardDetailView = lazy(() => import('../views/shared/CardDetailView').then(
 
 export function SpecialistLayout() {
   const { activeTab, setActiveTab, currentUser } = useWorkspace();
-  const isAuditSpecialist = currentUser?.role === 'auth' || currentUser?.role === 'auth_specialist' || currentUser?.role === 'audit';
+  const isAuditSpecialist = currentUser?.role === 'auth' || currentUser?.role === 'auth_specialist' || currentUser?.role === 'audit' || currentUser?.email === 'jitender.s@us24solutions.com';
 
   // Automatically redirect normal specialists if they land on the queue tab
   useEffect(() => {

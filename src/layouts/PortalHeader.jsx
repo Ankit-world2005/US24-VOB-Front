@@ -82,7 +82,13 @@ export function PortalHeader() {
             <span className="user-avatar">{initials}</span>
             <div className="user-info hide-sm">
               <span className="user-name">{currentUser.name}</span>
-              <span className="user-sub">{isAdmin ? 'Administrator' : 'Specialist'}</span>
+              <span className="user-sub">
+                {currentUser?.role === 'admin' || activeRole === 'admin'
+                  ? 'Administrator'
+                  : currentUser?.role === 'auth' || currentUser?.role === 'auth_specialist' || currentUser?.role === 'audit' || currentUser?.email === 'jitender.s@us24solutions.com'
+                  ? 'Auth Specialist'
+                  : 'Specialist'}
+              </span>
             </div>
           </div>
 

@@ -27,6 +27,20 @@ function getAvatarStyle(str = '') {
   return AVATAR_PALETTES[idx];
 }
 
+function getNormalizedRole(rawRole) {
+  const r = (rawRole || 'user').toLowerCase();
+  if (r === 'admin' || r === 'administrator') return 'admin';
+  if (r === 'auth' || r === 'auth_specialist' || r === 'audit') return 'auth';
+  return 'user';
+}
+
+function getRoleLabel(role) {
+  const norm = getNormalizedRole(role);
+  if (norm === 'admin') return 'Administrator';
+  if (norm === 'auth') return 'Auth Specialist';
+  return 'Specialist';
+}
+
 function formatLastLogin(dateStr) {
   if (!dateStr) return 'Never';
   try {
@@ -148,7 +162,7 @@ export function UserManagementView() {
   const filteredUsers = useMemo(() => {
     return users.filter(u => {
       const status = getUserStatus(u);
-      const role = u.role || 'user';
+      const role = getNormalizedRole(u.role);
 
       // 1. Role Filter
       if (roleFilter !== 'all' && role !== roleFilter) {
@@ -227,7 +241,7 @@ export function UserManagementView() {
 
   // Role Reassignment Action
   const handleReassignRole = async (user, targetRole) => {
-    const currentRole = user.role || 'user';
+    const currentRole = getNormalizedRole(user.role);
     if (currentRole === targetRole) return;
 
     const userId = user.id || user._id;
@@ -517,7 +531,7 @@ export function UserManagementView() {
 
                   const avatarStyle = getAvatarStyle(displayName);
                   const status = getUserStatus(u);
-                  const role = u.role || 'user';
+                  const role = getNormalizedRole(u.role);
                   const isAdmin = role === 'admin';
 
                   return (
@@ -538,27 +552,11 @@ export function UserManagementView() {
                         </div>
                       </td>
 
-                      {/* Role Assign Drop-Down */}
+                      {/* Role Badge */}
                       <td>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                          <select
-                            className={`role-select-badge role-${role}`}
-                            value={role}
-                            disabled={updatingRoleId === id}
-                            onChange={(e) => handleReassignRole(u, e.target.value)}
-                            title="Click to reassign role"
-                            aria-label={`Change role for ${displayName}`}
-                          >
-                            <option value="user">● Specialist</option>
-                            <option value="auth">● Auth Specialist</option>
-                            <option value="admin">★ Administrator</option>
-                          </select>
-                          {updatingRoleId === id && (
-                            <span style={{ fontSize: '11px', color: 'var(--ink-soft)' }} title="Updating role...">
-                              ⏳
-                            </span>
-                          )}
-                        </div>
+                        <span className={`role-badge role-${role}`}>
+                          {getRoleLabel(role)}
+                        </span>
                       </td>
 
                       {/* Status */}

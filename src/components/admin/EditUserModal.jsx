@@ -13,7 +13,7 @@ export function EditUserModal({ isOpen, onClose, user, clients = [], onSuccess }
   useEffect(() => {
     if (isOpen && user) {
       setName(user.name || '');
-      setRole(user.role || 'user');
+      const rawRole = (user.role || 'user').toLowerCase(); const normRole = (rawRole === 'admin' || rawRole === 'administrator') ? 'admin' : (rawRole === 'auth' || rawRole === 'auth_specialist' || rawRole === 'audit' ? 'auth' : 'user'); setRole(normRole);
       setErrorMessage('');
 
       // Populate selected client IDs from user data
@@ -178,8 +178,13 @@ export function EditUserModal({ isOpen, onClose, user, clients = [], onSuccess }
                 <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--ink)' }}>{user.name || 'Portal User'}</div>
                 <div style={{ fontSize: '12px', color: 'var(--ink-soft)', wordBreak: 'break-all' }}>{user.email}</div>
               </div>
-              <div style={{ fontSize: '11px', fontFamily: 'var(--mono)', padding: '3px 8px', borderRadius: '4px', background: 'var(--surface)', border: '1px solid var(--rule)' }}>
-                {user.id}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span className={`role-badge role-${role}`} style={{ fontSize: '11.5px', padding: '2px 8px' }}>
+                  {role === 'admin' ? 'Administrator' : role === 'auth' ? 'Auth Specialist' : 'Specialist'}
+                </span>
+                <div style={{ fontSize: '11px', fontFamily: 'var(--mono)', padding: '3px 8px', borderRadius: '4px', background: 'var(--surface)', border: '1px solid var(--rule)' }}>
+                  {user.id}
+                </div>
               </div>
             </div>
 
