@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { usersApi } from '../../api/users';
 import { useWorkspace } from '../../context/WorkspaceContext';
 
@@ -27,12 +27,13 @@ function generateSecurePassword() {
   return pwd.sort(() => Math.random() - 0.5).join('');
 }
 
-export function AddSpecialistModal({ isOpen, onClose, onSuccess }) {
+export function AddSpecialistModal({ isOpen, onClose, onSuccess, clients = [] }) {
   const { showToast } = useWorkspace();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('user'); // 'user' = Specialist, 'auth' = Auth Specialist, 'admin' = Administrator
+  const [selectedClientIds, setSelectedClientIds] = useState([]);
   const [tempPassword, setTempPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [requireReset, setRequireReset] = useState(true);
@@ -47,6 +48,7 @@ export function AddSpecialistModal({ isOpen, onClose, onSuccess }) {
       setName('');
       setEmail('');
       setRole('user');
+      setSelectedClientIds([]);
       setTempPassword(generateSecurePassword());
       setShowPassword(false);
       setRequireReset(true);
@@ -84,6 +86,22 @@ export function AddSpecialistModal({ isOpen, onClose, onSuccess }) {
     setCopied(false);
   };
 
+  const handleToggleClient = (clientId) => {
+    setSelectedClientIds(prev => 
+      prev.includes(clientId) 
+        ? prev.filter(id => id !== clientId)
+        : [...prev, clientId]
+    );
+  };
+
+  const handleSelectAllClients = () => {
+    if (selectedClientIds.length === clients.length) {
+      setSelectedClientIds([]);
+    } else {
+      setSelectedClientIds(clients.map(c => c.id));
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMessage('');
@@ -110,7 +128,8 @@ export function AddSpecialistModal({ isOpen, onClose, onSuccess }) {
         role,
         initialPassword: tempPassword,
         requirePasswordChange: requireReset,
-        status: 'active'
+        status: 'active',
+        ...(selectedClientIds.length > 0 ? { clientIds: selectedClientIds } : {})
       };
 
       await usersApi.createUser(payload);
@@ -129,6 +148,8 @@ export function AddSpecialistModal({ isOpen, onClose, onSuccess }) {
     }
   };
 
+  const isAllSelected = clients.length > 0 && selectedClientIds.length === clients.length;
+
   return (
     <div
       className="modal-overlay"
@@ -138,8 +159,8 @@ export function AddSpecialistModal({ isOpen, onClose, onSuccess }) {
       <div
         className="modal-container"
         style={{
-          maxWidth: '540px',
-          maxHeight: 'min(90vh, 680px)',
+          maxWidth: '560px',
+          maxHeight: 'min(92vh, 740px)',
           display: 'flex',
           flexDirection: 'column',
           margin: 'auto',
@@ -155,7 +176,7 @@ export function AddSpecialistModal({ isOpen, onClose, onSuccess }) {
           <div>
             <div className="modal-eyebrow">User Administration · FR-2</div>
             <h3 id="add-specialist-title" className="modal-title" style={{ margin: '4px 0 0 0' }}>
-              Add Specialist / User
+              Add Portal User / Specialist
             </h3>
           </div>
           <button
@@ -207,7 +228,6 @@ export function AddSpecialistModal({ isOpen, onClose, onSuccess }) {
                 }}
                 role="alert"
               >
-                <span style={{ fontSize: '16px' }}>⚠️</span>
                 <span>{errorMessage}</span>
               </div>
             )}
@@ -266,7 +286,7 @@ export function AddSpecialistModal({ isOpen, onClose, onSuccess }) {
                     padding: '10px 12px',
                     border: `1.5px solid ${role === 'user' ? 'var(--navy, #0a2463)' : 'var(--rule, #c4c4db)'}`,
                     borderRadius: '8px',
-                    background: role === 'user' ? 'var(--mint-soft, #e3e9f6)' : 'var(--surface, #fdfafa)',
+                    background: role === 'user' ? 'rgba(10, 36, 99, 0.06)' : 'var(--surface, #fdfafa)',
                     cursor: 'pointer',
                     transition: 'all 0.15s ease'
                   }}
@@ -295,7 +315,7 @@ export function AddSpecialistModal({ isOpen, onClose, onSuccess }) {
                     padding: '10px 12px',
                     border: `1.5px solid ${role === 'auth' ? 'var(--navy, #0a2463)' : 'var(--rule, #c4c4db)'}`,
                     borderRadius: '8px',
-                    background: role === 'auth' ? 'var(--mint-soft, #e3e9f6)' : 'var(--surface, #fdfafa)',
+                    background: role === 'auth' ? 'rgba(10, 36, 99, 0.06)' : 'var(--surface, #fdfafa)',
                     cursor: 'pointer',
                     transition: 'all 0.15s ease'
                   }}
@@ -309,10 +329,10 @@ export function AddSpecialistModal({ isOpen, onClose, onSuccess }) {
                       onChange={() => setRole('auth')}
                       disabled={submitting}
                     />
-                    <strong style={{ fontSize: '13px', color: 'var(--ink)' }}>Auth Specialist</strong>
+                    <strong style={{ fontSize: '13px', color: 'var(--ink)' }}>Auth Spec</strong>
                   </div>
                   <span style={{ fontSize: '11px', color: 'var(--ink-soft)', marginTop: '4px' }}>
-                    QA & Auth queue
+                    Pre-authorization queue
                   </span>
                 </label>
 
@@ -324,7 +344,7 @@ export function AddSpecialistModal({ isOpen, onClose, onSuccess }) {
                     padding: '10px 12px',
                     border: `1.5px solid ${role === 'admin' ? 'var(--navy, #0a2463)' : 'var(--rule, #c4c4db)'}`,
                     borderRadius: '8px',
-                    background: role === 'admin' ? 'var(--mint-soft, #e3e9f6)' : 'var(--surface, #fdfafa)',
+                    background: role === 'admin' ? 'rgba(10, 36, 99, 0.06)' : 'var(--surface, #fdfafa)',
                     cursor: 'pointer',
                     transition: 'all 0.15s ease'
                   }}
@@ -341,91 +361,172 @@ export function AddSpecialistModal({ isOpen, onClose, onSuccess }) {
                     <strong style={{ fontSize: '13px', color: 'var(--ink)' }}>Administrator</strong>
                   </div>
                   <span style={{ fontSize: '11px', color: 'var(--ink-soft)', marginTop: '4px' }}>
-                    Full portal admin
+                    Full system access
                   </span>
                 </label>
               </div>
             </div>
 
-            {/* Temporary Credentials */}
-            <div
-              style={{
-                background: 'var(--surface-2, #f7f7f5)',
-                border: '1px solid var(--rule-soft, #e4e4e9)',
-                borderRadius: '8px',
-                padding: '14px 16px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '10px'
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--ink)' }}>
-                  Initial Temporary Password
-                </span>
+            {/* Optional Assigned Clients */}
+            {clients.length > 0 && (
+              <div className="field" style={{ margin: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <label style={{ fontWeight: 600 }}>
+                    Assigned Clients ({selectedClientIds.length === 0 && role === 'admin' ? 'All Clients (Admin Default)' : `${selectedClientIds.length} of ${clients.length}`})
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleSelectAllClients}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--cobalt, #1d4ed8)',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      padding: '2px 6px'
+                    }}
+                  >
+                    {isAllSelected ? 'Deselect All' : 'Select All Clients'}
+                  </button>
+                </div>
+
+                <div
+                  style={{
+                    maxHeight: '140px',
+                    overflowY: 'auto',
+                    border: '1px solid var(--rule, #c4c4db)',
+                    borderRadius: '8px',
+                    padding: '8px 12px',
+                    background: 'var(--surface, #fff)',
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                    gap: '6px'
+                  }}
+                >
+                  {clients.map(c => {
+                    const isChecked = selectedClientIds.includes(c.id);
+                    return (
+                      <label
+                        key={c.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '4px 6px',
+                          borderRadius: '4px',
+                          background: isChecked ? 'rgba(37, 99, 235, 0.08)' : 'transparent',
+                          cursor: 'pointer',
+                          fontSize: '12.5px'
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => handleToggleClient(c.id)}
+                          disabled={submitting}
+                        />
+                        <span style={{ color: 'var(--ink)', fontWeight: isChecked ? 600 : 400 }}>
+                          {c.name || c.id}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Initial Password Section */}
+            <div className="field" style={{ margin: 0 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <label htmlFor="tempPasswordGen" style={{ fontWeight: 600, display: 'block' }}>
+                  Generated Temporary Password *
+                </label>
                 <button
                   type="button"
                   onClick={handleRegeneratePassword}
+                  disabled={submitting}
                   style={{
                     background: 'none',
                     border: 'none',
-                    color: 'var(--cobalt, #0648c0)',
+                    color: 'var(--cobalt, #1d4ed8)',
                     fontSize: '12px',
+                    fontWeight: 600,
                     cursor: 'pointer',
-                    textDecoration: 'underline'
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
                   }}
-                  disabled={submitting}
                 >
                   ↻ Regenerate
                 </button>
               </div>
 
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  className="vob-input mono"
-                  value={tempPassword}
-                  onChange={(e) => setTempPassword(e.target.value)}
-                  style={{ flex: 1, padding: '7px 10px', fontSize: '13px', letterSpacing: showPassword ? 'normal' : '0.15em' }}
-                  disabled={submitting}
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="btn ghost"
-                  style={{ height: '36px', padding: '0 10px', fontSize: '12px', width: 'auto' }}
-                  title={showPassword ? 'Hide password' : 'Show password'}
-                >
-                  {showPassword ? 'Hide' : 'Show'}
-                </button>
+                <div style={{ position: 'relative', flex: 1 }}>
+                  <input
+                    id="tempPasswordGen"
+                    type={showPassword ? 'text' : 'password'}
+                    className="vob-input"
+                    style={{
+                      width: '100%',
+                      padding: '9px 40px 9px 12px',
+                      fontFamily: 'var(--mono)',
+                      fontSize: '13.5px',
+                      letterSpacing: showPassword ? '0.05em' : 'normal'
+                    }}
+                    value={tempPassword}
+                    onChange={(e) => setTempPassword(e.target.value)}
+                    disabled={submitting}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(p => !p)}
+                    tabIndex={-1}
+                    style={{
+                      position: 'absolute',
+                      right: '8px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--ink-soft)',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      padding: '4px'
+                    }}
+                    title={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? '🙈' : '👁️'}
+                  </button>
+                </div>
+
                 <button
                   type="button"
                   onClick={handleCopyPassword}
-                  className="btn"
                   style={{
-                    height: '36px',
-                    padding: '0 12px',
-                    fontSize: '12px',
-                    width: 'auto',
-                    background: copied ? 'var(--success, #166534)' : 'var(--navy, #0a2463)',
-                    borderColor: copied ? 'var(--success, #166534)' : 'var(--navy, #0a2463)'
+                    padding: '0 14px',
+                    height: '38px',
+                    background: copied ? 'var(--mint-soft, #e3e9f6)' : 'var(--surface-sunken, #f1f5f9)',
+                    border: '1px solid var(--rule, #c4c4db)',
+                    borderRadius: '6px',
+                    fontSize: '12.5px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    whiteSpace: 'nowrap'
                   }}
                 >
-                  {copied ? '✓ Copied' : 'Copy'}
+                  {copied ? '✓ Copied' : '📋 Copy'}
                 </button>
               </div>
 
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', color: 'var(--ink)', cursor: 'pointer', marginTop: '2px' }}>
-                <input
-                  type="checkbox"
-                  checked={requireReset}
-                  onChange={(e) => setRequireReset(e.target.checked)}
-                  disabled={submitting}
-                  style={{ width: '15px', height: '15px' }}
-                />
-                Require password change upon first sign-in (HIPAA Recommended)
-              </label>
+              <span style={{ fontSize: '11.5px', color: 'var(--ink-soft)', marginTop: '4px', display: 'block' }}>
+                Secure temporary credentials for first login.
+              </span>
             </div>
           </div>
 
@@ -434,29 +535,29 @@ export function AddSpecialistModal({ isOpen, onClose, onSuccess }) {
             className="modal-footer"
             style={{
               padding: '16px 24px',
-              borderTop: '1px solid var(--rule-soft, #e4e4e9)',
+              borderTop: '1px solid var(--rule, #c4c4db)',
               display: 'flex',
               justifyContent: 'flex-end',
               gap: '12px',
-              flexShrink: 0
+              flexShrink: 0,
+              background: 'var(--surface)'
             }}
           >
             <button
               type="button"
-              className="btn ghost"
+              className="btn btn-secondary"
               onClick={onClose}
               disabled={submitting}
-              style={{ width: 'auto', padding: '0 20px', height: '42px', fontSize: '14px' }}
             >
               Cancel
             </button>
             <button
               type="submit"
               className="btn"
-              disabled={submitting || !name.trim() || !email.trim()}
-              style={{ width: 'auto', padding: '0 24px', height: '42px', fontSize: '14px' }}
+              disabled={submitting}
+              style={{ fontWeight: 600, minWidth: '130px' }}
             >
-              {submitting ? 'Adding Specialist...' : '+ Add Specialist'}
+              {submitting ? 'Creating...' : '+ Create User'}
             </button>
           </div>
         </form>

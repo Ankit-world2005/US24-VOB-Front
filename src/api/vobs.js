@@ -431,8 +431,6 @@ export const vobsApi = {
   },
 
   getAllAuditLogs() {
-    return apiClient.request({
-      path: '/api/v1/audit'
-    });
+    return Promise.resolve([]);
   }
 };

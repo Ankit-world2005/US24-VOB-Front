@@ -1,4 +1,4 @@
-import { apiClient } from './client';
+﻿import { apiClient } from './client';
 
 export const usersApi = {
   // GET /users
@@ -7,6 +7,15 @@ export const usersApi = {
     if (Array.isArray(res)) return res;
     if (Array.isArray(res?.data)) return res.data;
     if (Array.isArray(res?.users)) return res.users;
+    return [];
+  },
+
+  // GET /clients
+  async getClients() {
+    const res = await apiClient.request({ path: '/api/v1/clients' });
+    if (Array.isArray(res)) return res;
+    if (Array.isArray(res?.data)) return res.data;
+    if (Array.isArray(res?.clients)) return res.clients;
     return [];
   },
 

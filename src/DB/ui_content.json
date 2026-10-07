@@ -6,9 +6,18 @@
     "headline": "Your workspace, signed in.",
     "lede": "Sign in with your company Outlook account to reach internal tools, resources and your team dashboard.",
     "facts": [
-      { "k": "Access", "v": "Role-based" },
-      { "k": "Account", "v": "Outlook ID" },
-      { "k": "Session", "v": "Per tab" }
+      {
+        "k": "Access",
+        "v": "Role-based"
+      },
+      {
+        "k": "Account",
+        "v": "Outlook ID"
+      },
+      {
+        "k": "Session",
+        "v": "Per tab"
+      }
     ]
   },
   "branding": {
@@ -19,19 +28,48 @@
   },
   "navigation": {
     "adminTabs": [
-      { "id": "dashboard", "label": "📊 Dashboard & Metrics" },
-      { "id": "upload_assign", "label": "📥 Upload & Assign" },
-      { "id": "records", "label": "📋 All Client Records" },
-      { "id": "users", "label": "👥 User Access" },
-      { "id": "audit_logs", "label": "🔒 HIPAA Audit Trail" }
+      {
+        "id": "dashboard",
+        "label": "📊 Dashboard & Metrics"
+      },
+      {
+        "id": "upload_assign",
+        "label": "📥 Upload & Assign"
+      },
+      {
+        "id": "records",
+        "label": "📋 All Client Records"
+      },
+      {
+        "id": "users",
+        "label": "👥 User Access"
+      }
     ],
     "specialistTabs": [
-      { "id": "my_dashboard", "label": "⚡ My Dashboard" },
-      { "id": "verification", "label": "📝 New Verification" },
-      { "id": "queue", "label": "🧾 Queue" },
-      { "id": "auth_queue", "label": "⏳ Auth Queue" },
-      { "id": "error_queue", "label": "⚠️ Error Queue" },
-      { "id": "saved_records", "label": "✓ Saved Records" }
+      {
+        "id": "my_dashboard",
+        "label": "⚡ My Dashboard"
+      },
+      {
+        "id": "verification",
+        "label": "📝 New Verification"
+      },
+      {
+        "id": "queue",
+        "label": "🧾 Queue"
+      },
+      {
+        "id": "auth_queue",
+        "label": "⏳ Auth Queue"
+      },
+      {
+        "id": "error_queue",
+        "label": "⚠️ Error Queue"
+      },
+      {
+        "id": "saved_records",
+        "label": "✓ Saved Records"
+      }
     ]
   },
   "footer": {

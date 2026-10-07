@@ -6,7 +6,6 @@ const AdminDashboardView = lazy(() => import('../views/admin/AdminDashboardView'
 const UploadAssignView = lazy(() => import('../views/admin/UploadAssignView').then(m => ({ default: m.UploadAssignView })));
 const GlobalRecordsView = lazy(() => import('../views/admin/GlobalRecordsView').then(m => ({ default: m.GlobalRecordsView })));
 const UserManagementView = lazy(() => import('../views/admin/UserManagementView').then(m => ({ default: m.UserManagementView })));
-const AuditLogsView = lazy(() => import('../views/admin/AuditLogsView').then(m => ({ default: m.AuditLogsView })));
 const CardDetailView = lazy(() => import('../views/shared/CardDetailView').then(m => ({ default: m.CardDetailView })));
 
 export function AdminLayout() {
@@ -47,7 +46,6 @@ export function AdminLayout() {
           {activeTab === 'upload_assign' && <UploadAssignView />}
           {activeTab === 'records' && <GlobalRecordsView />}
           {activeTab === 'users' && <UserManagementView />}
-          {activeTab === 'audit_logs' && <AuditLogsView />}
           {activeTab === 'card_detail' && <CardDetailView />}
         </Suspense>
       </div>

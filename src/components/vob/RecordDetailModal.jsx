@@ -7,23 +7,13 @@ import { CANONICAL_FIELDS } from '../../data/clients';
 
 export function RecordDetailModal({ vobId, isOpen, onClose }) {
   const [vob, setVob] = useState(null);
-  const [auditLogs, setAuditLogs] = useState([]);
-  const [activeTab, setActiveTab] = useState('data'); // 'data' or 'audit'
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (isOpen && vobId) {
       setLoading(true);
-      Promise.all([
-        vobsApi.getVobById(vobId),
-        // The history is a tab of its own: if it cannot load, still show the record.
-        vobsApi.getAudit(vobId).catch((err) => {
-          console.error(err);
-          return [];
-        })
-      ]).then(([vobData, logs]) => {
+      vobsApi.getVobById(vobId).then((vobData) => {
         setVob(vobData);
-        setAuditLogs(logs);
         setLoading(false);
       }).catch(err => {
         console.error(err);
@@ -49,27 +39,10 @@ export function RecordDetailModal({ vobId, isOpen, onClose }) {
           <button type="button" className="drawer-close-btn" onClick={onClose}>✕</button>
         </div>
 
-        <div className="modal-subnav">
-          <button
-            type="button"
-            className={`subnav-tab ${activeTab === 'data' ? 'active' : ''}`}
-            onClick={() => setActiveTab('data')}
-          >
-            📋 All 28 Canonical Fields
-          </button>
-          <button
-            type="button"
-            className={`subnav-tab ${activeTab === 'audit' ? 'active' : ''}`}
-            onClick={() => setActiveTab('audit')}
-          >
-            🔒 HIPAA Audit Log ({auditLogs.length})
-          </button>
-        </div>
-
         <div className="modal-body">
           {loading ? (
             <div className="modal-loading">Loading verified record details…</div>
-          ) : activeTab === 'data' && vob ? (
+          ) : vob ? (
             <div className="canonical-fields-grid">
               {CANONICAL_FIELDS.map(f => {
                 const val = vob[f.key];
@@ -87,42 +60,7 @@ export function RecordDetailModal({ vobId, isOpen, onClose }) {
                 );
               })}
             </div>
-          ) : (
-            <div className="audit-timeline">
-              {auditLogs.length === 0 ? (
-                <div className="empty-audit">No field modifications recorded yet for this record.</div>
-              ) : (
-                <div className="audit-table-wrap">
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Timestamp</th>
-                        <th>User</th>
-                        <th>Action</th>
-                        <th>Field</th>
-                        <th>Old Value</th>
-                        <th>New Value</th>
-                        <th>Notes</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {auditLogs.map(log => (
-                        <tr key={log.id}>
-                          <td className="mono">{new Date(log.timestamp).toLocaleString()}</td>
-                          <td>{log.user}</td>
-                          <td><span className="action-pill">{log.action}</span></td>
-                          <td className="mono bold">{log.field}</td>
-                          <td className="cell-old">{log.oldValue || '—'}</td>
-                          <td className="cell-new">{log.newValue || '—'}</td>
-                          <td>{log.notes}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
+          ) : null}
         </div>
 
         <div className="modal-footer">
