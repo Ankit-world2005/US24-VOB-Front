@@ -796,6 +796,41 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/v1/users' && method === 'POST') {
+      const { name, email, role = 'user', status = 'active' } = body || {};
+      if (!name || !name.trim()) {
+        sendJson(res, 400, { error: { code: 'validation_error', message: 'Employee name is required' } });
+        logDone(400);
+        return;
+      }
+      if (!email || !email.trim()) {
+        sendJson(res, 400, { error: { code: 'validation_error', message: 'Valid company email is required' } });
+        logDone(400);
+        return;
+      }
+      const normalizedEmail = email.trim().toLowerCase();
+      const existing = usersDb.find(u => u.email?.toLowerCase() === normalizedEmail);
+      if (existing) {
+        sendJson(res, 409, { error: { code: 'email_exists', message: `User with email "${normalizedEmail}" already exists` } });
+        logDone(409);
+        return;
+      }
+      const newId = `usr_${String(usersDb.length + 1).padStart(2, '0')}`;
+      const newUser = {
+        id: newId,
+        email: normalizedEmail,
+        name: name.trim(),
+        role: role === 'admin' ? 'admin' : (role === 'auth' ? 'auth' : (role === 'specialist' ? 'user' : role)),
+        status: status || 'active',
+        active: true,
+        assignedClients: role === 'admin' ? ['all'] : []
+      };
+      usersDb.push(newUser);
+      sendJson(res, 201, newUser);
+      logDone(201);
+      return;
+    }
+
     if (pathname.startsWith('/api/v1/users/') && method === 'PATCH') {
       const userId = pathname.replace('/api/v1/users/', '');
       const user = usersDb.find(u => u.id === userId || u.email === userId);

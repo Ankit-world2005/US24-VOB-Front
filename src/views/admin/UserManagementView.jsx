@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { DataError } from '../../components/DataError';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { usersApi } from '../../api/users';
+import { AddSpecialistModal } from '../../components/admin/AddSpecialistModal';
 
 export function UserManagementView() {
   const { showToast } = useWorkspace();
@@ -9,6 +10,7 @@ export function UserManagementView() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   const loadUsers = () => {
     setLoading(true);
@@ -69,8 +71,29 @@ export function UserManagementView() {
             <h3>User Access & Role Management (FR-2, SEC-7)</h3>
             <span className="panel-sub">Grant, update, or immediately revoke employee portal access and security permissions</span>
           </div>
-          <div className="security-pill">
-            Immediate Revocation Active (SEC-7)
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="btn"
+              style={{
+                width: 'auto',
+                height: '34px',
+                padding: '0 14px',
+                fontSize: '13px',
+                fontWeight: 600,
+                borderRadius: 'var(--r-md, 6px)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+              onClick={() => setIsAddModalOpen(true)}
+              id="add-specialist-btn"
+            >
+              + Add Specialist
+            </button>
+            <div className="security-pill">
+              Immediate Revocation Active (SEC-7)
+            </div>
           </div>
         </div>
 
@@ -181,6 +204,12 @@ export function UserManagementView() {
           </table>
         </div>
       </div>
+
+      <AddSpecialistModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onSuccess={loadUsers}
+      />
     </div>
   );
 }
