@@ -5056,6 +5056,62 @@ body.print-frame::before {
   border: 1px solid #bfdbfe;
 }
 
+/* Interactive Role Assign Dropdown Badge */
+.role-select-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 26px 4px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid transparent;
+  font-family: inherit;
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 12px 12px;
+  transition: all 0.15s ease;
+}
+
+.role-select-badge:hover:not(:disabled) {
+  filter: brightness(0.96);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.role-select-badge:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.3);
+}
+
+.role-select-badge:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.role-select-badge.role-admin {
+  background-color: #f3e8ff;
+  color: #7e22ce;
+  border-color: #e9d5ff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237e22ce' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+.role-select-badge.role-auth {
+  background-color: #ccfbf1;
+  color: #0f766e;
+  border-color: #99f6e4;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%230f766e' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+.role-select-badge.role-user {
+  background-color: #dbeafe;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%231d4ed8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
 /* Status Badges */
 .status-pill-badge {
   display: inline-flex;
@@ -5245,4 +5301,51 @@ body.print-frame::before {
   height: 1px;
   background: var(--rule, #e2e8f0);
   margin: 4px 0;
+}
+
+.user-action-role-section {
+  padding: 6px 8px;
+  background: var(--surface-sunken, #f8fafc);
+  border-radius: 6px;
+  border: 1px solid var(--rule-soft, #e2e8f0);
+  margin-bottom: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.user-action-role-header {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-soft, #64748b);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+}
+
+.user-action-role-select {
+  width: 100%;
+  height: 30px;
+  padding: 3px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 5px;
+  border: 1px solid var(--rule, #cbd5e1);
+  background: var(--surface, #ffffff);
+  color: var(--ink, #1e293b);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.user-action-role-select:hover {
+  border-color: var(--cobalt, #2563eb);
+}
+
+.user-action-role-select:focus {
+  outline: none;
+  border-color: var(--cobalt, #2563eb);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
 }

@@ -15,15 +15,15 @@ export function SpecialistDashboardView() {
   const [loadError, setLoadError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
 
-  const isAuditSpecialist = currentUser?.email === 'jitender.s@us24solutions.com';
+  const isAuditSpecialist = currentUser?.role === 'auth' || currentUser?.role === 'auth_specialist' || currentUser?.role === 'audit';
 
   useEffect(() => {
     setLoading(true);
     setLoadError('');
     Promise.all([
-      dashboardApi.getSummary({ userEmail: currentUser.email }),
+      dashboardApi.getSummary({ userEmail: currentUser?.email }),
       vobsApi.getVobs({
-        assigneeId: currentUser.email,
+        assigneeId: currentUser?.email,
         status: isAuditSpecialist ? ['Assigned', 'In Progress'] : 'Assigned',
         limit: 100
       })
@@ -36,7 +36,7 @@ export function SpecialistDashboardView() {
       setLoadError(err?.message || 'Could not load this data.');
       setLoading(false);
     });
-  }, [currentUser.email, isAuditSpecialist, reloadKey]);
+  }, [currentUser?.email, currentUser?.role, isAuditSpecialist, reloadKey]);
 
   // Only VOBs a specialist submitted for audit; one an admin reassigned to the
   // audit specialist is ordinary work and stays under My Assigned Tasks.

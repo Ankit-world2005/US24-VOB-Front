@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { DataError } from '../../components/DataError';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { usersApi } from '../../api/users';
@@ -70,6 +70,7 @@ export function UserManagementView() {
   const [editingUser, setEditingUser] = useState(null);
   const [resettingUser, setResettingUser] = useState(null);
   const [activeMenuId, setActiveMenuId] = useState(null);
+  const [updatingRoleId, setUpdatingRoleId] = useState(null);
 
   const menuRef = useRef(null);
 
@@ -221,6 +222,34 @@ export function UserManagementView() {
     } catch (err) {
       console.error(err);
       showToast('Failed to update user access status.', 'error');
+    }
+  };
+
+  // Role Reassignment Action
+  const handleReassignRole = async (user, targetRole) => {
+    const currentRole = user.role || 'user';
+    if (currentRole === targetRole) return;
+
+    const userId = user.id || user._id;
+    setUpdatingRoleId(userId);
+    setActiveMenuId(null);
+
+    const roleLabels = {
+      user: 'Specialist',
+      auth: 'Auth Specialist',
+      admin: 'Administrator'
+    };
+
+    try {
+      await usersApi.patchUser(userId, { role: targetRole });
+      const roleLabel = roleLabels[targetRole] || targetRole;
+      showToast(`Role for ${user.name || user.email} updated to ${roleLabel}.`, 'success');
+      loadData();
+    } catch (err) {
+      console.error('Failed to reassign role:', err);
+      showToast(err?.message || 'Failed to reassign user role.', 'error');
+    } finally {
+      setUpdatingRoleId(null);
     }
   };
 
@@ -509,11 +538,27 @@ export function UserManagementView() {
                         </div>
                       </td>
 
-                      {/* Role Badge */}
+                      {/* Role Assign Drop-Down */}
                       <td>
-                        <span className={`role-badge role-${role}`}>
-                          {role === 'admin' ? 'Administrator' : role === 'auth' ? 'Auth Specialist' : 'Specialist'}
-                        </span>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                          <select
+                            className={`role-select-badge role-${role}`}
+                            value={role}
+                            disabled={updatingRoleId === id}
+                            onChange={(e) => handleReassignRole(u, e.target.value)}
+                            title="Click to reassign role"
+                            aria-label={`Change role for ${displayName}`}
+                          >
+                            <option value="user">● Specialist</option>
+                            <option value="auth">● Auth Specialist</option>
+                            <option value="admin">★ Administrator</option>
+                          </select>
+                          {updatingRoleId === id && (
+                            <span style={{ fontSize: '11px', color: 'var(--ink-soft)' }} title="Updating role...">
+                              ⏳
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Status */}
@@ -543,7 +588,28 @@ export function UserManagementView() {
                           </button>
 
                           {activeMenuId === id && (
-                            <div className="user-action-dropdown">
+                            <div className="user-action-dropdown" style={{ width: '215px' }}>
+                              {/* Role Assignment Drop-Down */}
+                              <div className="user-action-role-section">
+                                <label className="user-action-role-header" htmlFor={`role-select-${id}`}>
+                                  <span>🎭 Assign Role</span>
+                                </label>
+                                <select
+                                  id={`role-select-${id}`}
+                                  className="user-action-role-select"
+                                  value={role}
+                                  disabled={updatingRoleId === id}
+                                  onChange={(e) => handleReassignRole(u, e.target.value)}
+                                  aria-label={`Assign role for ${displayName}`}
+                                >
+                                  <option value="user">👤 Specialist</option>
+                                  <option value="auth">🛡️ Auth Specialist</option>
+                                  <option value="admin">⭐ Administrator</option>
+                                </select>
+                              </div>
+
+                              <div className="user-action-divider" />
+
                               <button
                                 type="button"
                                 className="user-action-item"

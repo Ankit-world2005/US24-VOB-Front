@@ -17,7 +17,8 @@ let usersDb = [
   { id: 'usr_02', email: 'anita.s@us24solutions.com', name: 'Anita Sharma', role: 'specialist', assignedClients: ['arra'], status: 'active' },
   { id: 'usr_03', email: 'auth@us24solutions.com', name: 'Auth Specialist', role: 'auth', assignedClients: ['all'], status: 'active' },
   { id: 'usr_04', email: 'saurabh@us24solutions.com', name: 'Saurabh Admin', role: 'admin', assignedClients: ['all'], status: 'active' },
-  { id: 'usr_05', email: 'admin@us24solutions.com', name: 'System Admin', role: 'admin', assignedClients: ['all'], status: 'active' }
+  { id: 'usr_05', email: 'admin@us24solutions.com', name: 'System Admin', role: 'admin', assignedClients: ['all'], status: 'active' },
+  { id: 'usr_06', email: 'jitender.s@us24solutions.com', name: 'Jitender S', role: 'auth', assignedClients: ['all'], status: 'active' }
 ];
 
 function loadSeedData() {

@@ -15,7 +15,7 @@ const AUTH_FIELD_KEYS = CANONICAL_FIELDS.filter(f => f.group === 'auth').map(f =
 export function followSubmitResult(result, showToast, setActiveTab) {
   const status = (result.status || '').toLowerCase();
   if (result.audit_stage === 'pending_audit' || result.routed_to === 'audit') {
-    showToast("VOB submitted and moved to Audit Specialist (Jitendra) for verification.", "success");
+    showToast("VOB submitted and moved to Audit Specialist for verification.", "success");
     setActiveTab('my_dashboard');
     return;
   }
