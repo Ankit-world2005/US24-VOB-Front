@@ -46,6 +46,7 @@ export const fieldLabel = (key) => STANDALONE_LABELS[key] || CANONICAL_FIELDS_BY
 // A failure's label: its field's, or "Remark" for the note a specialist adds in the Queue tab
 export function failureLabel(failure) {
   if (failure.code === 'reviewer_remark') return 'Remark';
+  if (failure.field === 'audit_remark' || failure.rule === 'audit_rejection') return 'Audit Remark';
   const key = formKeyFor(failure.field) || failure.field;
   return STANDALONE_LABELS[key] || CANONICAL_FIELDS_BY_KEY.get(key)?.label || CANONICAL_FIELDS_BY_KEY.get(failure.field)?.label || failure.field;
 }

@@ -125,7 +125,9 @@ export function VerificationFormView() {
             onClick={handleSubmit}
             disabled={isSubmitting}
           >
-            {isSubmitting ? 'Submitting for Audit Verification…' : '✓ Submit VOB for Audit'}
+            {isSubmitting
+              ? (inAuthQueue ? 'Completing Authorization…' : 'Submitting for Audit Verification…')
+              : (inAuthQueue ? '✓ Complete Authorization & Approve' : '✓ Submit VOB for Audit')}
           </button>
         </div>
       </div>

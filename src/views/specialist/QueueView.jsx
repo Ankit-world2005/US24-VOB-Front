@@ -569,8 +569,12 @@ export function QueueView() {
     try {
       // The record as it is now: its version may have moved on since it was loaded.
       const { version } = await vobsApi.getVobById(record.id);
-      await vobsApi.auditApprove(record.id, version);
-      showToast(`VOB ${record.id} verified. Moved to the specialist's Approved tab.`, "success");
+      const res = await vobsApi.auditApprove(record.id, version);
+      if (res?.status === 'auth_queue') {
+        showToast(`VOB ${record.id} verified. Authorization is required — moved to specialist's Auth Queue tab.`, "success");
+      } else {
+        showToast(`VOB ${record.id} verified. No authorization required — moved to specialist's Approved tab.`, "success");
+      }
       setQueueTargetVobId?.(null);
       setActiveTab('my_dashboard');
     } catch (err) {
@@ -767,30 +771,43 @@ export function QueueView() {
                   : `✅ No wrong or missing fields: ${record.id} goes on as usual`}
             </span>
           )}
-          {record ? (
-            <div style={{ display: 'flex', gap: '10px', marginLeft: 'auto' }}>
-              <button
-                type="button"
-                className="btn btn-sm btn-outline-danger"
-                onClick={handleAuditReassign}
-                disabled={isSubmitting}
-                style={{ borderColor: '#ef4444', color: '#ef4444', fontWeight: 600, padding: '8px 16px' }}
-                title="Return VOB to the original specialist with remarks in Error Queue"
-              >
-                {isSubmitting ? 'Processing…' : '↩ Return to Specialist with Remarks'}
-              </button>
-              <button
-                type="button"
-                className="btn btn-sm"
-                onClick={handleAuditApprove}
-                disabled={isSubmitting}
-                style={{ backgroundColor: '#10b981', color: '#fff', fontWeight: 600, padding: '8px 18px' }}
-                title="Approve and save VOB to the specialist's Approved tab"
-              >
-                {isSubmitting ? 'Processing…' : '✓ Audit Verified & Approve'}
-              </button>
-            </div>
-          ) : (
+          {record ? (() => {
+            const isAuthYes = Boolean(
+              record?.authorizationRequired === true ||
+              record?.extra?.auth_initial_eval === 'YES' ||
+              record?.extra?.auth_treatment === 'YES' ||
+              doc?.answers?.authInitialEval === 'YES' ||
+              doc?.answers?.authTreatment === 'YES'
+            );
+            return (
+              <div style={{ display: 'flex', gap: '10px', marginLeft: 'auto', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline-danger"
+                  onClick={handleAuditReassign}
+                  disabled={isSubmitting}
+                  style={{ borderColor: '#ef4444', color: '#ef4444', fontWeight: 600, padding: '8px 16px' }}
+                  title="If discrepancies found, return to original specialist in Error Tab"
+                >
+                  {isSubmitting ? 'Processing…' : '↩ Reassign to Specialist (Error Tab)'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={handleAuditApprove}
+                  disabled={isSubmitting}
+                  style={{ backgroundColor: '#10b981', color: '#fff', fontWeight: 600, padding: '8px 18px' }}
+                  title={isAuthYes ? "Verified! Moves to specialist's Auth Queue tab" : "Verified! Moves to specialist's Approved tab"}
+                >
+                  {isSubmitting
+                    ? 'Processing…'
+                    : isAuthYes
+                    ? '✓ Verified → Specialist Auth Queue'
+                    : '✓ Verified → Approved Records'}
+                </button>
+              </div>
+            );
+          })() : (
             <span className="queue-submit-hint" style={{ marginLeft: 'auto', color: 'var(--ink-soft)' }}>
               Select or load a record to verify or return.
             </span>
