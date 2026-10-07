@@ -33,7 +33,6 @@ export function AddSpecialistModal({ isOpen, onClose, onSuccess, clients = [] })
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('user'); // 'user' = Specialist, 'auth' = Auth Specialist, 'admin' = Administrator
-  const [selectedClientIds, setSelectedClientIds] = useState([]);
   const [tempPassword, setTempPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [requireReset, setRequireReset] = useState(true);
@@ -48,7 +47,7 @@ export function AddSpecialistModal({ isOpen, onClose, onSuccess, clients = [] })
       setName('');
       setEmail('');
       setRole('user');
-      setSelectedClientIds([]);
+      
       setTempPassword(generateSecurePassword());
       setShowPassword(false);
       setRequireReset(true);
@@ -86,22 +85,6 @@ export function AddSpecialistModal({ isOpen, onClose, onSuccess, clients = [] })
     setCopied(false);
   };
 
-  const handleToggleClient = (clientId) => {
-    setSelectedClientIds(prev => 
-      prev.includes(clientId) 
-        ? prev.filter(id => id !== clientId)
-        : [...prev, clientId]
-    );
-  };
-
-  const handleSelectAllClients = () => {
-    if (selectedClientIds.length === clients.length) {
-      setSelectedClientIds([]);
-    } else {
-      setSelectedClientIds(clients.map(c => c.id));
-    }
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMessage('');
@@ -129,7 +112,6 @@ export function AddSpecialistModal({ isOpen, onClose, onSuccess, clients = [] })
         initialPassword: tempPassword,
         requirePasswordChange: requireReset,
         status: 'active',
-        ...(selectedClientIds.length > 0 ? { clientIds: selectedClientIds } : {})
       };
 
       await usersApi.createUser(payload);
@@ -147,8 +129,6 @@ export function AddSpecialistModal({ isOpen, onClose, onSuccess, clients = [] })
       setSubmitting(false);
     }
   };
-
-  const isAllSelected = clients.length > 0 && selectedClientIds.length === clients.length;
 
   return (
     <div
@@ -366,75 +346,6 @@ export function AddSpecialistModal({ isOpen, onClose, onSuccess, clients = [] })
                 </label>
               </div>
             </div>
-
-            {/* Optional Assigned Clients */}
-            {clients.length > 0 && (
-              <div className="field" style={{ margin: 0 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                  <label style={{ fontWeight: 600 }}>
-                    Assigned Clients ({selectedClientIds.length === 0 && role === 'admin' ? 'All Clients (Admin Default)' : `${selectedClientIds.length} of ${clients.length}`})
-                  </label>
-                  <button
-                    type="button"
-                    onClick={handleSelectAllClients}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: 'var(--cobalt, #1d4ed8)',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      padding: '2px 6px'
-                    }}
-                  >
-                    {isAllSelected ? 'Deselect All' : 'Select All Clients'}
-                  </button>
-                </div>
-
-                <div
-                  style={{
-                    maxHeight: '140px',
-                    overflowY: 'auto',
-                    border: '1px solid var(--rule, #c4c4db)',
-                    borderRadius: '8px',
-                    padding: '8px 12px',
-                    background: 'var(--surface, #fff)',
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                    gap: '6px'
-                  }}
-                >
-                  {clients.map(c => {
-                    const isChecked = selectedClientIds.includes(c.id);
-                    return (
-                      <label
-                        key={c.id}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          padding: '4px 6px',
-                          borderRadius: '4px',
-                          background: isChecked ? 'rgba(37, 99, 235, 0.08)' : 'transparent',
-                          cursor: 'pointer',
-                          fontSize: '12.5px'
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => handleToggleClient(c.id)}
-                          disabled={submitting}
-                        />
-                        <span style={{ color: 'var(--ink)', fontWeight: isChecked ? 600 : 400 }}>
-                          {c.name || c.id}
-                        </span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
 
             {/* Initial Password Section */}
             <div className="field" style={{ margin: 0 }}>

@@ -552,7 +552,7 @@ export function UserManagementView() {
                                   setEditingUser(u);
                                 }}
                               >
-                                ✏️ Edit Access & Clients
+                                ✏️ Edit Access & Role
                               </button>
 
                               <button

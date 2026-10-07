@@ -7,7 +7,6 @@ export function EditUserModal({ isOpen, onClose, user, clients = [], onSuccess }
 
   const [name, setName] = useState('');
   const [role, setRole] = useState('user');
-  const [selectedClientIds, setSelectedClientIds] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -48,22 +47,6 @@ export function EditUserModal({ isOpen, onClose, user, clients = [], onSuccess }
 
   if (!isOpen || !user) return null;
 
-  const handleToggleClient = (clientId) => {
-    setSelectedClientIds(prev => 
-      prev.includes(clientId) 
-        ? prev.filter(id => id !== clientId)
-        : [...prev, clientId]
-    );
-  };
-
-  const handleSelectAllClients = () => {
-    if (selectedClientIds.length === clients.length) {
-      setSelectedClientIds([]);
-    } else {
-      setSelectedClientIds(clients.map(c => c.id));
-    }
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMessage('');
@@ -78,9 +61,7 @@ export function EditUserModal({ isOpen, onClose, user, clients = [], onSuccess }
     try {
       const payload = {
         name: cleanName,
-        role,
-        clientIds: selectedClientIds
-      };
+        role,      };
 
       await usersApi.patchUser(user.id, payload);
       showToast(`User ${cleanName} updated successfully.`, 'success');
@@ -94,8 +75,6 @@ export function EditUserModal({ isOpen, onClose, user, clients = [], onSuccess }
       setSubmitting(false);
     }
   };
-
-  const isAllSelected = clients.length > 0 && selectedClientIds.length === clients.length;
 
   return (
     <div
@@ -310,82 +289,7 @@ export function EditUserModal({ isOpen, onClose, user, clients = [], onSuccess }
               </div>
             </div>
 
-            {/* Client Access Assignments */}
-            <div className="field" style={{ margin: 0 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <label style={{ fontWeight: 600 }}>
-                  Assigned Clients ({selectedClientIds.length} of {clients.length})
-                </label>
-                <button
-                  type="button"
-                  onClick={handleSelectAllClients}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--cobalt, #1d4ed8)',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    padding: '2px 6px'
-                  }}
-                >
-                  {isAllSelected ? 'Deselect All' : 'Select All Clients'}
-                </button>
-              </div>
-
-              <div
-                style={{
-                  maxHeight: '180px',
-                  overflowY: 'auto',
-                  border: '1px solid var(--rule, #c4c4db)',
-                  borderRadius: '8px',
-                  padding: '8px 12px',
-                  background: 'var(--surface, #fff)',
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-                  gap: '8px'
-                }}
-              >
-                {clients.length === 0 ? (
-                  <div style={{ fontSize: '12px', color: 'var(--ink-soft)', padding: '12px 0' }}>
-                    No clients configured in system.
-                  </div>
-                ) : (
-                  clients.map(c => {
-                    const isChecked = selectedClientIds.includes(c.id);
-                    return (
-                      <label
-                        key={c.id}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          padding: '6px 8px',
-                          borderRadius: '6px',
-                          background: isChecked ? 'rgba(37, 99, 235, 0.08)' : 'transparent',
-                          cursor: 'pointer',
-                          fontSize: '13px',
-                          transition: 'background 0.15s ease'
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => handleToggleClient(c.id)}
-                          disabled={submitting}
-                        />
-                        <span style={{ fontWeight: isChecked ? 600 : 400, color: 'var(--ink)' }}>
-                          {c.name || c.id}
-                        </span>
-                      </label>
-                    );
-                  })
-                )}
-              </div>
-              <span style={{ fontSize: '11.5px', color: 'var(--ink-soft)', marginTop: '4px', display: 'block' }}>
-                Users will only see and process VOBs and tasks for their assigned clients.
-              </span>
-            </div>
+            
           </div>
 
           {/* Footer Actions */}
