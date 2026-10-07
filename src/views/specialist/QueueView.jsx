@@ -527,11 +527,12 @@ export function QueueView() {
     const remarksToSend = remark.trim() || 'Discrepancies found during audit verification. Please correct and resubmit.';
     setIsSubmitting(true);
     try {
+      const { version } = await vobsApi.getVobById(record.id);
       await vobsApi.reassignVob(record.id, {
         assignee_id: targetUser,
         reason: remarksToSend,
         status: 'error',
-        version: record.version || 1
+        version
       });
       showToast(`VOB ${record.id} returned to specialist with remarks. Moved to Error Queue.`, "info");
       setQueueTargetVobId?.(null);
@@ -547,7 +548,9 @@ export function QueueView() {
     if (!record) return;
     setIsSubmitting(true);
     try {
-      await vobsApi.auditApprove(record.id, record.version || 1);
+      // The record as it is now: its version may have moved on since it was loaded.
+      const { version } = await vobsApi.getVobById(record.id);
+      await vobsApi.auditApprove(record.id, version);
       showToast(`VOB ${record.id} verified. Moved to the specialist's Approved tab.`, "success");
       setQueueTargetVobId?.(null);
       setActiveTab('my_dashboard');

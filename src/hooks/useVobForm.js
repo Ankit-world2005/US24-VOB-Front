@@ -19,6 +19,13 @@ export function followSubmitResult(result, showToast, setActiveTab) {
     setActiveTab('my_dashboard');
     return;
   }
+  // The audit specialist approved a VOB waiting on their audit: it went back to
+  // the specialist who sent it, so it is not in this user's Saved Records.
+  if (status === 'approved' && result.returned_to) {
+    showToast("VOB verified. Moved to the specialist's Approved tab.", "success");
+    setActiveTab('my_dashboard');
+    return;
+  }
   if (status === 'error') {
     const mismatches = (result.failingRules || []).filter(f => f.code === 'document_mismatch').length;
     showToast(

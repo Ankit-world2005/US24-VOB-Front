@@ -38,18 +38,17 @@ export function SpecialistDashboardView() {
     });
   }, [currentUser.email, isAuditSpecialist, reloadKey]);
 
-  const auditTasks = isAuditSpecialist
-    ? myVobs.filter(v => v.audit_stage === 'pending_audit' || v.previous_assignee || v.previousAssigneeId)
-    : [];
-  const assignedTasks = isAuditSpecialist
-    ? myVobs.filter(v => !(v.audit_stage === 'pending_audit' || v.previous_assignee || v.previousAssigneeId))
-    : myVobs;
+  // Only VOBs a specialist submitted for audit; one an admin reassigned to the
+  // audit specialist is ordinary work and stays under My Assigned Tasks.
+  const awaitingAudit = (v) => v.audit_stage === 'pending_audit';
+  const auditTasks = isAuditSpecialist ? myVobs.filter(awaitingAudit) : [];
+  const assignedTasks = isAuditSpecialist ? myVobs.filter(v => !awaitingAudit(v)) : myVobs;
 
   const handleStartNext = () => {
     const listToPick = isAuditSpecialist && auditTasks.length > 0 ? auditTasks : assignedTasks;
     const nextPending = listToPick.find(v => v.vobStatus === "Assigned" || v.vobStatus === "In Progress");
     if (nextPending) {
-      if (isAuditSpecialist && (nextPending.audit_stage === 'pending_audit' || nextPending.previous_assignee)) {
+      if (isAuditSpecialist && awaitingAudit(nextPending)) {
         openQueueWithVob(nextPending.id);
       } else {
         openVerification(nextPending.id);
