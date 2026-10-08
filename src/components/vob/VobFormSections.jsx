@@ -32,17 +32,27 @@ const QUEUE_CHECK_CODES = new Set(['document_mismatch', 'reviewer_remark']);
  * section is open.
  */
 export function VobFormSections({ formData, provenance, failingRules, inAuthQueue, onFieldChange }) {
+  // Real form field validation failures only (exclude audit remarks from form error banner)
+  const formFailingRules = useMemo(() => {
+    return (failingRules || []).filter(r => {
+      const field = typeof r === 'string' ? r : r?.field;
+      const rule = typeof r === 'object' ? r?.rule : null;
+      const code = typeof r === 'object' ? r?.code : null;
+      return field !== 'audit_remark' && rule !== 'audit_rejection' && code !== 'audit_remark';
+    });
+  }, [failingRules]);
+
   // Failures from the Queue tab's check carry their own remarks.
-  const fromQueueCheck = failingRules.length > 0 && failingRules.every(r => QUEUE_CHECK_CODES.has(r.code));
-  const mismatchCount = failingRules.filter(r => r.code === 'document_mismatch').length;
+  const fromQueueCheck = formFailingRules.length > 0 && formFailingRules.every(r => QUEUE_CHECK_CODES.has(r.code));
+  const mismatchCount = formFailingRules.filter(r => r.code === 'document_mismatch').length;
   const failingRuleMap = useMemo(() => {
     const map = new Map();
-    for (const r of failingRules) {
+    for (const r of formFailingRules) {
       const key = formKeyFor(r.field) || r.field;
       map.set(key, r.message);
     }
     return map;
-  }, [failingRules]);
+  }, [formFailingRules]);
 
   return (
     <>
@@ -57,7 +67,7 @@ export function VobFormSections({ formData, provenance, failingRules, inAuthQueu
       )}
 
       {/* Validation Error Banner */}
-      {failingRules.length > 0 && (
+      {formFailingRules.length > 0 && (
         <div className="validation-error-banner" role="alert">
           <div className="error-banner-icon">⚠️</div>
           <div className="error-banner-content">
@@ -68,12 +78,12 @@ export function VobFormSections({ formData, provenance, failingRules, inAuthQueu
               </>
             ) : (
               <>
-                <h4>Validation Error — {failingRules.length} Rule(s) Failed</h4>
+                <h4>Validation Error — {formFailingRules.length} Rule(s) Failed</h4>
                 <p>The Parker VOB format requires all mandatory fields to be verified before approval:</p>
               </>
             )}
             <ul className="error-fields-list">
-              {failingRules.map((err, i) => (
+              {formFailingRules.map((err, i) => (
                 <li key={i}>
                   <strong>{failureLabel(err)}:</strong> {err.message}
                 </li>

@@ -132,7 +132,14 @@ export const STATUS_MAP_TO_BACKEND = {
  */
 function toFailures(list) {
   if (!Array.isArray(list)) return [];
-  return list.map(f => (typeof f === 'string' ? { field: f, message: 'Required' } : f));
+  return list
+    .filter(f => {
+      const field = typeof f === 'string' ? f : f?.field;
+      const rule = typeof f === 'object' ? f?.rule : null;
+      const code = typeof f === 'object' ? f?.code : null;
+      return field !== 'audit_remark' && rule !== 'audit_rejection' && code !== 'audit_remark';
+    })
+    .map(f => (typeof f === 'string' ? { field: f, message: 'Required' } : f));
 }
 
 /**
@@ -151,6 +158,9 @@ export function normalizeVobListItem(item) {
   const authStartDate = item.auth_valid_from || item.fields?.auth_valid_from || item.authDetails?.authStartDate || '';
   const authEndDate = item.auth_valid_to || item.fields?.auth_valid_to || item.authDetails?.authEndDate || '';
 
+  const auditRemarks = item.reassignment_reason || item.reassignmentReason || item.audit_remarks || item.auditRemarks || item.extra?.auditRemarks || null;
+  const failureList = toFailures(item.failures ?? item.failingRules);
+
   return {
     ...item,
     id: item.id,
@@ -163,10 +173,15 @@ export function normalizeVobListItem(item) {
     clientObj: item.client,
     assignee: item.assignee,
     assignedTo: assigneeName || item.assignee_id || '',
-    failureCount: item.failure_count || (item.failures?.length || 0),
+    previousAssignee: item.previous_assignee || (item.previous_assignee_id ? { id: item.previous_assignee_id, name: item.previous_assignee_id } : null),
+    auditRemarks,
+    reassignmentReason: auditRemarks,
+    auditStage: item.audit_stage || item.extra?.auditStage || null,
+    failureCount: item.failure_count || (failureList.length || 0),
     // The Error Queue lists these as each row's failing rules and remarks.
-    failingRules: toFailures(item.failures ?? item.failingRules),
+    failingRules: failureList,
     updatedAt: item.updated_at || item.updatedAt,
+    reassignedAt: item.reassigned_at || item.reassignedAt || null,
     insurance: item.insurance || item.fields?.insurance || 'General Healthcare',
     appointmentType: item.appointment_type || item.appointmentType || item.fields?.service_type || item.serviceType || 'Physical Therapy',
     authRequestTat: item.auth_request_tat || item.fields?.auth_request_tat || item.authRequestTat || '3-5 business days',
@@ -402,6 +417,7 @@ export function normalizeSingleVob(raw) {
   const fields = raw.fields || {};
   const patient = raw.patient || {};
   const sources = raw.sources || {};
+  const auditRemarks = raw.reassignment_reason || raw.reassignmentReason || raw.audit_remarks || raw.auditRemarks || raw.extra?.auditRemarks || null;
   const failures = toFailures(raw.failures);
 
   const backendStatus = (raw.status || 'in_progress').toLowerCase();
@@ -424,6 +440,9 @@ export function normalizeSingleVob(raw) {
     dos: fields.dos || raw.dos || '',
     failures: failures,
     failingRules: failures,
+    auditRemarks: auditRemarks,
+    reassignmentReason: auditRemarks,
+    auditStage: raw.audit_stage || raw.extra?.auditStage || null,
     sources: sources,
     format: raw.format,
     extra: raw.extra || {},

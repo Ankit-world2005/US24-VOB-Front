@@ -6,6 +6,7 @@ import { VobFormSections } from '../../components/vob/VobFormSections';
 import { AiTranscriptDrawer } from '../../components/vob/AiTranscriptDrawer';
 import { ParkerLivePreview } from '../../components/vob/ParkerLivePreview';
 import { CallVerificationPanel } from '../../components/vob/CallVerificationPanel';
+import { CorrectionLogsModal } from '../../components/vob/CorrectionLogsModal';
 
 export function VerificationFormView() {
   const { activeVobId, setActiveVobId, setActiveTab } = useWorkspace();
@@ -27,6 +28,7 @@ export function VerificationFormView() {
     handleSubmit
   } = useVobForm();
   const [isAiDrawerOpen, setIsAiDrawerOpen] = useState(false);
+  const [isLogsOpen, setIsLogsOpen] = useState(false);
 
   if (loading) {
     return <div className="panel-card"><div className="loading-spinner-wrap">Loading VOB Verification Form…</div></div>;
@@ -56,6 +58,17 @@ export function VerificationFormView() {
         activeVobId={activeVobId}
         onSwitchVob={setActiveVobId}
       >
+        {(vob.status === 'error' || vob.auditRemarks || vob.reassignmentReason || vob.reassignment_reason || vob.audit_remarks || (failingRules || []).some(r => r.field === 'audit_remark')) && (
+          <button
+            type="button"
+            className="btn btn-sm btn-logs-action"
+            style={{ marginRight: '8px' }}
+            onClick={() => setIsLogsOpen(true)}
+            title="View audit specialist remarks and full correction logs"
+          >
+            📋 View Logs
+          </button>
+        )}
         <button
           type="button"
           className="btn btn-sm"
@@ -138,6 +151,13 @@ export function VerificationFormView() {
         onClose={() => setIsAiDrawerOpen(false)}
         vobId={activeVobId}
         onApplyFields={handleApplyAiFields}
+      />
+
+      {/* Correction & Audit Logs Modal */}
+      <CorrectionLogsModal
+        vob={vob}
+        isOpen={isLogsOpen}
+        onClose={() => setIsLogsOpen(false)}
       />
     </div>
   );
