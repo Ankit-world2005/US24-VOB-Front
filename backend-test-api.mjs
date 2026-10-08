@@ -502,9 +502,19 @@ const server = http.createServer(async (req, res) => {
 
       // Filter by assignee_id
       const assigneeId = reqUrl.searchParams.get('assignee_id');
+      const callerUser = usersDb.find(u => assigneeId && (u.email.toLowerCase() === assigneeId.toLowerCase() || u.id === assigneeId));
+      const isCallerAuth = callerUser?.role === 'auth';
+
       if (assigneeId) {
         if (assigneeId === 'none') {
           filtered = filtered.filter(v => !v.assignee_id || v.assignee_id === 'none');
+        } else if (isCallerAuth) {
+          // An auth specialist sees their own assigned tasks + any VOB pending audit!
+          filtered = filtered.filter(v => 
+            (v.assignee_id || '').toLowerCase() === assigneeId.toLowerCase() ||
+            v.extra?.auditStage === 'pending_audit' ||
+            v.audit_stage === 'pending_audit'
+          );
         } else {
           filtered = filtered.filter(v => (v.assignee_id || '').toLowerCase() === assigneeId.toLowerCase());
         }
@@ -529,6 +539,8 @@ const server = http.createServer(async (req, res) => {
         dos: v.fields?.dos || '',
         status: v.status,
         assignee: v.assignee,
+        audit_stage: v.extra?.auditStage || v.audit_stage || null,
+        previous_assignee: v.previous_assignee || (v.previous_assignee_id ? { id: v.previous_assignee_id, name: v.previous_assignee_id } : null),
         failure_count: v.failures?.length || 0,
         // The Error Queue lists each failure with its message (a cross-check's remark).
         failures: v.failures || [],
@@ -550,10 +562,10 @@ const server = http.createServer(async (req, res) => {
     // -------------------------------------------------------------
     // 6. Single VOB Routes: /api/v1/vobs/:id
     // -------------------------------------------------------------
-    const vobPathMatch = pathname.match(/^\/api\/v1\/vobs\/([^/]+)(\/(submit|auth|transcript))?$/);
+    const vobPathMatch = pathname.match(/^\/api\/v1\/vobs\/([^/]+)(\/(submit|auth|transcript|audit-approve|reassign))?$/);
     if (vobPathMatch) {
       const vobId = vobPathMatch[1];
-      const subAction = vobPathMatch[3]; // 'submit', 'auth', or undefined
+      const subAction = vobPathMatch[3]; // 'submit', 'auth', 'audit-approve', 'reassign', or undefined
 
       const vobIndex = vobsDb.findIndex(v => v.id === vobId);
       if (vobIndex === -1) {
@@ -639,6 +651,43 @@ const server = http.createServer(async (req, res) => {
           return;
         }
 
+        // Route to audit if submitted by normal specialist and not yet audited
+        const isAlreadyAudited = vob.status === 'auth_queue' || vob.extra?.auditStage === 'audited';
+        if (vob.extra?.auditStage === 'pending_audit') {
+          // Hand back to submitting specialist upon audit submit
+          const returnTo = vob.extra?.submittedBySpecialistId || vob.previous_assignee_id || vob.assignee_id;
+          vob.extra = {
+            ...(vob.extra || {}),
+            auditStage: 'audited',
+            auditedAt: new Date().toISOString()
+          };
+          vob.assignee_id = returnTo;
+          vob.previous_assignee_id = 'auditor';
+          vob.reassigned_to_id = returnTo;
+          vob.reassigned_at = new Date().toISOString();
+        } else if (!isAlreadyAudited) {
+          const submittingSpecialist = vob.assignee_id || 'specialist';
+          vob.extra = {
+            ...(vob.extra || {}),
+            auditStage: 'pending_audit',
+            submittedForAuditAt: new Date().toISOString(),
+            submittedBySpecialistId: submittingSpecialist
+          };
+          vob.status = 'in_progress';
+          vob.previous_assignee_id = submittingSpecialist;
+          vob.version = (vob.version || 1) + 1;
+          vob.updated_at = new Date().toISOString();
+
+          sendJson(res, 200, {
+            status: 'in_progress',
+            version: vob.version,
+            audit_stage: 'pending_audit',
+            routed_to: 'audit'
+          });
+          logDone(200);
+          return;
+        }
+
         // Authorization section (form rows 8–9): any empty field sends the VOB to the Auth Queue
         const x = vob.extra || {};
         const blank = (v) => v === null || v === undefined || String(v).trim() === '';
@@ -678,6 +727,121 @@ const server = http.createServer(async (req, res) => {
           status: 'approved',
           version: vob.version,
           completed_at: vob.completed_at
+        });
+        logDone(200);
+        return;
+      }
+
+      // POST /api/v1/vobs/:id/audit-approve
+      if (subAction === 'audit-approve' && method === 'POST') {
+        const body = await parseJsonBody(req);
+        const expectedVersion = body.version;
+
+        if (expectedVersion !== undefined && vob.version !== expectedVersion) {
+          sendJson(res, 409, {
+            error: { code: 'conflict', message: 'Version mismatch. Reload latest.' }
+          });
+          logDone(409);
+          return;
+        }
+
+        const x = vob.extra || {};
+        const f = vob.fields || {};
+        const blank = (v) => v === null || v === undefined || String(v).trim() === '';
+        const awaiting = [
+          ['extra.auth_initial_eval', x.auth_initial_eval],
+          ['authorization_required', f.authorization_required],
+          ['referral_required', f.referral_required],
+          ['extra.pcp_referral', x.pcp_referral],
+          ['extra.how_to_obtain_auth', x.how_to_obtain_auth],
+          ['auth_request_tat', f.auth_request_tat],
+          ['auth_number', f.auth_number],
+          ['extra.auth_coverage_dates', x.auth_coverage_dates || (f.auth_valid_from && f.auth_valid_to ? 'dates' : '')]
+        ].filter(([, v]) => blank(v)).map(([k]) => k);
+
+        const targetStatus = awaiting.length > 0 ? 'auth_queue' : 'approved';
+        const returnTo = vob.extra?.submittedBySpecialistId || vob.previous_assignee_id || vob.assignee_id;
+        const auditorEmail = req.headers['x-user-email'] || 'auditor';
+
+        vob.extra = {
+          ...(vob.extra || {}),
+          auditStage: 'audited',
+          auditedBy: auditorEmail,
+          auditedAt: new Date().toISOString()
+        };
+
+        vob.status = targetStatus;
+        vob.version = (vob.version || 1) + 1;
+        vob.completed_at = targetStatus === 'approved' ? new Date().toISOString() : null;
+        vob.updated_at = new Date().toISOString();
+
+        // Move back to submitting specialist
+        vob.assignee_id = returnTo;
+        if (vob.assignee) {
+          vob.assignee.email = returnTo;
+        }
+        vob.previous_assignee_id = auditorEmail;
+        vob.reassigned_to_id = returnTo;
+        vob.reassigned_at = new Date().toISOString();
+        vob.reassignment_reason = 'Verified by Audit Specialist';
+
+        sendJson(res, 200, {
+          id: vob.id,
+          status: targetStatus,
+          version: vob.version,
+          vob_completion_date: vob.completed_at,
+          assignee_id: returnTo,
+          ...(awaiting.length > 0 ? { awaiting } : {})
+        });
+        logDone(200);
+        return;
+      }
+
+      // POST /api/v1/vobs/:id/reassign
+      if (subAction === 'reassign' && method === 'POST') {
+        const body = await parseJsonBody(req);
+        const prev = vob.assignee_id;
+        const targetAssignee = body.assignee_id || vob.previous_assignee_id;
+        const targetUser = usersDb.find(u => u.email === targetAssignee || u.id === targetAssignee);
+        const reason = body.reason || null;
+        const targetStatus = body.status === 'error' ? 'error' : vob.status;
+
+        vob.assignee_id = targetAssignee;
+        if (vob.assignee) vob.assignee.email = targetAssignee;
+        vob.previous_assignee_id = prev;
+        vob.reassigned_to_id = targetAssignee;
+        vob.reassignment_reason = reason;
+        vob.reassigned_at = new Date().toISOString();
+        vob.version = (vob.version || 1) + 1;
+        vob.updated_at = new Date().toISOString();
+
+        if (targetStatus === 'error') {
+          vob.status = 'error';
+          vob.extra = {
+            ...(vob.extra || {}),
+            auditStage: 'returned_to_specialist',
+            auditRemarks: reason
+          };
+          if (reason) {
+            vob.failures = [{ field: 'audit_remark', rule: 'audit_rejection', message: reason }];
+          }
+        } else if (targetUser?.role === 'auth') {
+          vob.extra = {
+            ...(vob.extra || {}),
+            auditStage: 'pending_audit',
+            submittedForAuditAt: new Date().toISOString(),
+            submittedBySpecialistId: prev
+          };
+        }
+
+        sendJson(res, 200, {
+          id: vob.id,
+          status: vob.status,
+          version: vob.version,
+          assignee_id: vob.assignee_id,
+          previous_assignee_id: vob.previous_assignee_id,
+          reassigned_at: vob.reassigned_at,
+          reassignment_reason: vob.reassignment_reason
         });
         logDone(200);
         return;
