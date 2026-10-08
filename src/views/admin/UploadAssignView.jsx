@@ -204,7 +204,7 @@ export function UploadAssignView() {
   React.useEffect(() => {
     usersApi.getUsers().then(users => {
       const activeSpecialists = (users || [])
-        .filter(u => u.role === 'user' && u.active !== false)
+        .filter(u => (u.role === 'user' || u.role === 'auth') && u.active !== false && u.status !== 'deactivated')
         .map(u => ({
           id: u.id,
           email: u.email,

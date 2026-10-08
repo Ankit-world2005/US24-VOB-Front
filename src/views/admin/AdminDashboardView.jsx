@@ -161,15 +161,15 @@ export function AdminDashboardView() {
 
         <div className="panel-card">
           <div className="panel-header">
-            <h3>Specialist Allocation & Velocity</h3>
-            <span className="panel-sub">Active specialists · {scopeName}</span>
+            <h3>User & Specialist Allocation & Velocity</h3>
+            <span className="panel-sub">Active portal users · {scopeName}</span>
           </div>
           {showPlaceholder ? (
-            <div className="panel-empty">Loading specialist workload…</div>
+            <div className="panel-empty">Loading team workload…</div>
           ) : specialists.length === 0 ? (
-            <div className="panel-empty">No active specialists found.</div>
+            <div className="panel-empty">No active portal users found.</div>
           ) : (
-            <div className="table-responsive">
+            <div className="table-responsive" style={{ maxHeight: '460px', overflowY: 'auto' }}>
               <table className="spec-table">
                 <colgroup>
                   <col />
@@ -181,7 +181,7 @@ export function AdminDashboardView() {
                 </colgroup>
                 <thead>
                   <tr>
-                    <th rowSpan={2}>Specialist</th>
+                    <th rowSpan={2}>User / Specialist</th>
                     <th rowSpan={2} className="spec-num" title="Assigned + In Progress">Open</th>
                     <th rowSpan={2} className="spec-num" title="Validation errors to fix">Errors</th>
                     <th colSpan={2} className="spec-group">Approved</th>
@@ -201,7 +201,67 @@ export function AdminDashboardView() {
                           <div className="spec-info">
                             <div className="spec-avatar" aria-hidden="true">{initials(sp.name)}</div>
                             <div className="spec-ident">
-                              <div className="spec-name" title={sp.name}>{sp.name}</div>
+                              <div className="spec-name" title={sp.name}>
+                                <span>{sp.name}</span>
+                                {sp.role === 'admin' ? (
+                                  <span
+                                    className="spec-role-pill admin-pill"
+                                    style={{
+                                      marginLeft: '6px',
+                                      fontSize: '10px',
+                                      fontWeight: 600,
+                                      padding: '1px 5px',
+                                      borderRadius: '4px',
+                                      background: 'rgba(79, 70, 229, 0.12)',
+                                      color: '#4338ca',
+                                      border: '1px solid rgba(79, 70, 229, 0.25)',
+                                      display: 'inline-block',
+                                      verticalAlign: 'middle',
+                                      lineHeight: '1.3',
+                                    }}
+                                  >
+                                    Admin
+                                  </span>
+                                ) : sp.role === 'auth' ? (
+                                  <span
+                                    className="spec-role-pill auth-pill"
+                                    style={{
+                                      marginLeft: '6px',
+                                      fontSize: '10px',
+                                      fontWeight: 600,
+                                      padding: '1px 5px',
+                                      borderRadius: '4px',
+                                      background: '#fef3c7',
+                                      color: '#b45309',
+                                      border: '1px solid rgba(217, 119, 6, 0.25)',
+                                      display: 'inline-block',
+                                      verticalAlign: 'middle',
+                                      lineHeight: '1.3',
+                                    }}
+                                  >
+                                    Auth
+                                  </span>
+                                ) : (
+                                  <span
+                                    className="spec-role-pill user-pill"
+                                    style={{
+                                      marginLeft: '6px',
+                                      fontSize: '10px',
+                                      fontWeight: 500,
+                                      padding: '1px 5px',
+                                      borderRadius: '4px',
+                                      background: 'var(--surface-2, #f1f5f9)',
+                                      color: 'var(--ink-soft, #64748b)',
+                                      border: '1px solid var(--rule-soft, #e2e8f0)',
+                                      display: 'inline-block',
+                                      verticalAlign: 'middle',
+                                      lineHeight: '1.3',
+                                    }}
+                                  >
+                                    Specialist
+                                  </span>
+                                )}
+                              </div>
                               <div className="spec-email" title={sp.email}>{sp.email}</div>
                             </div>
                           </div>

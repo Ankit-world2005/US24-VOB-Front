@@ -13,12 +13,14 @@ const HOST = process.env.HOST || '0.0.0.0';
 // In-memory database initialized from DB/vobs.json if present
 let vobsDb = [];
 let usersDb = [
-  { id: 'usr_01', email: 'rohit.k@us24solutions.com', name: 'Rohit Kumar', role: 'specialist', assignedClients: ['parker'], status: 'active' },
-  { id: 'usr_02', email: 'anita.s@us24solutions.com', name: 'Anita Sharma', role: 'specialist', assignedClients: ['arra'], status: 'active' },
-  { id: 'usr_03', email: 'auth@us24solutions.com', name: 'Auth Specialist', role: 'auth', assignedClients: ['all'], status: 'active' },
-  { id: 'usr_04', email: 'saurabh@us24solutions.com', name: 'Saurabh Admin', role: 'admin', assignedClients: ['all'], status: 'active' },
-  { id: 'usr_05', email: 'admin@us24solutions.com', name: 'System Admin', role: 'admin', assignedClients: ['all'], status: 'active' },
-  { id: 'usr_06', email: 'jitender.s@us24solutions.com', name: 'Jitender S', role: 'auth', assignedClients: ['all'], status: 'active' }
+  { id: 'US24-04', email: 'saurabh@us24solutions.com', name: 'Saurabh', role: 'admin', active: true, status: 'active', assignedClients: ['all'] },
+  { id: 'US24-06', email: 'manish.v@us24solutions.com', name: 'Manish V', role: 'admin', active: true, status: 'active', assignedClients: ['all'] },
+  { id: 'US24-01', email: 'admin@us24.test', name: 'Avery Admin', role: 'admin', active: true, status: 'active', assignedClients: ['all'] },
+  { id: 'US24-05', email: 'rohit.k@us24solutions.com', name: 'Rohit K (2)', role: 'user', active: true, status: 'active', assignedClients: ['all'] },
+  { id: 'US24-02', email: 'user@us24.test', name: 'Sam Specialist', role: 'user', active: true, status: 'active', assignedClients: ['all'] },
+  { id: 'US24-07', email: 'jitender.s@us24solutions.com', name: 'Jitender S', role: 'auth', active: true, status: 'active', assignedClients: ['all'] },
+  { id: 'US24-08', email: 'ankit.k@us24solutions.com', name: 'Ankit Kumar', role: 'auth', active: true, status: 'active', assignedClients: ['all'] },
+  { id: 'US24-03', email: 'auth@us24.test', name: 'Ari Auth', role: 'auth', active: false, status: 'revoked', assignedClients: ['all'] }
 ];
 
 function loadSeedData() {
@@ -783,6 +785,64 @@ const server = http.createServer(async (req, res) => {
         timestamp: new Date().toISOString(),
         columns,
         rows
+      });
+      logDone(200);
+      return;
+    }
+
+    // -------------------------------------------------------------
+    // 6c. Dashboard: GET /api/v1/dashboard/summary & /api/v1/dashboard/breakdown
+    // -------------------------------------------------------------
+    if (pathname === '/api/v1/dashboard/summary' && method === 'GET') {
+      const pending = vobsDb.filter(v => v.status === 'assigned' || v.status === 'in_progress').length;
+      const authQueue = vobsDb.filter(v => v.status === 'auth_queue').length;
+      const error = vobsDb.filter(v => v.status === 'error').length;
+      const approved = vobsDb.filter(v => v.status === 'approved').length;
+      sendJson(res, 200, { total: vobsDb.length, pending, authQueue, error, approved });
+      logDone(200);
+      return;
+    }
+
+    if (pathname === '/api/v1/dashboard/breakdown' && method === 'GET') {
+      const clientMap = new Map();
+      vobsDb.forEach(v => {
+        const cid = v.client_id || v.client?.id || 'parker';
+        const cname = v.client?.name || cid;
+        if (!clientMap.has(cid)) clientMap.set(cid, { id: cid, name: cname, total: 0, open: 0, authQueue: 0, error: 0, approved: 0 });
+        const c = clientMap.get(cid);
+        c.total += 1;
+        if (v.status === 'assigned' || v.status === 'in_progress') c.open += 1;
+        else if (v.status === 'auth_queue') c.authQueue += 1;
+        else if (v.status === 'error') c.error += 1;
+        else if (v.status === 'approved') c.approved += 1;
+      });
+
+      const specialists = usersDb.filter(u => u.active).map(u => {
+        const myVobs = vobsDb.filter(v => (v.assignee_id === u.id || v.assignee_id === u.email || v.assignee?.id === u.id || v.assignee?.email === u.email));
+        const open = myVobs.filter(v => v.status === 'assigned' || v.status === 'in_progress').length;
+        const error = myVobs.filter(v => v.status === 'error').length;
+        const authQueue = myVobs.filter(v => v.status === 'auth_queue').length;
+        const approved = myVobs.filter(v => v.status === 'approved').length;
+        return {
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          role: u.role,
+          open,
+          error,
+          authQueue,
+          approved,
+          approvedToday: 0,
+          approved7d: 0
+        };
+      });
+
+      sendJson(res, 200, {
+        generatedAt: new Date().toISOString(),
+        totalVobs: vobsDb.length,
+        clients: [...clientMap.values()],
+        specialists,
+        needsAssignment: vobsDb.filter(v => !v.assignee_id || v.assignee_id === 'none').length
       });
       logDone(200);
       return;
