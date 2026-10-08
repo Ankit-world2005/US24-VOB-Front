@@ -1,5 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useWorkspace } from '../../context/WorkspaceContext';
+import { usersApi } from '../../api/users';
+import { MentionPopupDropdown } from './MentionPopupDropdown';
+
+const FALLBACK_USERS = [
+  { id: 'team', name: 'All Team Members', tag: 'team', role: 'all', isTeam: true },
+  { id: 'US24-04', name: 'Saurabh', tag: 'Saurabh', email: 'saurabh@us24solutions.com', role: 'admin' },
+  { id: 'US24-08', name: 'Ankit Kumar', tag: 'AnkitKumar', email: 'ankit.k@us24solutions.com', role: 'auth' },
+  { id: 'US24-07', name: 'Jitender S', tag: 'JitenderS', email: 'jitender.s@us24solutions.com', role: 'auth' },
+  { id: 'US24-06', name: 'Manish V', tag: 'ManishV', email: 'manish.v@us24solutions.com', role: 'admin' },
+  { id: 'US24-01', name: 'Avery Admin', tag: 'AveryAdmin', email: 'admin@us24.test', role: 'admin' },
+  { id: 'US24-02', name: 'Sam Specialist', tag: 'SamSpecialist', email: 'user@us24.test', role: 'user' },
+  { id: 'US24-05', name: 'Rohit K', tag: 'RohitK', email: 'rohit.k@us24solutions.com', role: 'user' }
+];
 
 const DEFAULT_MESSAGES = [
   {
@@ -13,6 +26,19 @@ const DEFAULT_MESSAGES = [
     unread: true,
   },
   {
+    id: 'msg-direct-sample',
+    type: 'direct',
+    sender: 'Saurabh',
+    role: 'Administrator',
+    title: 'Direct Note to @AnkitKumar',
+    recipient: 'AnkitKumar',
+    targetedUser: 'AnkitKumar',
+    body: 'Please review priority eligibility cases for Namste clinic @AnkitKumar',
+    timestamp: '35m ago',
+    unread: true,
+    mentions: ['@AnkitKumar'],
+  },
+  {
     id: 'msg-task-2',
     type: 'task',
     sender: 'System Allocation',
@@ -20,17 +46,19 @@ const DEFAULT_MESSAGES = [
     title: 'New Records Assigned',
     body: 'You have new patient eligibility verifications assigned to your queue today.',
     timestamp: '1h ago',
-    unread: true,
+    unread: false,
   },
   {
-    id: 'msg-auth-3',
-    type: 'auth',
-    sender: 'Auth Specialist Team',
-    role: 'Authorizations',
-    title: 'Prior Auth Completed',
-    body: 'Insurance authorization approved for physical therapy evaluation coverage.',
-    timestamp: '3h ago',
+    id: 'msg-team-sample',
+    type: 'team',
+    sender: 'Sam Specialist',
+    role: 'Specialist',
+    title: 'Team Announcement',
+    recipient: 'All Team',
+    body: 'Hey @team all morning Arizona authorizations are verified and updated!',
+    timestamp: '2h ago',
     unread: false,
+    mentions: ['@team'],
   },
   {
     id: 'msg-sys-4',
@@ -44,15 +72,93 @@ const DEFAULT_MESSAGES = [
   }
 ];
 
+function renderMessageContent(text) {
+  if (!text) return null;
+  const parts = text.split(/(@[a-zA-Z0-9._-]+)/g);
+  return parts.map((part, index) => {
+    if (/^@[a-zA-Z0-9._-]+$/.test(part)) {
+      const isTeam = part.toLowerCase() === '@team' || part.toLowerCase() === '@all';
+      return (
+        <span
+          key={index}
+          className={`msg-mention-inline-tag ${isTeam ? 'mention-team-tag' : 'mention-user-tag'}`}
+        >
+          {part}
+        </span>
+      );
+    }
+    return part;
+  });
+}
+
 export function MessageBox() {
   const { currentUser } = useWorkspace();
   const [isOpen, setIsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('all'); // 'all' | 'unread' | 'notes'
+  const [activeTab, setActiveTab] = useState('all'); // 'all' | 'unread' | 'mentions' | 'notes'
   const [noteText, setNoteText] = useState('');
+  
+  // Autocomplete state
+  const [availableUsers, setAvailableUsers] = useState(FALLBACK_USERS);
+  const [showMentionPopup, setShowMentionPopup] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [mentionRange, setMentionRange] = useState({ start: 0, end: 0 });
+
   const popoverRef = useRef(null);
   const triggerRef = useRef(null);
+  const inputRef = useRef(null);
 
-  // Load persisted messages or default seed
+  // Load registered users dynamically
+  useEffect(() => {
+    let mounted = true;
+    usersApi.getUsers().then((data) => {
+      if (!mounted || !Array.isArray(data) || data.length === 0) return;
+      
+      const mapped = data.map((u) => {
+        const cleanTag = (u.name || u.email || 'user')
+          .replace(/[^a-zA-Z0-9]/g, '');
+        return {
+          id: u.id,
+          name: u.name,
+          tag: cleanTag || u.id,
+          email: u.email,
+          role: u.role || 'user'
+        };
+      });
+
+      setAvailableUsers([
+        { id: 'team', name: 'All Team Members', tag: 'team', role: 'all', isTeam: true },
+        ...mapped
+      ]);
+    }).catch(() => {
+      // Keep FALLBACK_USERS
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // Filter candidates matching @query
+  const filteredCandidates = useMemo(() => {
+    if (!showMentionPopup) return [];
+    const q = mentionQuery.toLowerCase().trim();
+    if (!q) return availableUsers;
+
+    return availableUsers.filter((u) => {
+      const matchName = (u.name || '').toLowerCase().includes(q);
+      const matchTag = (u.tag || '').toLowerCase().includes(q);
+      const matchEmail = (u.email || '').toLowerCase().includes(q);
+      const matchRole = (u.role || '').toLowerCase().includes(q);
+      return matchName || matchTag || matchEmail || matchRole;
+    });
+  }, [showMentionPopup, mentionQuery, availableUsers]);
+
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [mentionQuery, showMentionPopup]);
+
+  // Persisted messages
   const [messages, setMessages] = useState(() => {
     try {
       const saved = localStorage.getItem('us24_message_box_items');
@@ -61,16 +167,30 @@ export function MessageBox() {
     return DEFAULT_MESSAGES;
   });
 
-  // Save to localStorage when changed
   useEffect(() => {
     try {
       localStorage.setItem('us24_message_box_items', JSON.stringify(messages));
     } catch {}
   }, [messages]);
 
-  // Click outside to close
+  // Robust Click Outside Handler (Safe against detached DOM elements during click/unmount)
   useEffect(() => {
     function handleClickOutside(event) {
+      // 1. If target node was detached from DOM during the event cycle (e.g. unmounted item), it was clicked inside!
+      if (!event.target || !document.contains(event.target)) {
+        return;
+      }
+
+      // 2. Check composedPath() to see if the target was inside popover or trigger
+      const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
+      if (
+        (popoverRef.current && path.includes(popoverRef.current)) ||
+        (triggerRef.current && path.includes(triggerRef.current))
+      ) {
+        return;
+      }
+
+      // 3. Check contains() on refs
       if (
         popoverRef.current &&
         !popoverRef.current.contains(event.target) &&
@@ -78,12 +198,17 @@ export function MessageBox() {
         !triggerRef.current.contains(event.target)
       ) {
         setIsOpen(false);
+        setShowMentionPopup(false);
       }
     }
 
     function handleKeyDown(event) {
       if (event.key === 'Escape') {
-        setIsOpen(false);
+        if (showMentionPopup) {
+          setShowMentionPopup(false);
+        } else {
+          setIsOpen(false);
+        }
       }
     }
 
@@ -95,68 +220,221 @@ export function MessageBox() {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen]);
+  }, [isOpen, showMentionPopup]);
 
-  const unreadCount = messages.filter(m => m.unread).length;
+  const unreadCount = messages.filter((m) => m.unread).length;
+  const mentionsCount = messages.filter((m) => m.type === 'direct' || m.type === 'team' || (m.mentions && m.mentions.length > 0)).length;
+  const notesCount = messages.filter((m) => m.type === 'notes').length;
 
   const markAllAsRead = () => {
-    setMessages(prev => prev.map(m => ({ ...m, unread: false })));
+    setMessages((prev) => prev.map((m) => ({ ...m, unread: false })));
   };
 
   const markAsRead = (id) => {
-    setMessages(prev => prev.map(m => (m.id === id ? { ...m, unread: false } : m)));
+    setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, unread: false } : m)));
   };
 
   const deleteMessage = (id, e) => {
     e.stopPropagation();
-    setMessages(prev => prev.filter(m => m.id !== id));
+    setMessages((prev) => prev.filter((m) => m.id !== id));
+  };
+
+  // Insert mention into input WITHOUT closing the entire message box
+  const handleSelectMention = (candidate) => {
+    const text = noteText;
+    const start = mentionRange.start;
+    const end = mentionRange.end;
+
+    const before = text.slice(0, start);
+    const after = text.slice(end);
+    const insertTag = `@${candidate.tag} `;
+    const newText = before + insertTag + after;
+
+    setNoteText(newText);
+    setShowMentionPopup(false);
+
+    // Re-focus input and set cursor right after inserted tag
+    setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.focus();
+        const nextPos = start + insertTag.length;
+        inputRef.current.setSelectionRange(nextPos, nextPos);
+      }
+    }, 10);
+  };
+
+  // Keyboard navigation inside input
+  const handleInputKeyDown = (e) => {
+    if (showMentionPopup) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        e.stopPropagation();
+        setSelectedIndex((prev) => (filteredCandidates.length > 0 ? (prev + 1) % filteredCandidates.length : 0));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        e.stopPropagation();
+        setSelectedIndex((prev) => (filteredCandidates.length > 0 ? (prev - 1 + filteredCandidates.length) % filteredCandidates.length : 0));
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        e.stopPropagation();
+        if (filteredCandidates.length > 0) {
+          handleSelectMention(filteredCandidates[selectedIndex]);
+        } else {
+          setShowMentionPopup(false);
+        }
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        setShowMentionPopup(false);
+        return;
+      }
+    }
+  };
+
+  // Robust @ detector
+  const handleInputChange = (e) => {
+    const val = e.target.value;
+    setNoteText(val);
+
+    const cursorPos = typeof e.target.selectionStart === 'number'
+      ? e.target.selectionStart
+      : val.length;
+    const textBefore = val.slice(0, cursorPos);
+    const atIndex = textBefore.lastIndexOf('@');
+
+    if (atIndex !== -1) {
+      const query = textBefore.slice(atIndex + 1);
+      // Valid mention query: no whitespace between @ and cursor
+      if (!/\s/.test(query)) {
+        setShowMentionPopup(true);
+        setMentionQuery(query);
+        setMentionRange({ start: atIndex, end: cursorPos });
+        return;
+      }
+    }
+
+    setShowMentionPopup(false);
+  };
+
+  // Helper chips to quickly insert @
+  const handleQuickMention = (tag) => {
+    const prefix = noteText.endsWith(' ') || noteText.length === 0 ? '' : ' ';
+    const newText = `${noteText}${prefix}@${tag} `;
+    setNoteText(newText);
+    setShowMentionPopup(false);
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  };
+
+  const handleOpenUserSearch = () => {
+    const prefix = noteText.endsWith(' ') || noteText.length === 0 ? '' : ' ';
+    const newText = `${noteText}${prefix}@`;
+    setNoteText(newText);
+    setShowMentionPopup(true);
+    setMentionQuery('');
+    setMentionRange({ start: newText.length - 1, end: newText.length });
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
   };
 
   const handleSendNote = (e) => {
     e.preventDefault();
     if (!noteText.trim()) return;
 
+    const mentionMatches = noteText.match(/@([a-zA-Z0-9._-]+)/g) || [];
+    const isTeamMention = mentionMatches.some(
+      (m) => m.toLowerCase() === '@team' || m.toLowerCase() === '@all'
+    );
+    const firstUserMention = mentionMatches.find(
+      (m) => m.toLowerCase() !== '@team' && m.toLowerCase() !== '@all'
+    );
+
+    const targetTag = firstUserMention ? firstUserMention.replace(/^@/, '') : null;
+    const targetUserObj = targetTag
+      ? availableUsers.find(
+          (u) =>
+            u.tag.toLowerCase() === targetTag.toLowerCase() ||
+            (u.name || '').toLowerCase() === targetTag.toLowerCase()
+        )
+      : null;
+
+    const messageType = isTeamMention ? 'team' : targetTag ? 'direct' : 'notes';
+    const messageTitle = isTeamMention
+      ? '📢 Team Broadcast'
+      : targetUserObj
+      ? `Direct to @${targetUserObj.name}`
+      : targetTag
+      ? `Direct to @${targetTag}`
+      : 'Team Note';
+
     const newNote = {
       id: `msg-note-${Date.now()}`,
-      type: 'notes',
+      type: messageType,
       sender: currentUser?.name || 'Me',
-      role: currentUser?.role === 'admin' ? 'Administrator' : currentUser?.role === 'auth' ? 'Auth Specialist' : 'Specialist',
-      title: 'Team Note',
+      role:
+        currentUser?.role === 'admin'
+          ? 'Administrator'
+          : currentUser?.role === 'auth'
+          ? 'Auth Specialist'
+          : 'Specialist',
+      title: messageTitle,
+      recipient: isTeamMention ? 'All Team' : targetUserObj?.name || targetTag || null,
+      targetedUser: targetTag,
       body: noteText.trim(),
       timestamp: 'Just now',
       unread: false,
+      mentions: mentionMatches
     };
 
-    setMessages(prev => [newNote, ...prev]);
+    setMessages((prev) => [newNote, ...prev]);
     setNoteText('');
+    setShowMentionPopup(false);
   };
 
-  const filteredMessages = messages.filter(m => {
+  const filteredMessages = messages.filter((m) => {
     if (activeTab === 'unread') return m.unread;
+    if (activeTab === 'mentions') {
+      return m.type === 'direct' || m.type === 'team' || (m.mentions && m.mentions.length > 0);
+    }
     if (activeTab === 'notes') return m.type === 'notes';
     return true;
   });
 
   return (
     <div className="message-box-wrapper" style={{ position: 'relative' }}>
-      {/* Trigger Button between HIPAA BAA and User Avatar */}
+      {/* Trigger Button in Header */}
       <button
         id="btn-message-box-trigger"
         ref={triggerRef}
         type="button"
         className={`message-box-trigger ${isOpen ? 'active' : ''}`}
-        onClick={() => setIsOpen(prev => !prev)}
-        aria-label="Message Box & Notifications"
+        onClick={() => setIsOpen((prev) => !prev)}
+        aria-label="Message Box & Communications"
         title="Message Box & Communications"
         aria-expanded={isOpen}
       >
         <span className="msg-icon-wrap" aria-hidden="true">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
           </svg>
-          {unreadCount > 0 && (
-            <span className="msg-badge-dot" aria-hidden="true" />
-          )}
+          {unreadCount > 0 && <span className="msg-badge-dot" aria-hidden="true" />}
         </span>
         <span className="msg-trigger-label hide-sm">Messages</span>
         {unreadCount > 0 && (
@@ -174,6 +452,10 @@ export function MessageBox() {
           className="message-box-popover"
           role="dialog"
           aria-label="Message Box Panel"
+          onMouseDown={(e) => {
+            // Prevent clicks inside popover from propagating
+            e.stopPropagation();
+          }}
         >
           {/* Header */}
           <div className="msg-popover-header">
@@ -227,10 +509,18 @@ export function MessageBox() {
               </button>
               <button
                 type="button"
+                className={`msg-tab-item ${activeTab === 'mentions' ? 'active' : ''}`}
+                onClick={() => setActiveTab('mentions')}
+                title="Direct messages & @mentions"
+              >
+                @Mentions ({mentionsCount})
+              </button>
+              <button
+                type="button"
                 className={`msg-tab-item ${activeTab === 'notes' ? 'active' : ''}`}
                 onClick={() => setActiveTab('notes')}
               >
-                Notes ({messages.filter(m => m.type === 'notes').length})
+                Notes ({notesCount})
               </button>
             </div>
           </div>
@@ -241,11 +531,13 @@ export function MessageBox() {
               <div className="msg-empty-state">
                 <div className="msg-empty-icon" aria-hidden="true">📭</div>
                 <div className="msg-empty-text">No messages in this tab.</div>
-                <span className="msg-empty-sub">System updates and specialist notes will appear here.</span>
+                <span className="msg-empty-sub">
+                  Type <strong>@</strong> below to mention a specialist or team member.
+                </span>
               </div>
             ) : (
               <ul className="msg-items-list">
-                {filteredMessages.map(msg => (
+                {filteredMessages.map((msg) => (
                   <li
                     key={msg.id}
                     className={`msg-item ${msg.unread ? 'is-unread' : ''}`}
@@ -254,7 +546,17 @@ export function MessageBox() {
                     <div className="msg-item-top">
                       <div className="msg-sender-info">
                         <span className={`msg-type-tag type-${msg.type}`}>
-                          {msg.type === 'audit' ? '📋 Audit' : msg.type === 'task' ? '👤 Queue' : msg.type === 'notes' ? '💬 Note' : '🛡️ System'}
+                          {msg.type === 'audit'
+                            ? '📋 Audit'
+                            : msg.type === 'task'
+                            ? '👤 Queue'
+                            : msg.type === 'direct'
+                            ? '🎯 Direct'
+                            : msg.type === 'team'
+                            ? '📢 Broadcast'
+                            : msg.type === 'notes'
+                            ? '💬 Note'
+                            : '🛡️ System'}
                         </span>
                         <span className="msg-sender-name">{msg.sender}</span>
                       </div>
@@ -271,8 +573,20 @@ export function MessageBox() {
                       </div>
                     </div>
 
+                    {/* Recipient banner */}
+                    {msg.recipient && (
+                      <div className="msg-recipient-banner">
+                        <span className="recipient-label">
+                          {msg.type === 'team' ? '📢 Broadcast To:' : '🎯 Sent To:'}
+                        </span>
+                        <span className="recipient-name">
+                          {msg.type === 'team' ? '@team (All Team)' : `@${msg.recipient}`}
+                        </span>
+                      </div>
+                    )}
+
                     <div className="msg-item-title">{msg.title}</div>
-                    <div className="msg-item-body">{msg.body}</div>
+                    <div className="msg-item-body">{renderMessageContent(msg.body)}</div>
 
                     {msg.unread && (
                       <span className="msg-unread-dot" title="Unread" aria-hidden="true" />
@@ -283,25 +597,61 @@ export function MessageBox() {
             )}
           </div>
 
-          {/* Quick Note Composer at Bottom */}
-          <form className="msg-popover-composer" onSubmit={handleSendNote}>
-            <input
-              type="text"
-              id="input-msg-quick-note"
-              className="msg-composer-input"
-              placeholder="Post a quick note or remark…"
-              value={noteText}
-              onChange={(e) => setNoteText(e.target.value)}
-            />
+          {/* Quick Mention Helper Pills */}
+          <div className="msg-quick-mentions-bar">
+            <span className="quick-mention-label">Quick Mention:</span>
             <button
-              type="submit"
-              className="msg-composer-send-btn"
-              disabled={!noteText.trim()}
-              title="Post note"
+              type="button"
+              className="quick-mention-chip chip-team"
+              onClick={() => handleQuickMention('team')}
+              title="Broadcast to all team members"
             >
-              Post ↗
+              📢 @team
             </button>
-          </form>
+            <button
+              type="button"
+              className="quick-mention-chip chip-user"
+              onClick={handleOpenUserSearch}
+              title="Type @ to search and mention users"
+            >
+              👤 @user
+            </button>
+            <span className="quick-mention-hint">Type @ for auto-complete</span>
+          </div>
+
+          {/* Composer Area with guaranteed relative positioning */}
+          <div className="msg-composer-outer-wrap">
+            {/* Floating Autocomplete Dropdown Popup */}
+            <MentionPopupDropdown
+              visible={showMentionPopup}
+              candidates={filteredCandidates}
+              selectedIndex={selectedIndex}
+              query={mentionQuery}
+              onSelect={handleSelectMention}
+            />
+
+            <form className="msg-popover-composer" onSubmit={handleSendNote}>
+              <input
+                ref={inputRef}
+                type="text"
+                id="input-msg-quick-note"
+                className="msg-composer-input"
+                placeholder="Message team... Type @ to mention user"
+                value={noteText}
+                onChange={handleInputChange}
+                onKeyDown={handleInputKeyDown}
+                autoComplete="off"
+              />
+              <button
+                type="submit"
+                className="msg-composer-send-btn"
+                disabled={!noteText.trim()}
+                title="Send note with @mention"
+              >
+                Send ↗
+              </button>
+            </form>
+          </div>
         </div>
       )}
     </div>
