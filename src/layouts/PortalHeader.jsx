@@ -1,6 +1,7 @@
 import React from 'react';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { CLIENTS } from '../data/clients';
+import { MessageBox } from '../components/common/MessageBox';
 
 export function PortalHeader() {
   const {
@@ -77,6 +78,7 @@ export function PortalHeader() {
             </svg>
             HIPAA BAA
           </span>
+          <MessageBox />
 
           <div className="user-profile-pill">
             <span className="user-avatar">{initials}</span>
