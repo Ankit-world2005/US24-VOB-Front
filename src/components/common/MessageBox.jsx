@@ -17,85 +17,17 @@ const FALLBACK_USERS = [
 
 const DEFAULT_MESSAGES = [
   {
-    id: 'msg-audit-1',
-    type: 'audit',
-    sender: 'Audit Specialist',
-    role: 'Quality Assurance',
-    title: 'Audit Queue Verified',
-    body: 'VOB record for Parker Rehabilitation passed QA audit and was handed back to specialist queue.',
-    timestamp: '15m ago',
-    unread: true,
-  },
-  {
-    id: 'msg-direct-ankit',
-    type: 'direct',
-    sender: 'Saurabh',
-    role: 'Administrator',
-    title: 'Direct Note to @AnkitKumar',
-    recipient: 'AnkitKumar',
-    targetedUser: 'AnkitKumar',
-    body: 'Please review priority eligibility cases for Namste clinic @AnkitKumar',
-    timestamp: '25m ago',
-    unread: true,
-    mentions: ['@AnkitKumar'],
-  },
-  {
-    id: 'msg-direct-sam',
-    type: 'direct',
-    sender: 'Manish V',
-    role: 'Administrator',
-    title: 'Direct Note to @SamSpecialist',
-    recipient: 'SamSpecialist',
-    targetedUser: 'SamSpecialist',
-    body: 'Please verify Banner Desert authorization queue cases @SamSpecialist',
-    timestamp: '35m ago',
-    unread: true,
-    mentions: ['@SamSpecialist'],
-  },
-  {
-    id: 'msg-direct-jitender',
-    type: 'direct',
-    sender: 'Saurabh',
-    role: 'Administrator',
-    title: 'Direct Note to @JitenderS',
-    recipient: 'JitenderS',
-    targetedUser: 'JitenderS',
-    body: 'Specialist queue priority dispatch update @JitenderS',
-    timestamp: '45m ago',
-    unread: true,
-    mentions: ['@JitenderS'],
-  },
-  {
-    id: 'msg-task-2',
-    type: 'task',
-    sender: 'System Allocation',
-    role: 'Automated Dispatch',
-    title: 'New Records Assigned',
-    body: 'You have new patient eligibility verifications assigned to your queue today.',
-    timestamp: '1h ago',
-    unread: false,
-  },
-  {
     id: 'msg-team-sample',
     type: 'team',
-    sender: 'Sam Specialist',
-    role: 'Specialist',
-    title: 'Team Announcement',
+    sender: 'Saurabh',
+    role: 'Administrator',
+    title: '📢 Team Announcement',
     recipient: 'All Team',
-    body: 'Hey @team all morning Arizona authorizations are verified and updated!',
-    timestamp: '2h ago',
-    unread: false,
-    mentions: ['@team'],
-  },
-  {
-    id: 'msg-sys-4',
-    type: 'system',
-    sender: 'HIPAA Security Bot',
-    role: 'Compliance',
-    title: 'BAA Security Verification',
-    body: 'Encrypted communication channel active under HIPAA Business Associate Agreement.',
+    body: 'Welcome team! Encrypted HIPAA-compliant communication channel is active.',
     timestamp: 'Today',
     unread: false,
+    mentions: ['@team'],
+    deletedFor: []
   }
 ];
 
@@ -120,13 +52,175 @@ function renderMessageContent(text) {
 
 
 /**
- * Determines whether a message should be visible to the current user.
- * - Team/Broadcast: visible to all.
- * - System/Audit: visible to all.
- * - Direct / @Mention: ONLY visible to the mentioned recipient AND the sender.
+ * Extract canonical identifying strings for a user (email, name, id, cleaned tokens)
+ */
+function getUserIdentifiers(user) {
+  if (!user) return [];
+  const keys = new Set();
+  if (user.id) keys.add(String(user.id).toLowerCase().trim());
+  if (user.email) {
+    const email = user.email.toLowerCase().trim();
+    keys.add(email);
+    keys.add(email.split('@')[0].replace(/[^a-zA-Z0-9]/g, ''));
+  }
+  if (user.name) {
+    const name = user.name.toLowerCase().trim();
+    keys.add(name);
+    keys.add(name.replace(/[^a-zA-Z0-9]/g, ''));
+  }
+  if (user.username) {
+    keys.add(user.username.toLowerCase().trim());
+  }
+  return Array.from(keys).filter(Boolean);
+}
+
+/**
+ * Check if a message has been deleted by/for the current user ("Delete for me").
+ * When User A deletes a message, it is hidden for User A ONLY.
+ * The other user (User B) continues to see the message in their message box!
+ */
+function isMessageDeletedByUser(msg, currentUser) {
+  if (!msg || !currentUser) return false;
+
+  const userKeys = getUserIdentifiers(currentUser);
+  if (userKeys.length === 0) return false;
+
+  // 1. Check if msg.deletedFor contains any of this user's identifiers
+  if (Array.isArray(msg.deletedFor) && msg.deletedFor.length > 0) {
+    const hasDeleted = msg.deletedFor.some((delKey) => {
+      const cleanDel = String(delKey).toLowerCase().trim();
+      return userKeys.includes(cleanDel);
+    });
+    if (hasDeleted) return true;
+  }
+
+  // 2. Check local user-specific deleted set in localStorage for instant local persistence
+  try {
+    const primaryKey = (currentUser.email || currentUser.name || 'user')
+      .replace(/[^a-zA-Z0-9]/g, '_')
+      .toLowerCase();
+    const stored = localStorage.getItem(`us24_deleted_msgs_${primaryKey}`);
+    if (stored) {
+      const list = JSON.parse(stored);
+      if (Array.isArray(list) && list.includes(msg.id)) {
+        return true;
+      }
+    }
+  } catch (e) {}
+
+  return false;
+}
+
+/**
+ * Strict recipient check:
+ * Returns true IF AND ONLY IF currentUser is the intended recipient of msg.
+ * The SENDER is NEVER considered a recipient.
+ */
+function isRecipientOfMessage(msg, currentUser) {
+  if (!msg || !currentUser) return false;
+
+  const currentName = (currentUser.name || '').toLowerCase().trim();
+  const currentEmail = (currentUser.email || '').toLowerCase().trim();
+  const senderName = (msg.sender || '').toLowerCase().trim();
+  const senderEmail = (msg.senderEmail || '').toLowerCase().trim();
+
+  // RULE 1: SENDER IS NEVER THE RECIPIENT
+  if (
+    senderName === 'me' ||
+    (currentName && senderName === currentName) ||
+    (currentEmail && senderEmail === currentEmail) ||
+    (currentUser.id && msg.senderId && msg.senderId === currentUser.id)
+  ) {
+    return false;
+  }
+
+  // RULE 2: Team / Broadcast messages (@team or @all) are received by team members
+  const isTeam =
+    msg.type === 'team' ||
+    msg.recipient === 'All Team' ||
+    msg.recipient === 'team' ||
+    (Array.isArray(msg.mentions) &&
+      msg.mentions.some((m) => {
+        const l = m.toLowerCase();
+        return l === '@team' || l === '@all';
+      }));
+  if (isTeam) {
+    return true;
+  }
+
+  const cleanUserTag = (currentUser.name || currentUser.email || '')
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .toLowerCase();
+  const userTagFromEmail = (currentUser.email || '')
+    .split('@')[0]
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .toLowerCase();
+
+  if (!cleanUserTag && !userTagFromEmail && !currentName) {
+    return false;
+  }
+
+  const recipientClean = (msg.recipient || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+  const targetedClean = (msg.targetedUser || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+
+  // RULE 3: Direct matching on recipient or targetedUser
+  if (
+    recipientClean &&
+    (recipientClean === cleanUserTag ||
+      recipientClean === userTagFromEmail ||
+      (msg.recipient || '').toLowerCase().trim() === currentName)
+  ) {
+    return true;
+  }
+  if (
+    targetedClean &&
+    (targetedClean === cleanUserTag || targetedClean === userTagFromEmail)
+  ) {
+    return true;
+  }
+
+  // RULE 4: Mentions array (e.g. ['@AnkitKumar'])
+  if (Array.isArray(msg.mentions) && msg.mentions.length > 0) {
+    const isMentioned = msg.mentions.some((m) => {
+      const clean = m.replace(/^@/, '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+      return clean === cleanUserTag || clean === userTagFromEmail;
+    });
+    if (isMentioned) return true;
+  }
+
+  // RULE 5: Inline text @tag match (requires minimum 3 characters)
+  if (msg.body && cleanUserTag.length >= 3) {
+    const bodyLower = msg.body.toLowerCase();
+    if (
+      bodyLower.includes('@' + cleanUserTag) ||
+      (userTagFromEmail.length >= 3 && bodyLower.includes('@' + userTagFromEmail)) ||
+      (currentName.length >= 3 && bodyLower.includes('@' + currentName.replace(/\s+/g, '')))
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Message list visibility check:
+ * A direct message is ONLY visible to:
+ * 1) The person to whom it was sent (recipient)
+ * 2) The person who sent it (author/sender)
+ * No one else can see it.
+ *
+ * CRITICAL RULE: If currentUser deleted this message ("Delete for me"),
+ * it is hidden from currentUser ONLY.
+ * The message remains completely untouched in the other user's message box!
  */
 function isMessageVisibleToUser(msg, currentUser) {
-  if (!currentUser) return false;
+  if (!msg || !currentUser) return false;
+
+  // RULE 0: If current user deleted this message, hide it from their box!
+  if (isMessageDeletedByUser(msg, currentUser)) {
+    return false;
+  }
 
   // 1. Team / Broadcast messages are visible to everyone
   const isTeam =
@@ -140,158 +234,97 @@ function isMessageVisibleToUser(msg, currentUser) {
       }));
   if (isTeam) return true;
 
-  // 2. System / Audit queue alerts are visible to all staff
-  if (msg.type === 'system' || msg.type === 'audit' || msg.type === 'task') {
-    return true;
-  }
+  const currentName = (currentUser.name || '').toLowerCase().trim();
+  const currentEmail = (currentUser.email || '').toLowerCase().trim();
+  const senderName = (msg.sender || '').toLowerCase().trim();
+  const senderEmail = (msg.senderEmail || '').toLowerCase().trim();
 
-  const userCleanTag = (currentUser.name || currentUser.email || '')
-    .replace(/[^a-zA-Z0-9]/g, '')
-    .toLowerCase();
-  const userNameLower = (currentUser.name || '').toLowerCase().trim();
-  const userEmailLower = (currentUser.email || '').toLowerCase().trim();
-
-  // 3. Sender always sees their own sent message
-  const senderNameLower = (msg.sender || '').toLowerCase().trim();
-  const senderEmailLower = (msg.senderEmail || '').toLowerCase().trim();
+  // 2. Sender sees their own sent message (unless deleted by sender)
   if (
-    msg.sender === 'Me' ||
-    (senderNameLower && senderNameLower === userNameLower) ||
-    (senderEmailLower && senderEmailLower === userEmailLower) ||
-    msg.senderId === currentUser.id
+    (currentName && senderName === currentName) ||
+    (currentEmail && senderEmail === currentEmail) ||
+    (currentUser.id && msg.senderId && msg.senderId === currentUser.id)
   ) {
     return true;
   }
 
-  // 4. Recipient matching (targeted user or recipient field)
-  const recipientClean = (msg.recipient || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-  const targetedClean = (msg.targetedUser || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-
-  if (recipientClean && (recipientClean === userCleanTag || (msg.recipient || '').toLowerCase().trim() === userNameLower)) {
+  // 3. Recipient sees the message (unless deleted by recipient)
+  if (isRecipientOfMessage(msg, currentUser)) {
     return true;
   }
 
-  if (targetedClean && targetedClean === userCleanTag) {
-    return true;
-  }
-
-  // 5. Check mentions array (e.g. ['@AnkitKumar'])
-  if (Array.isArray(msg.mentions) && msg.mentions.length > 0) {
-    const isMentioned = msg.mentions.some((m) => {
-      const clean = m.replace(/^@/, '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-      return clean === userCleanTag || clean === recipientClean;
-    });
-    if (isMentioned) return true;
-  }
-
-  // 6. Check body text for @cleanTag
-  if (msg.body) {
-    const bodyLower = msg.body.toLowerCase();
-    if (
-      bodyLower.includes('@' + userCleanTag) ||
-      (userNameLower && bodyLower.includes('@' + userNameLower.replace(/\s+/g, '')))
-    ) {
-      return true;
-    }
-  }
-
-  // Hidden for everyone else - strictly private
-  return false;
-}
-
-/**
- * Checks if a notification alert popup belongs to the currently logged-in user.
- * Alert will ONLY trigger if the currentUser was the one mentioned / targeted!
- */
-function isNotificationForUser(notif, currentUser) {
-  if (!notif || !currentUser) return false;
-
-  // Delivery receipt for the sender
-  if (notif.isSenderReceipt) {
-    return true;
-  }
-
-  // Team broadcast alerts everyone
-  const isTeam =
-    notif.type === 'team' ||
-    notif.recipient === 'All Team' ||
-    (Array.isArray(notif.mentions) &&
-      notif.mentions.some((m) => {
-        const l = m.toLowerCase();
-        return l === '@team' || l === '@all';
-      }));
-  if (isTeam) return true;
-
-  const userCleanTag = (currentUser.name || currentUser.email || '')
-    .replace(/[^a-zA-Z0-9]/g, '')
-    .toLowerCase();
-  const userNameLower = (currentUser.name || '').toLowerCase().trim();
-
-  const recipientClean = (notif.recipient || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-  const targetedClean = (notif.targetedUser || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-
-  if (recipientClean === userCleanTag || (notif.recipient || '').toLowerCase().trim() === userNameLower) {
-    return true;
-  }
-  if (targetedClean === userCleanTag) {
-    return true;
-  }
-
-  if (Array.isArray(notif.mentions)) {
-    const isMentioned = notif.mentions.some((m) => {
-      const clean = m.replace(/^@/, '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-      return clean === userCleanTag;
-    });
-    if (isMentioned) return true;
-  }
-
-  if (notif.body) {
-    const bodyLower = notif.body.toLowerCase();
-    if (bodyLower.includes('@' + userCleanTag)) {
-      return true;
-    }
-  }
-
+  // Strictly hidden for all other users
   return false;
 }
 
 export function MessageBox() {
   const { currentUser } = useWorkspace();
+  // Unique instance ID for this browser tab to prevent any self-notifications
+  const tabId = useMemo(() => 'tab-' + Math.random().toString(36).slice(2, 9), []);
   const [isOpen, setIsOpen] = useState(false);
   const [activeNotification, setActiveNotification] = useState(null);
 
-  // Notification popup triggers ONLY if targeted/mentioned user matches currentUser
+  // Notification popup triggers ONLY if currentUser is the RECIPIENT (never sender)
   const triggerNotification = (notif) => {
     if (!notif) return;
-    if (isNotificationForUser(notif, currentUser)) {
+    if (isRecipientOfMessage(notif, currentUser)) {
       setActiveNotification(notif);
     }
   };
 
-  // Welcome / initial notification on page load
+  // Listen for real-time messages across browser tabs/windows
   useEffect(() => {
-    const timer = setTimeout(() => {
-      const alreadyShown = sessionStorage.getItem('us24_msg_notif_welcomed');
-      if (!alreadyShown) {
-        sessionStorage.setItem('us24_msg_notif_welcomed', 'true');
-        const tag = (currentUser?.name || 'AnkitKumar').replace(/[^a-zA-Z0-9]/g, '');
-        triggerNotification({
-          id: 'notif-welcome-priority',
-          type: 'direct',
-          sender: 'Saurabh',
-          role: 'Administrator',
-          title: 'Direct Note to @' + tag,
-          recipient: currentUser?.name || 'You',
-          targetedUser: tag,
-          body: 'Please review priority eligibility cases for Namste clinic @' + tag,
-          timestamp: 'Just now',
-          unread: true,
-          mentions: ['@' + tag]
-        });
+    let bc;
+    try {
+      bc = new BroadcastChannel('us24_messages_channel');
+      bc.onmessage = (event) => {
+        if (event.data?.type === 'MESSAGE_SENT' && event.data.message) {
+          const incoming = event.data.message;
+
+          // HARD GUARD 1: If message was sent from this exact tab -> NEVER notify
+          if (incoming.originTabId && incoming.originTabId === tabId) {
+            return;
+          }
+
+          // HARD GUARD 2: If message was sent by currentUser -> NEVER notify sender
+          const myName = (currentUser?.name || '').toLowerCase().trim();
+          const myEmail = (currentUser?.email || '').toLowerCase().trim();
+          const sName = (incoming.sender || '').toLowerCase().trim();
+          const sEmail = (incoming.senderEmail || '').toLowerCase().trim();
+
+          if (
+            sName === 'me' ||
+            (myName && sName === myName) ||
+            (myEmail && sEmail === myEmail) ||
+            (currentUser?.id && incoming.senderId === currentUser.id)
+          ) {
+            return;
+          }
+
+          // HARD GUARD 3: Alert ONLY if currentUser is strictly the RECIPIENT
+          if (isRecipientOfMessage(incoming, currentUser)) {
+            setMessages((prev) => [incoming, ...prev.filter((m) => m.id !== incoming.id)]);
+            setActiveNotification(incoming);
+          }
+        }
+      };
+    } catch (e) {}
+
+    const handleStorage = (e) => {
+      if (e.key === 'us24_message_box_items_v4' && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          setMessages(parsed);
+        } catch {}
       }
-    }, 2500);
-    return () => clearTimeout(timer);
-  }, [currentUser?.name]);
+    };
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      if (bc) bc.close();
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, [currentUser]);
   const [activeTab, setActiveTab] = useState('all'); // 'all' | 'unread' | 'mentions' | 'notes'
   const [noteText, setNoteText] = useState('');
   
@@ -358,21 +391,25 @@ export function MessageBox() {
 
   const handleTestNotification = () => {
     const myTag = (currentUser?.name || 'AnkitKumar').replace(/[^a-zA-Z0-9]/g, '');
+    // Simulates an incoming note sent TO currentUser from Saurabh
     const testNotif = {
       id: 'notif-test-' + Date.now(),
       type: 'direct',
       sender: 'Saurabh',
+      senderEmail: 'saurabh@us24solutions.com',
       role: 'Administrator',
       title: 'Direct Note to @' + myTag,
       recipient: currentUser?.name || 'Ankit Kumar',
       targetedUser: myTag,
-      body: 'Urgent case #VOB-8921 requires verification sign-off @' + myTag,
+      body: 'Urgent priority case verification requested @' + myTag,
       timestamp: 'Just now',
       unread: true,
-      mentions: ['@' + myTag]
+      mentions: ['@' + myTag],
+      deletedFor: []
     };
     setMessages((prev) => [testNotif, ...prev]);
-    triggerNotification(testNotif);
+    // Triggers notification popup specifically for currentUser because they are the recipient!
+    setActiveNotification(testNotif);
   };
 
   const handleOpenFromNotification = (notif) => {
@@ -393,7 +430,7 @@ export function MessageBox() {
   // Persisted messages
   const [messages, setMessages] = useState(() => {
     try {
-      const saved = localStorage.getItem('us24_message_box_items');
+      const saved = localStorage.getItem('us24_message_box_items_v4');
       if (saved) return JSON.parse(saved);
     } catch {}
     return DEFAULT_MESSAGES;
@@ -401,7 +438,7 @@ export function MessageBox() {
 
   useEffect(() => {
     try {
-      localStorage.setItem('us24_message_box_items', JSON.stringify(messages));
+      localStorage.setItem('us24_message_box_items_v4', JSON.stringify(messages));
     } catch {}
   }, [messages]);
 
@@ -455,9 +492,8 @@ export function MessageBox() {
   }, [isOpen, showMentionPopup]);
 
   // Filter messages visible ONLY to current user (mentioned recipient, author, or team broadcast)
-  const visibleMessages = useMemo(() => {
-    return messages.filter((m) => isMessageVisibleToUser(m, currentUser));
-  }, [messages, currentUser]);
+  // Always compute fresh per-render based on active currentUser to guarantee privacy
+  const visibleMessages = messages.filter((m) => isMessageVisibleToUser(m, currentUser));
 
   const unreadCount = visibleMessages.filter((m) => m.unread).length;
   const mentionsCount = visibleMessages.filter(
@@ -473,9 +509,45 @@ export function MessageBox() {
     setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, unread: false } : m)));
   };
 
+  // Independent "Delete for me" deletion:
+  // When User A deletes a message, it is hidden from User A's message box ONLY.
+  // The other user (User B) continues to see the message in their message box!
   const deleteMessage = (id, e) => {
-    e.stopPropagation();
-    setMessages((prev) => prev.filter((m) => m.id !== id));
+    if (e && typeof e.stopPropagation === 'function') {
+      e.stopPropagation();
+    }
+
+    const userKeys = getUserIdentifiers(currentUser);
+    const primaryKey = (currentUser?.email || currentUser?.name || 'user')
+      .replace(/[^a-zA-Z0-9]/g, '_')
+      .toLowerCase();
+
+    // 1. Store in user-specific localStorage for instant "Delete for me" persistence
+    try {
+      const storageKey = `us24_deleted_msgs_${primaryKey}`;
+      const saved = localStorage.getItem(storageKey);
+      const list = saved ? JSON.parse(saved) : [];
+      if (!list.includes(id)) {
+        list.push(id);
+        localStorage.setItem(storageKey, JSON.stringify(list));
+      }
+    } catch (err) {}
+
+    // 2. Update message in shared state with deletedFor array
+    // This marks it deleted for this specific user, while leaving it untouched for the other user!
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m.id === id) {
+          const prevDeleted = Array.isArray(m.deletedFor) ? m.deletedFor : [];
+          const updatedDeleted = Array.from(new Set([...prevDeleted, ...userKeys]));
+          return {
+            ...m,
+            deletedFor: updatedDeleted
+          };
+        }
+        return m;
+      })
+    );
   };
 
   // Insert mention into input WITHOUT closing the entire message box
@@ -609,13 +681,14 @@ export function MessageBox() {
     const messageTitle = isTeamMention
       ? '📢 Team Broadcast'
       : targetUserObj
-      ? `Direct to @${targetUserObj.name}`
+      ? 'Direct to @' + targetUserObj.name
       : targetTag
-      ? `Direct to @${targetTag}`
+      ? 'Direct to @' + targetTag
       : 'Team Note';
 
     const newNote = {
-      id: `msg-note-${Date.now()}`,
+      id: 'msg-note-' + Date.now(),
+      originTabId: tabId, // Tag message with sender tab ID
       type: messageType,
       sender: currentUser?.name || 'Me',
       senderEmail: currentUser?.email,
@@ -631,57 +704,25 @@ export function MessageBox() {
       targetedUser: targetTag,
       body: noteText.trim(),
       timestamp: 'Just now',
-      unread: false,
-      mentions: mentionMatches
+      unread: true, // Recipient will see it as unread
+      mentions: mentionMatches,
+      deletedFor: []
     };
 
+    // Add to state and save
     setMessages((prev) => [newNote, ...prev]);
     setNoteText('');
     setShowMentionPopup(false);
 
-    // Instant dispatch notification popup
-    triggerNotification({
-      id: 'notif-sent-' + Date.now(),
-      type: messageType,
-      sender: currentUser?.name || 'Me',
-      role: 'Sent Message',
-      title: isTeamMention
-        ? '📢 Broadcast Dispatched to @team'
-        : targetUserObj
-        ? '🎯 Note Sent to @' + targetUserObj.name
-        : '💬 Message Dispatched',
-      recipient: isTeamMention ? 'All Team' : targetUserObj?.name || targetTag,
-      body: noteText.trim(),
-      timestamp: 'Just now',
-      mentions: mentionMatches
-    });
+    // Broadcast in real-time to other tabs/windows
+    // The recipient tab will receive this and show the notification popup!
+    try {
+      const bc = new BroadcastChannel('us24_messages_channel');
+      bc.postMessage({ type: 'MESSAGE_SENT', message: newNote });
+      setTimeout(() => bc.close(), 100);
+    } catch (err) {}
 
-    // Simulated incoming reply notification popup after 2.5s
-    setTimeout(() => {
-      const responder = isTeamMention
-        ? { name: 'Sam Specialist', role: 'Specialist' }
-        : targetUserObj
-        ? { name: targetUserObj.name, role: targetUserObj.role === 'admin' ? 'Administrator' : 'Specialist' }
-        : { name: 'Saurabh', role: 'Administrator' };
-
-      const myTag = (currentUser?.name || 'Specialist').replace(/[^a-zA-Z0-9]/g, '');
-      const replyMsg = {
-        id: 'msg-reply-' + Date.now(),
-        type: isTeamMention ? 'team' : 'direct',
-        sender: responder.name,
-        role: responder.role,
-        title: 'Reply from ' + responder.name,
-        recipient: currentUser?.name || 'Me',
-        targetedUser: myTag,
-        body: 'Received your note @' + myTag + '! Reviewing and updating verification now.',
-        timestamp: 'Just now',
-        unread: true,
-        mentions: ['@' + myTag]
-      };
-
-      setMessages((prev) => [replyMsg, ...prev]);
-      triggerNotification(replyMsg);
-    }, 2500);
+    // SENDER DOES NOT GET THE NOTIFICATION POPUP (Only the recipient does!)
   };
 
   const filteredMessages = visibleMessages.filter((m) => {
@@ -837,7 +878,7 @@ export function MessageBox() {
               </div>
             ) : (
               <ul className="msg-items-list">
-                {filteredMessages.map((msg) => (
+                {filteredMessages.filter((msg) => isMessageVisibleToUser(msg, currentUser)).map((msg) => (
                   <li
                     key={msg.id}
                     className={`msg-item ${msg.unread ? 'is-unread' : ''}`}
@@ -865,7 +906,7 @@ export function MessageBox() {
                         <button
                           type="button"
                           className="msg-delete-btn"
-                          title="Dismiss message"
+                          title="Delete for me"
                           onClick={(e) => deleteMessage(msg.id, e)}
                         >
                           ×
@@ -875,12 +916,17 @@ export function MessageBox() {
 
                     {/* Recipient banner (Private targeting) */}
                     {msg.recipient && (
-                      <div className="msg-recipient-banner">
-                        <span className="recipient-label">
-                          {msg.type === 'team' ? '📢 Broadcast To:' : '🔒 Private To:'}
-                        </span>
-                        <span className="recipient-name">
-                          {msg.type === 'team' ? '@team (All Team)' : `@${msg.recipient}`}
+                      <div className="msg-recipient-banner" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 8px', borderRadius: '4px', background: msg.type === 'team' ? 'rgba(249, 115, 22, 0.08)' : 'rgba(6, 72, 192, 0.06)', margin: '4px 0 6px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span className="recipient-label" style={{ fontWeight: 600, fontSize: '11px', color: msg.type === 'team' ? '#c2410c' : '#0648c0' }}>
+                            {msg.type === 'team' ? '📢 Team Broadcast:' : '🔒 Private To:'}
+                          </span>
+                          <span className="recipient-name" style={{ fontWeight: 700, fontSize: '11.5px', color: msg.type === 'team' ? '#ea580c' : '#0284c7' }}>
+                            {msg.type === 'team' ? '@team (All Team)' : `@${msg.recipient}`}
+                          </span>
+                        </div>
+                        <span style={{ fontSize: '10px', color: '#64748b' }}>
+                          {msg.type === 'team' ? 'Visible to Team' : 'Only recipient & sender can view'}
                         </span>
                         {msg.sender === (currentUser?.name || 'Me') && (
                           <span
