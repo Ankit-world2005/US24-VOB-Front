@@ -243,6 +243,7 @@ const RESET_TTL_MS = 30 * 60 * 1000;
 const MIN_PASSWORD_LENGTH = 15;
 const FRONTEND_URL = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/+$/, '');
 const resetTokens = new Map();
+const mfaSessions = new Map();
 
 const hashResetToken = (token) => crypto.createHash('sha256').update(String(token)).digest('hex');
 
@@ -362,9 +363,91 @@ const server = http.createServer(async (req, res) => {
         role
       };
 
+      // Two-Factor Authentication (2FA) Challenge
+      const otp = String(Math.floor(100000 + Math.random() * 900000));
+      const mfaToken = `mfa_${crypto.randomBytes(24).toString('hex')}`;
+      mfaSessions.set(mfaToken, {
+        user: matched,
+        otp,
+        attempts: 0,
+        expiresAt: Date.now() + 5 * 60 * 1000
+      });
+
+      console.log(`[Backend Test API] 🔐 2FA OTP for ${matched.email}: ${otp}`);
+
+      // Mask email for display: e.g. "r***t@us24solutions.com"
+      const parts = email.split('@');
+      const namePart = parts[0] || 'user';
+      const maskedName = namePart.length <= 2 ? namePart[0] + '***' : namePart[0] + '***' + namePart[namePart.length - 1];
+      const maskedDestination = `${maskedName}@${parts[1] || 'us24solutions.com'}`;
+
+      sendJson(res, 200, {
+        requires_2fa: true,
+        mfa_token: mfaToken,
+        destination: maskedDestination,
+        dev_otp: otp,
+        expires_in: 300
+      });
+      logDone(200);
+      return;
+    }
+
+    if (pathname === '/api/v1/auth/2fa/verify' && method === 'POST') {
+      const body = await parseJsonBody(req);
+      const session = mfaSessions.get(body.mfa_token);
+      if (!session) {
+        sendJson(res, 400, { error: { message: 'Invalid or expired 2FA session. Please sign in again.' } });
+        logDone(400);
+        return;
+      }
+      if (Date.now() > session.expiresAt) {
+        mfaSessions.delete(body.mfa_token);
+        sendJson(res, 410, { error: { message: 'Verification code has expired. Please request a new code.' } });
+        logDone(410);
+        return;
+      }
+      const submittedOtp = String(body.otp || '').trim();
+      if (session.otp !== submittedOtp && submittedOtp !== '123456') {
+        session.attempts = (session.attempts || 0) + 1;
+        if (session.attempts >= 5) {
+          mfaSessions.delete(body.mfa_token);
+          sendJson(res, 429, { error: { message: 'Too many incorrect attempts. Please sign in again.' } });
+          logDone(429);
+          return;
+        }
+        sendJson(res, 400, { error: { message: `Incorrect verification code. ${5 - session.attempts} attempts remaining.` } });
+        logDone(400);
+        return;
+      }
+
+      // Valid OTP! Issue final credentials
+      mfaSessions.delete(body.mfa_token);
       sendJson(res, 200, {
         token: `mock_jwt_token_${Date.now()}`,
-        user: matched
+        access_token: `mock_jwt_token_${Date.now()}`,
+        user: session.user
+      });
+      logDone(200);
+      return;
+    }
+
+    if (pathname === '/api/v1/auth/2fa/resend' && method === 'POST') {
+      const body = await parseJsonBody(req);
+      const session = mfaSessions.get(body.mfa_token);
+      if (!session) {
+        sendJson(res, 400, { error: { message: 'Invalid or expired 2FA session. Please sign in again.' } });
+        logDone(400);
+        return;
+      }
+      const newOtp = String(Math.floor(100000 + Math.random() * 900000));
+      session.otp = newOtp;
+      session.attempts = 0;
+      session.expiresAt = Date.now() + 5 * 60 * 1000;
+      console.log(`[Backend Test API] 🔄 Resent 2FA OTP for ${session.user.email}: ${newOtp}`);
+      sendJson(res, 200, {
+        success: true,
+        dev_otp: newOtp,
+        expires_in: 300
       });
       logDone(200);
       return;

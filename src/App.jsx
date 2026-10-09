@@ -22,6 +22,10 @@ export function App() {
     setError,
     clearError,
     login,
+    mfaChallenge,
+    setMfaChallenge,
+    verify2Fa,
+    resend2Fa,
     logout,
     isLocked,
     secondsRemaining
@@ -85,6 +89,10 @@ export function App() {
 
   return (
     <LoginPage
+      mfaChallenge={mfaChallenge}
+      onVerify2Fa={verify2Fa}
+      onResend2Fa={resend2Fa}
+      onCancel2Fa={() => setMfaChallenge(null)}
       rememberedEmail={rememberedEmail}
       loading={loading}
       error={

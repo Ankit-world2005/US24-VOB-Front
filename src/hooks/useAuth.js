@@ -67,6 +67,7 @@ export function useAuth() {
 
   const [secondsRemaining, setSecondsRemaining] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [mfaChallenge, setMfaChallenge] = useState(null);
   const [error, setError] = useState('');
 
   // Update lockout countdown ticker
@@ -140,8 +141,16 @@ export function useAuth() {
         throw apiErr;
       }
 
-      if (authResponse?.access_token) {
-        apiClient.setToken(authResponse.access_token, remember);
+      // 2FA Challenge check
+      if (authResponse?.requires_2fa === true) {
+        setMfaChallenge(authResponse);
+        setLoading(false);
+        return { requires2fa: true, mfaChallenge: authResponse };
+      }
+
+      const receivedToken = authResponse?.access_token || authResponse?.token;
+      if (receivedToken) {
+        apiClient.setToken(receivedToken, remember);
         if (authResponse.refresh_token) {
           apiClient.setRefreshToken(authResponse.refresh_token, remember);
         }
@@ -162,7 +171,7 @@ export function useAuth() {
           email: authResponse.user?.email || cleanEmail,
           name: authResponse.user?.name || cleanEmail.split('@')[0],
           role: authResponse.user?.role || 'user',
-          token: authResponse.access_token,
+          token: receivedToken,
           at: Date.now()
         };
 
@@ -183,6 +192,77 @@ export function useAuth() {
       return false;
     }
   }, [lockState]);
+
+  const verify2Fa = useCallback(
+    async ({ mfaToken, otp, remember, fallbackEmail }) => {
+      setError('');
+      setLoading(true);
+      try {
+        const authResponse = await authApi.verify2Fa({ mfaToken, otp });
+        const token = authResponse?.access_token || authResponse?.token;
+        if (token) {
+          apiClient.setToken(token, remember);
+          if (authResponse.refresh_token) {
+            apiClient.setRefreshToken(authResponse.refresh_token, remember);
+          }
+          saveLock({ attempts: 0, until: 0 });
+
+          const email = authResponse.user?.email || fallbackEmail || rememberedEmail;
+          if (typeof window !== 'undefined') {
+            if (remember && email) {
+              storage.set(window.localStorage, EMAIL_KEY, email);
+              setRememberedEmail(email);
+            }
+          }
+
+          const newSession = {
+            id: authResponse.user?.id,
+            email: authResponse.user?.email || email,
+            name: authResponse.user?.name || email?.split('@')[0],
+            role: authResponse.user?.role || 'user',
+            token,
+            at: Date.now()
+          };
+
+          if (typeof window !== 'undefined') {
+            storage.set(window.sessionStorage, SESSION_KEY, JSON.stringify(newSession));
+          }
+
+          setSession(newSession);
+          setMfaChallenge(null);
+          setLoading(false);
+          return true;
+        }
+        throw new Error('Verification did not return a valid session token.');
+      } catch (err) {
+        console.error('2FA Verification error:', err);
+        const msg =
+          err?.data?.error?.message ||
+          err?.message ||
+          'Invalid verification code. Please try again.';
+        setError(msg);
+        setLoading(false);
+        throw err;
+      }
+    },
+    [rememberedEmail]
+  );
+
+  const resend2Fa = useCallback(async ({ mfaToken }) => {
+    setError('');
+    try {
+      const res = await authApi.resend2Fa({ mfaToken });
+      if (res?.dev_otp || res?.devOtp) {
+        setMfaChallenge((prev) => ({ ...prev, dev_otp: res.dev_otp || res.devOtp }));
+      }
+      return res;
+    } catch (err) {
+      const msg =
+        err?.data?.error?.message || err?.message || 'Failed to resend code. Please try again.';
+      setError(msg);
+      throw err;
+    }
+  }, []);
 
   const logout = useCallback(() => {
     try {
@@ -230,6 +310,10 @@ export function useAuth() {
     clearError,
     login,
     logout,
+    mfaChallenge,
+    setMfaChallenge,
+    verify2Fa,
+    resend2Fa,
     isLocked: secondsRemaining > 0,
     secondsRemaining
   };

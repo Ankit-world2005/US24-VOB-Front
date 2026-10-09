@@ -10,6 +10,26 @@ export const authApi = {
     });
   },
 
+  // POST /api/v1/auth/2fa/verify
+  // Validates the 6-digit OTP code against issued mfa_token
+  verify2Fa({ mfaToken, otp }) {
+    return apiClient.request({
+      path: '/api/v1/auth/2fa/verify',
+      method: 'POST',
+      data: { mfa_token: mfaToken, otp }
+    });
+  },
+
+  // POST /api/v1/auth/2fa/resend
+  // Requests a fresh OTP code for an active mfa session
+  resend2Fa({ mfaToken }) {
+    return apiClient.request({
+      path: '/api/v1/auth/2fa/resend',
+      method: 'POST',
+      data: { mfa_token: mfaToken }
+    });
+  },
+
   // GET /api/v1/auth/me
   //
   // Takes no argument on purpose: the server resolves the caller from the bearer
