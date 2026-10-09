@@ -3,7 +3,7 @@
 const API_BASE_URL =
   (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE_URL !== undefined)
     ? import.meta.env.VITE_API_BASE_URL
-    : (typeof window !== 'undefined' ? '' : 'http://localhost:8000');
+    : (typeof window !== 'undefined' ? '' : 'http://127.0.0.1:8000');
 const TOKEN_KEY = 'us24-token';
 const REFRESH_KEY = 'us24-refresh';
 
@@ -29,6 +29,14 @@ let refreshInFlight = null;
 
 // Why the last refresh was refused, for the sign-in page to explain.
 let refreshRefusal = null;
+
+// High-performance in-memory cache & request deduplication for idempotent GET reads
+const readCache = new Map();
+const inFlightRequests = new Map();
+
+export function clearApiCache() {
+  readCache.clear();
+}
 
 // A read the server could not serve for a moment — busy (503), or a gateway
 // error — is tried again after these waits, or after the server's Retry-After.
@@ -86,6 +94,8 @@ export const apiClient = {
   clearToken() {
     memoryToken = null;
     memoryRefresh = null;
+    readCache.clear();
+    inFlightRequests.clear();
     if (typeof window !== 'undefined') {
       try {
         window.sessionStorage.removeItem(TOKEN_KEY);
@@ -176,17 +186,53 @@ export const apiClient = {
   /**
    * Sends a request to the backend API, trying a read again when the server
    * could not serve it for a moment (see READ_RETRY_DELAYS_MS).
+   * Automatically deduplicates parallel in-flight GET requests and caches reads for 15s.
    */
   async request(opts) {
-    for (let attempt = 0; ; attempt += 1) {
-      try {
-        return await this.send(opts);
-      } catch (err) {
-        const delay = READ_RETRY_DELAYS_MS[attempt];
-        if ((opts.method || 'GET') !== 'GET' || delay === undefined || !isTransient(err)) throw err;
-        await sleep(Math.min(err.retryAfterMs || delay, MAX_RETRY_WAIT_MS));
+    const method = (opts.method || 'GET').toUpperCase();
+
+    // Mutations invalidate the read cache so fresh data is guaranteed
+    if (method !== 'GET') {
+      readCache.clear();
+      return this.send(opts);
+    }
+
+    // Build unique cache key based on path, params and headers
+    const cacheKey = JSON.stringify({ path: opts.path, params: opts.params, headers: opts.headers });
+
+    // Check fresh cache entry (15 seconds TTL) unless caller requests skipCache
+    if (!opts.skipCache) {
+      const cached = readCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < 15000) {
+        return cached.data;
       }
     }
+
+    // Deduplicate concurrent in-flight requests (e.g. parallel /auth/me or /users calls)
+    if (inFlightRequests.has(cacheKey)) {
+      return inFlightRequests.get(cacheKey);
+    }
+
+    const promise = (async () => {
+      try {
+        for (let attempt = 0; ; attempt += 1) {
+          try {
+            const result = await this.send(opts);
+            readCache.set(cacheKey, { data: result, timestamp: Date.now() });
+            return result;
+          } catch (err) {
+            const delay = READ_RETRY_DELAYS_MS[attempt];
+            if (delay === undefined || !isTransient(err)) throw err;
+            await sleep(Math.min(err.retryAfterMs || delay, MAX_RETRY_WAIT_MS));
+          }
+        }
+      } finally {
+        inFlightRequests.delete(cacheKey);
+      }
+    })();
+
+    inFlightRequests.set(cacheKey, promise);
+    return promise;
   },
 
   /**

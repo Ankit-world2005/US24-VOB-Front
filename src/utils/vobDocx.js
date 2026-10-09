@@ -1,4 +1,3 @@
-import * as XLSX from 'xlsx';
 import { vobFormRows, shownValue } from './vobFormRows';
 
 /**
@@ -71,7 +70,8 @@ export function fillDocumentXml(xml, formData) {
 }
 
 /** The filled .docx, as bytes, from the template's bytes. */
-export function fillVobTemplate(templateBytes, formData) {
+export async function fillVobTemplate(templateBytes, formData) {
+  const XLSX = await import('xlsx');
   const { CFB } = XLSX;
   const zip = CFB.read(templateBytes, { type: 'buffer' });
   const doc = CFB.find(zip, '/word/document.xml');

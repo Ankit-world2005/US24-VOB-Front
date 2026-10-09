@@ -25,7 +25,7 @@ export function SpecialistDashboardView() {
       vobsApi.getVobs({
         assigneeId: currentUser?.email,
         status: isAuditSpecialist ? ['Assigned', 'In Progress'] : 'Assigned',
-        limit: 100
+        limit: 50
       })
     ]).then(([sumData, list]) => {
       setSummary(sumData);

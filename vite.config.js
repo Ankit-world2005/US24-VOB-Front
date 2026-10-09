@@ -5,7 +5,8 @@ import path from 'node:path';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
-  const backendTarget = (env.BACKEND_URL || env.VITE_BACKEND_URL || 'http://localhost:8000').replace(/\/+$/, '');
+  const rawTarget = env.BACKEND_URL || env.VITE_BACKEND_URL || 'http://127.0.0.1:8000';
+  const backendTarget = rawTarget.replace('//localhost:', '//127.0.0.1:').replace(/\/+$/, '');
 
   console.log(`[Vite] Proxying API routes to backend: ${backendTarget}`);
 
@@ -53,14 +54,13 @@ export default defineConfig(({ mode }) => {
         input: path.resolve(__dirname, 'public/index.html'),
         output: {
           manualChunks: {
-            'vendor-react': ['react', 'react-dom'],
-            'vendor-xlsx': ['xlsx']
+            'vendor-react': ['react', 'react-dom']
           }
         }
       }
     },
     optimizeDeps: {
-      include: ['react', 'react-dom', 'xlsx']
+      include: ['react', 'react-dom']
     },
     server: {
       port: 3000,

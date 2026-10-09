@@ -39,7 +39,7 @@ export function DocumentGeneratorModal({ vob, isOpen, onClose }) {
     try {
       const res = await fetch(templateUrl);
       if (!res.ok) throw new Error('Could not load the VOB form template.');
-      const bytes = fillVobTemplate(new Uint8Array(await res.arrayBuffer()), record);
+      const bytes = await fillVobTemplate(new Uint8Array(await res.arrayBuffer()), record);
       const filename = vobDocxFilename({
         client: vob.clientName,
         insurance: record.insurance,

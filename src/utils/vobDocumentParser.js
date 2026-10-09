@@ -1,4 +1,3 @@
-import * as XLSX from 'xlsx';
 import { vobFormRows } from './vobFormRows';
 import { DOCX_TYPE } from './vobDocx';
 
@@ -118,9 +117,10 @@ function textOf(xml) {
  * table with the template's rows and cells) is read cell by cell, each cell
  * against its own labels; any other is read as running text.
  */
-export function readVobDocx(bytes) {
+export async function readVobDocx(bytes) {
   let xml;
   try {
+    const XLSX = await import('xlsx');
     const zip = XLSX.CFB.read(bytes, { type: 'buffer' });
     const doc = XLSX.CFB.find(zip, '/word/document.xml');
     if (!doc) throw new Error('no body');
@@ -195,7 +195,7 @@ export async function readVobDocument(file) {
     throw new Error('This file is over 10 MB, too big to be a VOB. Check it is the right file.');
   }
   const bytes = new Uint8Array(await file.arrayBuffer());
-  return asReading(kind, kind === 'docx' ? readVobDocx(bytes) : readVobText(await pdfText(bytes)));
+  return asReading(kind, kind === 'docx' ? await readVobDocx(bytes) : readVobText(await pdfText(bytes)));
 }
 
 /** What a VOB's pasted text says (copied out of Word or a PDF). */

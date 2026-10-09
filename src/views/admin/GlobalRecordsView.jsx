@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import * as XLSX from 'xlsx';
 import { DataError } from '../../components/DataError';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { vobsApi } from '../../api/vobs';
@@ -54,6 +53,7 @@ export function GlobalRecordsView() {
         showToast("No records to export for this client.", "info");
         return;
       }
+      const XLSX = await import('xlsx');
       const book = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([res.columns, ...res.rows]), 'VOB Tracker');
       XLSX.writeFile(book, res.filename);
