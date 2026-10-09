@@ -50,11 +50,17 @@ export default defineConfig(({ mode }) => {
       }
     ],
     build: {
+      target: 'es2020',
+      cssCodeSplit: true,
+      minify: 'esbuild',
+      chunkSizeWarningLimit: 1200,
       rollupOptions: {
         input: path.resolve(__dirname, 'public/index.html'),
         output: {
-          manualChunks: {
-            'vendor-react': ['react', 'react-dom']
+          manualChunks(id) {
+            if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
+              return 'vendor-react';
+            }
           }
         }
       }
@@ -66,9 +72,6 @@ export default defineConfig(({ mode }) => {
       port: 3000,
       host: true,
       open: false,
-      // Every API call goes through /api/v1 (see src/api/*.js), which is the prefix
-      // the backend mounts. The bare /vobs, /dashboard, /users … entries that used to
-      // sit here matched nothing and are gone.
       proxy: {
         '/api': proxyConfig,
       }
