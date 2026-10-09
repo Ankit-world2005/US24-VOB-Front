@@ -15,7 +15,7 @@ export function SpecialistDashboardView() {
   const [loadError, setLoadError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
 
-  const isAuditSpecialist = currentUser?.role === 'auth' || currentUser?.role === 'auth_specialist' || currentUser?.role === 'audit' || currentUser?.email === 'jitender.s@us24solutions.com';
+  const isAuditSpecialist = currentUser?.role === 'auth' || currentUser?.role === 'auth_specialist' || currentUser?.role === 'audit' || currentUser?.email === 'jitender.s@us24solutions.com' || currentUser?.email === 'ankit.k@us24solutions.com';
 
   useEffect(() => {
     setLoading(true);
@@ -45,16 +45,20 @@ export function SpecialistDashboardView() {
   const assignedTasks = isAuditSpecialist ? myVobs.filter(v => !awaitingAudit(v)) : myVobs;
 
   const handleStartNext = () => {
-    const listToPick = isAuditSpecialist && auditTasks.length > 0 ? auditTasks : assignedTasks;
-    const nextPending = listToPick.find(v => v.vobStatus === "Assigned" || v.vobStatus === "In Progress");
-    if (nextPending) {
-      if (isAuditSpecialist && awaitingAudit(nextPending)) {
-        openQueueWithVob(nextPending.id);
+    if (isAuditSpecialist) {
+      const nextAudit = auditTasks.find(v => v.vobStatus === "Assigned" || v.vobStatus === "In Progress") || auditTasks[0] || myVobs[0];
+      if (nextAudit) {
+        openQueueWithVob(nextAudit.id);
       } else {
-        openVerification(nextPending.id);
+        openQueueWithVob(null);
       }
-    } else if (listToPick.length > 0) {
-      openVerification(listToPick[0].id);
+      return;
+    }
+    const nextPending = assignedTasks.find(v => v.vobStatus === "Assigned" || v.vobStatus === "In Progress");
+    if (nextPending) {
+      openVerification(nextPending.id);
+    } else if (assignedTasks.length > 0) {
+      openVerification(assignedTasks[0].id);
     }
   };
 
@@ -67,13 +71,23 @@ export function SpecialistDashboardView() {
         <div className="spec-banner-info">
           <span className="eyebrow">
             <span className="dot" aria-hidden="true" />
-            Specialist Workspace · Minimum Necessary Access (SEC-3)
+            {isAuditSpecialist
+              ? 'Audit Specialist Workspace · Quality Assurance & Compliance'
+              : 'Specialist Workspace · Minimum Necessary Access (SEC-3)'}
           </span>
           <h2 className="spec-banner-title">
             Hello, <span className="mark">{currentUser.name}</span>
           </h2>
           <p className="spec-banner-desc">
-            You have <strong>{loading || loadError ? '—' : summary.pending}</strong> pending verifications in your queue today. Pre-fill from previous records is automatically active.
+            {isAuditSpecialist ? (
+              <>
+                You have <strong>{loading || loadError ? '—' : auditTasks.length}</strong> record{auditTasks.length === 1 ? '' : 's'} awaiting quality audit verification today.
+              </>
+            ) : (
+              <>
+                You have <strong>{loading || loadError ? '—' : summary.pending}</strong> pending verifications in your queue today. Pre-fill from previous records is automatically active.
+              </>
+            )}
           </p>
         </div>
 
@@ -84,7 +98,7 @@ export function SpecialistDashboardView() {
             onClick={handleStartNext}
             disabled={myVobs.length === 0}
           >
-            ⚡ Open Next Assigned VOB
+            {isAuditSpecialist ? '⚡ Open Next Audit Record' : '⚡ Open Next Assigned VOB'}
           </button>
         </div>
       </section>
@@ -195,10 +209,14 @@ export function SpecialistDashboardView() {
               ) : loadError ? (
                 <tr><td colSpan="7" className="table-empty">Could not load your queue.</td></tr>
               ) : assignedTasks.length === 0 ? (
-                <tr><td colSpan="7" className="table-empty">No assigned tasks in your queue. Work in progress and finished work is under the cards above.</td></tr>
+                <tr><td colSpan="7" className="table-empty">{isAuditSpecialist ? 'No direct assigned tasks in your queue. Tasks awaiting verification are in the Awaiting Audit table above.' : 'No assigned tasks in your queue. Work in progress and finished work is under the cards above.'}</td></tr>
               ) : (
                 assignedTasks.map(v => (
-                  <tr key={v.id} className="interactive-row" onClick={() => openVerification(v.id)}>
+                  <tr
+                    key={v.id}
+                    className="interactive-row"
+                    onClick={() => isAuditSpecialist ? openQueueWithVob(v.id) : openVerification(v.id)}
+                  >
                     <td className="mono">{v.id}</td>
                     <td><ClientBadge clientId={v.client} /></td>
                     <td>
@@ -217,10 +235,14 @@ export function SpecialistDashboardView() {
                         className="btn btn-sm"
                         onClick={(e) => {
                           e.stopPropagation();
-                          openVerification(v.id);
+                          if (isAuditSpecialist) {
+                            openQueueWithVob(v.id);
+                          } else {
+                            openVerification(v.id);
+                          }
                         }}
                       >
-                        Verify & Complete →
+                        {isAuditSpecialist ? 'Audit & Verify →' : 'Verify & Complete →'}
                       </button>
                     </td>
                   </tr>

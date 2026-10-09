@@ -47,19 +47,22 @@ const CARDS = {
     tone: 'kpi-approved',
     // The summary counts every approved VOB, not just today's.
     user: { label: 'Saved (Approved)', meta: 'Validated & complete' },
+    auth: { label: 'Saved (Approved)', meta: 'Validated & complete' },
     admin: { label: 'Saved Records (Approved)', meta: 'Validated & complete' }
   }
 };
 
 const ORDER = {
   user: ['all', 'pending', 'auth_queue', 'error', 'approved'],
-  admin: ['all', 'pending', 'auth_queue', 'approved', 'error']
+  admin: ['all', 'pending', 'auth_queue', 'approved', 'error'],
+  auth: ['all', 'pending', 'approved']
 };
 
 /** The dashboard cards for a role, in display order, with that role's wording. */
 export function cardsFor(role) {
-  const key = role === 'admin' ? 'admin' : 'user';
-  return ORDER[key].map(id => ({ ...CARDS[id], ...CARDS[id][key] }));
+  const isAudit = role === 'auth' || role === 'auth_specialist' || role === 'audit';
+  const key = role === 'admin' ? 'admin' : isAudit ? 'auth' : 'user';
+  return ORDER[key].map(id => ({ ...CARDS[id], ...(CARDS[id][key] || CARDS[id].user) }));
 }
 
 /** One card for a role, or the first card when the id is unknown. */

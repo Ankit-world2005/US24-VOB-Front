@@ -87,8 +87,8 @@ export function PortalHeader() {
               <span className="user-sub">
                 {currentUser?.role === 'admin' || activeRole === 'admin'
                   ? 'Administrator'
-                  : currentUser?.role === 'auth' || currentUser?.role === 'auth_specialist' || currentUser?.role === 'audit' || currentUser?.email === 'jitender.s@us24solutions.com'
-                  ? 'Auth Specialist'
+                  : currentUser?.role === 'auth' || currentUser?.role === 'auth_specialist' || currentUser?.role === 'audit' || currentUser?.email === 'jitender.s@us24solutions.com' || currentUser?.email === 'ankit.k@us24solutions.com'
+                  ? 'Audit Specialist'
                   : 'Specialist'}
               </span>
             </div>

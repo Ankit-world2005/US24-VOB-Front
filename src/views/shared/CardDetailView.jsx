@@ -30,8 +30,9 @@ const LIST_LIMIT = 200;
  * database (SEC-6), so specialists do not.
  */
 export function CardDetailView() {
-  const { currentUser, selectedClient, activeCard, openCardPage, setActiveTab } = useWorkspace();
+  const { currentUser, selectedClient, activeCard, openCardPage, setActiveTab, openVerification, openQueueWithVob } = useWorkspace();
   const isAdmin = currentUser.role === 'admin';
+  const isAuditSpecialist = currentUser?.role === 'auth' || currentUser?.role === 'auth_specialist' || currentUser?.role === 'audit' || currentUser?.email === 'jitender.s@us24solutions.com' || currentUser?.email === 'ankit.k@us24solutions.com';
   const card = cardFor(currentUser.role, activeCard);
   const [summary, setSummary] = useState(null);
 
@@ -349,8 +350,12 @@ function TaskPanel({ vobId, row, card, isAdmin, now }) {
       {vob && (
         <div className="action-buttons-group task-actions">
           {!isAdmin && (
-            <button type="button" className="btn btn-sm" onClick={() => openVerification(vobId)}>
-              Open Form →
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => isAuditSpecialist ? openQueueWithVob(vobId) : openVerification(vobId)}
+            >
+              {isAuditSpecialist ? 'Audit Record →' : 'Open Form →'}
             </button>
           )}
           {vob.vobStatus === 'Approved' && (

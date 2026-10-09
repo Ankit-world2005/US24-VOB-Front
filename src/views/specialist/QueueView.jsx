@@ -132,7 +132,7 @@ function CallValuesList({ result }) {
  */
 export function QueueView() {
   const { currentUser, showToast, setActiveTab, queueTargetVobId, setQueueTargetVobId, activeVobId } = useWorkspace();
-  const isAuditSpecialist = currentUser?.role === 'auth' || currentUser?.role === 'auth_specialist' || currentUser?.role === 'audit' || currentUser?.email === 'jitender.s@us24solutions.com';
+  const isAuditSpecialist = currentUser?.role === 'auth' || currentUser?.role === 'auth_specialist' || currentUser?.role === 'audit' || currentUser?.email === 'jitender.s@us24solutions.com' || currentUser?.email === 'ankit.k@us24solutions.com';
 
   if (!isAuditSpecialist) {
     return (
@@ -517,9 +517,13 @@ export function QueueView() {
         showToast(`${record.id} went to the ${routedTo}, not the Error Queue: the server didn’t apply the transcript check.`, 'error');
       } else if (check.errors > 0 && !remarksRecorded) {
         showToast(`${record.id} is in the Error Queue, but without the transcript remarks: the server didn’t apply the transcript check.`, 'error');
-        setActiveTab('error_queue');
+        setActiveTab(isAuditSpecialist ? 'my_dashboard' : 'error_queue');
       } else {
-        followSubmitResult(res, showToast, setActiveTab);
+        if (isAuditSpecialist) {
+          setActiveTab('my_dashboard');
+        } else {
+          followSubmitResult(res, showToast, setActiveTab);
+        }
       }
     } catch (err) {
       console.error(err);
