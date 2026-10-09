@@ -14,7 +14,7 @@ export function TwoFactorOtpForm({
   const [resendCooldown, setResendCooldown] = useState(45);
   const [resending, setResending] = useState(false);
   const [resendNotice, setResendNotice] = useState('');
-  const [remainingTime, setRemainingTime] = useState(mfaChallenge?.expires_in || 300);
+  const [remainingTime, setRemainingTime] = useState(mfaChallenge?.expires_in || 180);
 
   const inputRefs = useRef([]);
 
@@ -23,7 +23,7 @@ export function TwoFactorOtpForm({
     inputRefs.current[0]?.focus();
   }, []);
 
-  // Expiry countdown timer (5 min default)
+  // Expiry countdown timer (3 min default)
   useEffect(() => {
     if (remainingTime <= 0) return;
     const interval = setInterval(() => {
@@ -132,7 +132,7 @@ export function TwoFactorOtpForm({
     try {
       await onResend();
       setResendCooldown(45);
-      setRemainingTime(300);
+      setRemainingTime(180);
       setDigits(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
       setResendNotice('A new verification code has been dispatched.');
@@ -145,7 +145,6 @@ export function TwoFactorOtpForm({
 
   const isComplete = digits.every((d) => d !== '');
   const isExpired = remainingTime <= 0;
-  const devOtp = mfaChallenge?.dev_otp || mfaChallenge?.devOtp;
 
   return (
     <section id="twoFactorView" className="two-factor-view">
@@ -200,48 +199,6 @@ export function TwoFactorOtpForm({
         <FormAlert tone="warning">
           Verification code has expired. Please request a new code below.
         </FormAlert>
-      )}
-
-      {/* Dev Mode Helper Chip */}
-      {devOtp && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            background: 'rgba(59, 130, 246, 0.08)',
-            border: '1px solid rgba(59, 130, 246, 0.25)',
-            padding: '8px 12px',
-            borderRadius: '8px',
-            fontSize: '0.82rem',
-            color: '#1d4ed8',
-            marginBottom: '16px'
-          }}
-        >
-          <span>
-            🛠️ <strong>Dev Mode Code:</strong> <code style={{ fontWeight: 700, letterSpacing: '1px' }}>{devOtp}</code>
-          </span>
-          <button
-            type="button"
-            onClick={() => {
-              const chars = devOtp.split('').slice(0, 6);
-              setDigits(chars);
-              onVerify(devOtp);
-            }}
-            style={{
-              background: '#2563eb',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '4px',
-              padding: '3px 8px',
-              fontSize: '0.75rem',
-              fontWeight: 500,
-              cursor: 'pointer'
-            }}
-          >
-            Auto Fill
-          </button>
-        </div>
       )}
 
       <form onSubmit={handleSubmit} noValidate>
