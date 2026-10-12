@@ -181,77 +181,75 @@ export function SpecialistDashboardView() {
         </section>
       )}
 
-      {/* My Assigned Tasks Table */}
-      <section className="panel-card">
-        <div className="panel-header">
-          <div>
-            <h3>My Assigned Tasks Queue</h3>
-            <span className="panel-sub">Strictly isolated to your assigned patient accounts (FR-13)</span>
+      {/* My Assigned Tasks Table (Regular Specialists only) */}
+      {!isAuditSpecialist && (
+        <section className="panel-card">
+          <div className="panel-header">
+            <div>
+              <h3>My Assigned Tasks Queue</h3>
+              <span className="panel-sub">Strictly isolated to your assigned patient accounts (FR-13)</span>
+            </div>
           </div>
-        </div>
 
-        <div className="table-responsive">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Record ID</th>
-                <th>Client</th>
-                <th>Patient Name</th>
-                <th>Date of Service</th>
-                <th>Insurance Carrier</th>
-                <th>Status</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan="7" className="table-empty">Loading your tasks…</td></tr>
-              ) : loadError ? (
-                <tr><td colSpan="7" className="table-empty">Could not load your queue.</td></tr>
-              ) : assignedTasks.length === 0 ? (
-                <tr><td colSpan="7" className="table-empty">{isAuditSpecialist ? 'No direct assigned tasks in your queue. Tasks awaiting verification are in the Awaiting Audit table above.' : 'No assigned tasks in your queue. Work in progress and finished work is under the cards above.'}</td></tr>
-              ) : (
-                assignedTasks.map(v => (
-                  <tr
-                    key={v.id}
-                    className="interactive-row"
-                    onClick={() => isAuditSpecialist ? openQueueWithVob(v.id) : openVerification(v.id)}
-                  >
-                    <td className="mono">{v.id}</td>
-                    <td><ClientBadge clientId={v.client} /></td>
-                    <td>
-                      <div className="bold">{v.patientName}</div>
-                      <div className="patient-sub-cell">DOB: {v.dob}</div>
-                    </td>
-                    <td>{v.dos}</td>
-                    <td>
-                      <div>{v.insurance}</div>
-                      <div className="patient-sub-cell">{v.planTypeAndName}</div>
-                    </td>
-                    <td><StatusBadge status={v.vobStatus} /></td>
-                    <td>
-                      <button
-                        type="button"
-                        className="btn btn-sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (isAuditSpecialist) {
-                            openQueueWithVob(v.id);
-                          } else {
+          <div className="table-responsive">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Record ID</th>
+                  <th>Client</th>
+                  <th>Patient Name</th>
+                  <th>Date of Service</th>
+                  <th>Insurance Carrier</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr><td colSpan="7" className="table-empty">Loading your tasks…</td></tr>
+                ) : loadError ? (
+                  <tr><td colSpan="7" className="table-empty">Could not load your queue.</td></tr>
+                ) : assignedTasks.length === 0 ? (
+                  <tr><td colSpan="7" className="table-empty">No assigned tasks in your queue. Work in progress and finished work is under the cards above.</td></tr>
+                ) : (
+                  assignedTasks.map(v => (
+                    <tr
+                      key={v.id}
+                      className="interactive-row"
+                      onClick={() => openVerification(v.id)}
+                    >
+                      <td className="mono">{v.id}</td>
+                      <td><ClientBadge clientId={v.client} /></td>
+                      <td>
+                        <div className="bold">{v.patientName}</div>
+                        <div className="patient-sub-cell">DOB: {v.dob}</div>
+                      </td>
+                      <td>{v.dos}</td>
+                      <td>
+                        <div>{v.insurance}</div>
+                        <div className="patient-sub-cell">{v.planTypeAndName}</div>
+                      </td>
+                      <td><StatusBadge status={v.vobStatus} /></td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn-sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
                             openVerification(v.id);
-                          }
-                        }}
-                      >
-                        {isAuditSpecialist ? 'Audit & Verify →' : 'Verify & Complete →'}
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+                          }}
+                        >
+                          Verify & Complete →
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
     </div>
   );
 }
