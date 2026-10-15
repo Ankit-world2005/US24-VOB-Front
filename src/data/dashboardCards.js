@@ -55,7 +55,7 @@ const CARDS = {
 const ORDER = {
   user: ['all', 'pending', 'auth_queue', 'error', 'approved'],
   admin: ['all', 'pending', 'auth_queue', 'approved', 'error'],
-  auth: ['all', 'pending', 'approved']
+  auth: ['all', 'pending', 'auth_queue', 'error', 'approved']
 };
 
 /** The dashboard cards for a role, in display order, with that role's wording. */

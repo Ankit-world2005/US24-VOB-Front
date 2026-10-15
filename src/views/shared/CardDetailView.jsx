@@ -350,13 +350,25 @@ function TaskPanel({ vobId, row, card, isAdmin, now }) {
       {vob && (
         <div className="action-buttons-group task-actions">
           {!isAdmin && (
-            <button
-              type="button"
-              className="btn btn-sm"
-              onClick={() => isAuditSpecialist ? openQueueWithVob(vobId) : openVerification(vobId)}
-            >
-              {isAuditSpecialist ? 'Audit Record →' : 'Open Form →'}
-            </button>
+            <>
+              {isAuditSpecialist && vob.audit_stage === 'pending_audit' && (
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  style={{ backgroundColor: '#6366f1', color: '#fff', fontWeight: 600 }}
+                  onClick={() => openQueueWithVob(vobId)}
+                >
+                  Audit Record →
+                </button>
+              )}
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={() => openVerification(vobId)}
+              >
+                Open Form →
+              </button>
+            </>
           )}
           {vob.vobStatus === 'Approved' && (
             <button type="button" className="btn btn-sm btn-doc" onClick={() => setDocOpen(true)}>

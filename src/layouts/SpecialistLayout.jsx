@@ -14,25 +14,18 @@ export function SpecialistLayout() {
   const { activeTab, setActiveTab, currentUser } = useWorkspace();
   const isAuditSpecialist = currentUser?.role === 'auth' || currentUser?.role === 'auth_specialist' || currentUser?.role === 'audit' || currentUser?.email === 'jitender.s@us24solutions.com' || currentUser?.email === 'ankit.k@us24solutions.com';
 
-  // Automatically redirect specialists to appropriate tabs if attempting restricted views
+  // Automatically redirect regular specialists if attempting restricted views
   useEffect(() => {
     if (!isAuditSpecialist && activeTab === 'queue') {
-      setActiveTab('my_dashboard');
-    } else if (isAuditSpecialist && (activeTab === 'verification' || activeTab === 'auth_queue' || activeTab === 'error_queue')) {
       setActiveTab('my_dashboard');
     }
   }, [activeTab, isAuditSpecialist, setActiveTab]);
 
   // Navigation tabs:
-  // Audit Specialists strictly have Dashboard, Audit Queue, and Saved Records.
-  // Verification Specialists have Dashboard, New Verification, Auth Queue, Error Queue, and Saved Records.
+  // Audit Specialists have all specialist tabs plus the Audit Queue tab.
+  // Regular Specialists have all specialist tabs except the Audit Queue tab.
   const tabs = UI_CONTENT.navigation.specialistTabs
-    .filter(tab => {
-      if (isAuditSpecialist) {
-        return tab.id !== 'verification' && tab.id !== 'auth_queue' && tab.id !== 'error_queue';
-      }
-      return tab.id !== 'queue';
-    })
+    .filter(tab => tab.id !== 'queue' || isAuditSpecialist)
     .map(tab => {
       if (tab.id === 'queue') {
         return { ...tab, label: '📋 Audit Queue' };
@@ -72,10 +65,10 @@ export function SpecialistLayout() {
           </div>
         }>
           {activeTab === 'my_dashboard' && <SpecialistDashboardView />}
-          {activeTab === 'verification' && !isAuditSpecialist && <VerificationFormView />}
+          {activeTab === 'verification' && <VerificationFormView />}
           {activeTab === 'queue' && isAuditSpecialist && <QueueView />}
-          {activeTab === 'auth_queue' && !isAuditSpecialist && <AuthQueueView />}
-          {activeTab === 'error_queue' && !isAuditSpecialist && <ErrorQueueView />}
+          {activeTab === 'auth_queue' && <AuthQueueView />}
+          {activeTab === 'error_queue' && <ErrorQueueView />}
           {activeTab === 'saved_records' && <SavedRecordsView />}
           {activeTab === 'card_detail' && <CardDetailView />}
         </Suspense>

@@ -517,13 +517,9 @@ export function QueueView() {
         showToast(`${record.id} went to the ${routedTo}, not the Error Queue: the server didn’t apply the transcript check.`, 'error');
       } else if (check.errors > 0 && !remarksRecorded) {
         showToast(`${record.id} is in the Error Queue, but without the transcript remarks: the server didn’t apply the transcript check.`, 'error');
-        setActiveTab(isAuditSpecialist ? 'my_dashboard' : 'error_queue');
+        setActiveTab('error_queue');
       } else {
-        if (isAuditSpecialist) {
-          setActiveTab('my_dashboard');
-        } else {
-          followSubmitResult(res, showToast, setActiveTab);
-        }
+        followSubmitResult(res, showToast, setActiveTab);
       }
     } catch (err) {
       console.error(err);
