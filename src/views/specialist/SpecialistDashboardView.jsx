@@ -142,7 +142,7 @@ export function SpecialistDashboardView() {
                   <tr><td colSpan="7" className="table-empty">No tasks currently awaiting audit verification.</td></tr>
                 ) : (
                   auditTasks.map(v => (
-                    <tr key={v.id} className="interactive-row" onClick={() => openQueueWithVob(v.id)}>
+                    <tr key={v.id}>
                       <td className="mono">{v.id}</td>
                       <td><ClientBadge clientId={v.client} /></td>
                       <td>
@@ -213,11 +213,7 @@ export function SpecialistDashboardView() {
                   <tr><td colSpan="7" className="table-empty">No assigned tasks in your queue. Work in progress and finished work is under the cards above.</td></tr>
                 ) : (
                   assignedTasks.map(v => (
-                    <tr
-                      key={v.id}
-                      className="interactive-row"
-                      onClick={() => openVerification(v.id)}
-                    >
+                    <tr key={v.id}>
                       <td className="mono">{v.id}</td>
                       <td><ClientBadge clientId={v.client} /></td>
                       <td>

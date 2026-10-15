@@ -154,7 +154,7 @@ export function GlobalRecordsView() {
                 <tr><td colSpan="9" className="table-empty">No records matching the selected filters.</td></tr>
               ) : (
                 vobs.map(v => (
-                  <tr key={v.id} className="interactive-row" onClick={() => setInspectVobId(v.id)}>
+                  <tr key={v.id}>
                     <td className="mono">{v.id}</td>
                     <td><ClientBadge clientId={v.client} /></td>
                     <td>

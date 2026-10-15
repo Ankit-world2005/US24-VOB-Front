@@ -316,7 +316,7 @@ export function AdminDashboardView() {
               </thead>
               <tbody>
                 {recentVobs.map(v => (
-                  <tr key={v.id} className="interactive-row" onClick={() => setInspectVobId(v.id)}>
+                  <tr key={v.id}>
                     <td><ClientBadge clientId={v.client} /></td>
                     <td>
                       <div className="patient-name-cell">{v.patientName}</div>
