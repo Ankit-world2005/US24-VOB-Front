@@ -297,6 +297,35 @@ export function useAuth() {
     return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired);
   }, []);
 
+  // HIPAA Section 164.312(a)(2)(iii): Inactivity auto-lock after 10 minutes maximum (600 seconds)
+  useEffect(() => {
+    if (!session || typeof window === 'undefined') return undefined;
+
+    const IDLE_LIMIT_MS = 10 * 60 * 1000;
+    let idleTimer = null;
+
+    const handleIdleTimeout = () => {
+      apiClient.clearToken();
+      storage.del(window.sessionStorage, SESSION_KEY);
+      setSession(null);
+      setError('Your session was automatically locked after 10 minutes of inactivity to protect patient health information (HIPAA §164.312). Please sign in again.');
+    };
+
+    const resetIdleTimer = () => {
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = setTimeout(handleIdleTimeout, IDLE_LIMIT_MS);
+    };
+
+    const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+    events.forEach((evt) => window.addEventListener(evt, resetIdleTimer, { passive: true }));
+    resetIdleTimer();
+
+    return () => {
+      if (idleTimer) clearTimeout(idleTimer);
+      events.forEach((evt) => window.removeEventListener(evt, resetIdleTimer));
+    };
+  }, [session]);
+
   const clearError = useCallback(() => {
     setError('');
   }, []);
