@@ -21,6 +21,13 @@ export function WorkspaceProvider({ session, onLogout, children }) {
   const [activeCard, setActiveCard] = useState(null);
   const [toast, setToast] = useState(null);
 
+  const isAuditSpecialist =
+    currentUser?.role === 'auth' ||
+    currentUser?.role === 'auth_specialist' ||
+    currentUser?.role === 'audit' ||
+    currentUser?.email === 'jitender.s@us24solutions.com' ||
+    currentUser?.email === 'ankit.k@us24solutions.com';
+
   // Sync role if session changes
   useEffect(() => {
     if (session?.role) {

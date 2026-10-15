@@ -133,25 +133,6 @@ function CallValuesList({ result }) {
 export function QueueView() {
   const { currentUser, showToast, setActiveTab, queueTargetVobId, setQueueTargetVobId, activeVobId } = useWorkspace();
   const isAuditSpecialist = currentUser?.role === 'auth' || currentUser?.role === 'auth_specialist' || currentUser?.role === 'audit' || currentUser?.email === 'jitender.s@us24solutions.com' || currentUser?.email === 'ankit.k@us24solutions.com';
-
-  if (!isAuditSpecialist) {
-    return (
-      <div className="panel-card empty-state" style={{ margin: '40px auto', maxWidth: '560px', textAlign: 'center', padding: '36px' }}>
-        <h3>🔒 Access Restricted</h3>
-        <p style={{ marginTop: '8px', color: 'var(--ink-soft)' }}>
-          The Audit Queue is exclusively for Auth / Audit Specialists (Quality Assurance verification).
-        </p>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={() => setActiveTab('my_dashboard')}
-          style={{ marginTop: '16px' }}
-        >
-          Return to My Dashboard
-        </button>
-      </div>
-    );
-  }
   const [transcriptOpen, setTranscriptOpen] = useState(true);
   const [documentOpen, setDocumentOpen] = useState(true);
   const [remark, setRemark] = useState('');

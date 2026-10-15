@@ -74,8 +74,8 @@ export const FIELD_KEY_MAP = {
   claimMailingAddress: 'claim_mailing_address',
   payerId: 'payer_id_claims',
   payerIdClaims: 'payer_id_claims',
-  idCard: 'id_card_ref',
-  policyId: 'id_card_ref',
+  idCardRef: 'id_card_ref',
+  policyIdRef: 'id_card_ref',
   tflDaysClaims: 'tfl_days_claims',
   tflCorrectedClaims: 'tfl_corrected_claims',
   
@@ -350,7 +350,7 @@ function toApiDate(value) {
   const s = String(value).trim();
   const iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:$|[T\s])/);
   if (iso) return calendarDate(+iso[1], +iso[2], +iso[3]);
-  const us = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4}|\d{2})$/);
+  const us = s.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4}|\d{2})$/);
   if (us) {
     const y = us[3].length === 2 ? (+us[3] < 50 ? 2000 : 1900) + +us[3] : +us[3];
     return calendarDate(y, +us[1], +us[2]);

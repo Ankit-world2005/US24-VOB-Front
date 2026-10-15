@@ -8,7 +8,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "api:start": "node backend-test-api.mjs",
-    "api:test": "node scripts/test-backend.mjs"
+    "api:test": "node scripts/test-backend.mjs",
+    "lint": "eslint src",
+    "prebuild": "npm run lint"
   },
   "dependencies": {
     "docx-preview": "^0.4.1",
@@ -23,6 +25,9 @@
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
+    "eslint": "9.39.5",
+    "eslint-plugin-react": "7.37.5",
+    "eslint-plugin-react-hooks": "7.1.1",
     "vite": "^5.4.2"
   },
   "allowScripts": {

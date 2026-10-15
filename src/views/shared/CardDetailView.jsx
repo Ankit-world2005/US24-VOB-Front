@@ -71,7 +71,8 @@ export function CardDetailView() {
       </nav>
 
       {/* Keyed so switching card or client starts from a clean list and selection. */}
-      <CardRecords key={`${card.id}|${isAdmin ? selectedClient : ''}`} card={card} isAdmin={isAdmin} />
+      <CardRecords key={`${card.id}|${isAdmin ? selectedClient : ''}`} card={card} isAdmin={isAdmin}
+              isAuditSpecialist={isAuditSpecialist} />
     </div>
   );
 }
@@ -238,8 +239,9 @@ function CardRecords({ card, isAdmin }) {
  * on this card's list; it carries the assignee name and update time, which the
  * single-record response does not.
  */
-function TaskPanel({ vobId, row, card, isAdmin, now }) {
-  const { openVerification } = useWorkspace();
+function TaskPanel({ vobId, row, card, isAdmin, isAuditSpecialist: propIsAudit, now }) {
+  const { openVerification, openQueueWithVob, isAuditSpecialist: ctxIsAudit } = useWorkspace();
+  const isAuditSpecialist = propIsAudit ?? ctxIsAudit;
   const [vob, setVob] = useState(null);
   const [loadError, setLoadError] = useState('');
   const [logs, setLogs] = useState([]);

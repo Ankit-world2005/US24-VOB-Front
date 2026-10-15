@@ -15,22 +15,6 @@ export function EditUserModal({ isOpen, onClose, user, clients = [], onSuccess }
       setName(user.name || '');
       const rawRole = (user.role || 'user').toLowerCase(); const normRole = (rawRole === 'admin' || rawRole === 'administrator') ? 'admin' : (rawRole === 'auth' || rawRole === 'auth_specialist' || rawRole === 'audit' ? 'auth' : 'user'); setRole(normRole);
       setErrorMessage('');
-
-      // Populate selected client IDs from user data
-      if (Array.isArray(user.clientIds) && user.clientIds.length > 0) {
-        setSelectedClientIds(user.clientIds);
-      } else if (Array.isArray(user.assignedClients)) {
-        // Fallback: match by name
-        const matchedIds = clients
-          .filter(c => user.assignedClients.some(ac => 
-            String(ac).toLowerCase() === String(c.name).toLowerCase() ||
-            String(ac).toLowerCase() === String(c.id).toLowerCase()
-          ))
-          .map(c => c.id);
-        setSelectedClientIds(matchedIds);
-      } else {
-        setSelectedClientIds([]);
-      }
     }
   }, [isOpen, user, clients]);
 
