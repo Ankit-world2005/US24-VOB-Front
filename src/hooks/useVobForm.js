@@ -100,7 +100,7 @@ export function useVobForm() {
         setVob(data);
         setFormData(data);
         setProvenance(data.provenance || {});
-        setHasTranscript(Boolean(data.transcriptText || (data.provenance && Object.values(data.provenance).some(p => p.source === 'ai'))));
+        setHasTranscript(Boolean(data.transcript || data.transcriptText || data.transcriptBlobKey || (data.provenance && Object.values(data.provenance).some(p => p.source === 'ai'))));
         if (data.failingRules) {
           setFailingRules(data.failingRules);
         }
@@ -138,9 +138,13 @@ export function useVobForm() {
     }, 50);
   }, []);
 
-  const handleApplyAiFields = useCallback((extracted) => {
+  const handleApplyAiFields = useCallback((extracted, appliedTranscript) => {
     setFormData(prevForm => {
       const nextFormData = { ...prevForm };
+      if (appliedTranscript) {
+        nextFormData.transcript = appliedTranscript;
+        nextFormData.transcriptText = appliedTranscript;
+      }
       for (const [k, val] of Object.entries(extracted)) {
         if (!nextFormData[k] || nextFormData[k] === '') {
           nextFormData[k] = val;

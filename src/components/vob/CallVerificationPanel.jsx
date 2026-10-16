@@ -42,8 +42,8 @@ export const CallVerificationPanel = memo(function CallVerificationPanel({
           <span className="badge-form-progress">
             FORM {filledCount}/{totalCount}
           </span>
-          <span className={`badge-transcript-status ${hasTranscript ? 'attached' : 'none'}`}>
-            {hasTranscript ? 'TRANSCRIPT ATTACHED' : 'NO TRANSCRIPT'}
+          <span className={`badge-transcript-status ${hasTranscript ? 'attached' : 'none'}`} title={hasTranscript ? "Associated transcript stored in Azure Blob Storage" : undefined}>
+            {hasTranscript ? (formData.transcriptFileName ? `☁️ ${formData.transcriptFileName}` : '☁️ TRANSCRIPT ATTACHED') : 'NO TRANSCRIPT'}
           </span>
         </div>
       </div>

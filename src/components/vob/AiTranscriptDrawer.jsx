@@ -1,21 +1,13 @@
 import React from 'react';
 import { useTranscriptExtraction, TranscriptExtractBody, TranscriptExtractActions } from './TranscriptExtractPanel';
 
-export function AiTranscriptDrawer({ isOpen, onClose, vobId, onApplyFields }) {
+export function AiTranscriptDrawer({ isOpen, onClose, vobId, initialTranscript = '', transcriptFileName = '', onApplyFields }) {
   // Held here, above the early return, so the text and result survive closing the drawer.
-  const extraction = useTranscriptExtraction(vobId);
+  const extraction = useTranscriptExtraction(vobId, { initialTranscript, transcriptFileName });
 
   if (!isOpen) return null;
 
   const handleApply = (fields) => {
-    if (extraction.transcript) {
-      try {
-        localStorage.setItem('us24_last_transcript', extraction.transcript);
-        if (vobId) {
-          sessionStorage.setItem(`us24_transcript_${vobId}`, extraction.transcript);
-        }
-      } catch (e) {}
-    }
     onApplyFields(fields, extraction.transcript);
     onClose();
   };

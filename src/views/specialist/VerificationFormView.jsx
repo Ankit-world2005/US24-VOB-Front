@@ -150,6 +150,8 @@ export function VerificationFormView() {
         isOpen={isAiDrawerOpen}
         onClose={() => setIsAiDrawerOpen(false)}
         vobId={activeVobId}
+        initialTranscript={formData.transcript || formData.transcriptText || vob.transcript || ''}
+        transcriptFileName={formData.transcriptFileName || vob.transcriptFileName || ''}
         onApplyFields={handleApplyAiFields}
       />
 

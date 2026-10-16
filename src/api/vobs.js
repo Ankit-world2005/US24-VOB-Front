@@ -480,6 +480,55 @@ export const vobsApi = {
     }
   },
 
+  /**
+   * Uploads a transcript file (.txt, .docx, .pdf, .json, .csv) to Azure Blob Storage and links it to the VOB.
+   */
+  async uploadTranscriptFile(vobId, file) {
+    const isText = file.type?.startsWith('text/') || file.name?.endsWith('.txt') || file.name?.endsWith('.json') || file.name?.endsWith('.csv');
+    let content;
+    let isBase64 = false;
+
+    if (isText) {
+      content = await file.text();
+    } else {
+      const arrayBuffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = '';
+      for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      content = btoa(binary);
+      isBase64 = true;
+    }
+
+    return await apiClient.request({
+      path: '/api/v1/storage/upload',
+      method: 'POST',
+      data: {
+        filename: file.name,
+        content,
+        isBase64,
+        contentType: file.type || 'text/plain',
+        vobId: vobId || undefined,
+        kind: 'transcript',
+      },
+    });
+  },
+
+  /**
+   * Saves or updates a transcript on a VOB in Azure Blob Storage.
+   */
+  async saveTranscript(vobId, text, filename = 'call_transcript.txt') {
+    return await apiClient.request({
+      path: `/api/v1/vobs/${vobId}/transcript`,
+      method: 'POST',
+      data: {
+        text,
+        filename,
+      },
+    });
+  },
+
   getAllAuditLogs() {
     return Promise.resolve([]);
   }

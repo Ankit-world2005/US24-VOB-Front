@@ -32,12 +32,25 @@ const displayValue = (v) => (v === true ? 'Yes' : v === false ? 'No' : String(v 
  * A pasted transcript and what the API read from it. Kept by whoever shows the
  * panel, so the AI drawer keeps its text and result while it is closed.
  */
-export function useTranscriptExtraction(vobId, { allFields = false } = {}) {
-  const [transcript, setTranscript] = useState('');
+export function useTranscriptExtraction(vobId, { allFields = false, initialTranscript = '', transcriptFileName = '' } = {}) {
+  const [transcript, setTranscript] = useState(initialTranscript || '');
+  const [fileName, setFileName] = useState(transcriptFileName || '');
+  const [isStorageBacked, setIsStorageBacked] = useState(Boolean(initialTranscript));
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [elapsed, setElapsed] = useState(0);
+
+  // Sync initialTranscript when active VOB loads or switches
+  useEffect(() => {
+    if (initialTranscript && (!transcript || transcript === '')) {
+      setTranscript(initialTranscript);
+      setIsStorageBacked(true);
+    }
+    if (transcriptFileName) {
+      setFileName(transcriptFileName);
+    }
+  }, [initialTranscript, transcriptFileName]);
 
   // Seconds since Extract was pressed, so a long read shows as working, not stuck.
   useEffect(() => {
@@ -61,18 +74,35 @@ export function useTranscriptExtraction(vobId, { allFields = false } = {}) {
   const length = transcript.trim().length;
   const tooLong = length > MAX_TRANSCRIPT_CHARS;
 
-  const readTranscriptFile = (file) => {
+  const readTranscriptFile = async (file) => {
+    setFileName(file.name);
+    try {
+      if (vobId) {
+        const res = await vobsApi.uploadTranscriptFile(vobId, file);
+        if (res?.text) {
+          setTranscript(res.text);
+          setIsStorageBacked(true);
+          setResult(null);
+          setError('');
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn('Azure storage upload fallback to local read:', err);
+    }
+
     const reader = new FileReader();
     reader.onload = (event) => {
       const text = event.target?.result || '';
       setTranscript(text);
+      setIsStorageBacked(false);
       setResult(null);
       setError('');
     };
     reader.readAsText(file);
   };
 
-  const clear = () => { setTranscript(''); setResult(null); setError(''); };
+  const clear = () => { setTranscript(''); setFileName(''); setIsStorageBacked(false); setResult(null); setError(''); };
 
   // One call: the API reads the transcript with Gemini LLM, checks every value
   // against the payer's words in it, and answers. Can run with or without a VOB ID.
@@ -93,7 +123,7 @@ export function useTranscriptExtraction(vobId, { allFields = false } = {}) {
     }
   };
 
-  return { transcript, setTranscript, isProcessing, result, error, elapsed, length, tooLong, readTranscriptFile, clear, extract };
+  return { transcript, setTranscript, fileName, isStorageBacked, isProcessing, result, error, elapsed, length, tooLong, readTranscriptFile, clear, extract };
 }
 
 /**
@@ -120,6 +150,13 @@ export function TranscriptExtractBody({ extraction, showResult = true, descripti
           <>Paste the payer call transcript or portal eligibility text. The AI proposes values for <strong>empty fields only</strong>, each with the payer's words it came from. Nothing is saved until you save the form.</>
         )}
       </p>
+
+      {transcript && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', padding: '6px 12px', background: 'rgba(2, 132, 199, 0.08)', border: '1px solid rgba(2, 132, 199, 0.2)', borderRadius: '6px', fontSize: '12px' }}>
+          <span style={{ fontWeight: 600, color: '#0369a1' }}>☁️ Azure Blob Storage:</span>
+          <span style={{ color: 'var(--ink)' }}>{extraction.fileName ? `📄 ${extraction.fileName}` : 'Associated Call Transcript'}</span>
+        </div>
+      )}
 
       <div className="transcript-input-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
         <span className="transcript-input-label" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--ink)' }}>

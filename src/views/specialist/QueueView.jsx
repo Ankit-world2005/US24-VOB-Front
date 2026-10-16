@@ -285,11 +285,10 @@ export function QueueView() {
       });
 
       const transcriptToLoad = recordData.transcript ||
+        recordData.transcriptText ||
         recordData.extra?.transcript ||
         recordData.extra?.call_transcript ||
-        recordData.extra?.transcript_text ||
-        (recordData.id ? sessionStorage.getItem(`us24_transcript_${recordData.id}`) : null) ||
-        localStorage.getItem('us24_last_transcript') || '';
+        recordData.extra?.transcript_text || '';
 
       if (transcriptToLoad) {
         extraction.setTranscript(transcriptToLoad);
@@ -326,10 +325,9 @@ export function QueueView() {
     const currentRec = manualRecord || record;
     if (!currentRec) return;
     const t = currentRec.transcript ||
+      currentRec.transcriptText ||
       currentRec.extra?.transcript ||
-      currentRec.extra?.call_transcript ||
-      (currentRec.id ? sessionStorage.getItem(`us24_transcript_${currentRec.id}`) : null) ||
-      localStorage.getItem('us24_last_transcript');
+      currentRec.extra?.call_transcript;
     if (t && (!extraction.transcript || extraction.transcript !== t)) {
       extraction.setTranscript(t);
       const local = readTranscriptLocally(t);
@@ -577,15 +575,17 @@ export function QueueView() {
           id="queue-transcript"
           className="queue-pane-transcript"
           icon="📝"
-          title="Test transcript"
-          summary={transcriptSummary}
+          title={record ? `Associated Transcript (${record.id})` : "Test transcript"}
+          summary={record?.transcript ? "☁️ Azure Blob Storage" : transcriptSummary}
           open={transcriptOpen}
           onToggle={() => setTranscriptOpen(o => !o)}
         >
           <TranscriptExtractBody
             extraction={extraction}
             showResult={false}
-            description="Paste the test call transcript and press Extract. The values the call gives are read out, and each is checked against the VOB on the right. Nothing on any record changes."
+            description={record?.transcript
+              ? `Transcript associated with VOB ${record.id} (${record.patientName || ''}) from which this record was created.`
+              : "Paste the test call transcript and press Extract. The values the call gives are read out, and each is checked against the VOB on the right. Nothing on any record changes."}
           />
           {result && <CallValuesList result={result} />}
           {extraction.error && !localReading && (
