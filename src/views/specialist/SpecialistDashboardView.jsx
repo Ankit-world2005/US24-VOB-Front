@@ -52,7 +52,7 @@ export function SpecialistDashboardView() {
     if (isAuditSpecialist) {
       const nextAudit = auditTasks.find(v => v.vobStatus === "Assigned" || v.vobStatus === "In Progress") || auditTasks[0];
       if (nextAudit) {
-        openQueueWithVob(nextAudit.id);
+        openVerification(nextAudit.id);
         return;
       }
       const nextAssigned = assignedTasks.find(v => v.vobStatus === "Assigned" || v.vobStatus === "In Progress") || assignedTasks[0];
@@ -60,7 +60,7 @@ export function SpecialistDashboardView() {
         openVerification(nextAssigned.id);
         return;
       }
-      openQueueWithVob(null);
+      openVerification(null);
       return;
     }
     const nextPending = assignedTasks.find(v => v.vobStatus === "Assigned" || v.vobStatus === "In Progress");
@@ -174,17 +174,32 @@ export function SpecialistDashboardView() {
                         <div className="patient-sub-cell">{v.planTypeAndName}</div>
                       </td>
                       <td>
-                        <button
-                          type="button"
-                          className="btn btn-sm"
-                          style={{ backgroundColor: '#6366f1', color: '#fff', fontWeight: 600 }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openQueueWithVob(v.id);
-                          }}
-                        >
-                          Verify →
-                        </button>
+                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                          <button
+                            type="button"
+                            className="btn btn-sm"
+                            style={{ backgroundColor: '#6366f1', color: '#fff', fontWeight: 600 }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openVerification(v.id);
+                            }}
+                            title="Verify in New Verification Form"
+                          >
+                            Verify Form →
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-sm ghost"
+                            style={{ color: '#4f46e5', fontWeight: 600, border: '1px solid rgba(79, 70, 229, 0.3)' }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openQueueWithVob(v.id);
+                            }}
+                            title="Open in Side-by-Side Queue Compare"
+                          >
+                            Queue Compare
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))

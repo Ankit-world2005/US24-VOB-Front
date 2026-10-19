@@ -56,16 +56,25 @@ export function VobFormBanner({ vob, formData, layoutMode, onLayoutChange, myVob
         )}
 
         {/* Quick switcher to next task */}
-        {myVobsList.length > 1 && (
+        {myVobsList && myVobsList.length > 1 && (
           <select
             className="select-input select-sm"
             value={activeVobId}
             onChange={(e) => onSwitchVob(e.target.value)}
             title="Switch to another assigned VOB"
           >
-            {myVobsList.map(v => (
-              <option key={v.id} value={v.id}>{v.patientName} ({v.vobStatus})</option>
-            ))}
+            {myVobsList.map(v => {
+              const isPendingAudit = v.audit_stage === 'pending_audit' ||
+                v.auditStage === 'pending_audit' ||
+                v.extra?.auditStage === 'pending_audit' ||
+                v.reassignmentReason === 'Submitted for Audit Verification' ||
+                v.reassignment_reason === 'Submitted for Audit Verification';
+              return (
+                <option key={v.id} value={v.id}>
+                  {isPendingAudit ? '🛡️ [Audit] ' : ''}{v.patientName || 'Unnamed'} ({v.vobStatus || v.status}) - ID: {v.id}
+                </option>
+              );
+            })}
           </select>
         )}
 
