@@ -54,6 +54,12 @@ export function VerificationFormView() {
   }
 
   const inAuthQueue = vob.status === 'auth_queue';
+  const isPendingAudit =
+    vob?.auditStage === 'pending_audit' ||
+    vob?.audit_stage === 'pending_audit' ||
+    vob?.extra?.auditStage === 'pending_audit' ||
+    vob?.reassignmentReason === 'Submitted for Audit Verification' ||
+    vob?.reassignment_reason === 'Submitted for Audit Verification';
   const submittingSpecialist =
     vob?.previous_assignee?.name ||
     vob?.previous_assignee?.email ||
@@ -95,9 +101,7 @@ export function VerificationFormView() {
           disabled={inAuthQueue}
           title={inAuthQueue
             ? "Locked while the VOB is in the Auth Queue"
-            : isAuditSpecialist
-              ? "Inspect and re-extract associated transcript"
-              : "Paste call transcript or payer portal text to auto-fill"}
+            : "Open transcript drawer to view, extract, and import values"}
         >
           {isAuditSpecialist ? "🔍 View / Re-Extract Transcript" : "Paste Transcript"}
         </button>
@@ -152,9 +156,7 @@ export function VerificationFormView() {
                     borderRadius: '999px'
                   }}
                 >
-                  {vob.auditStage === 'pending_audit' || vob.audit_stage === 'pending_audit' || vob.extra?.auditStage === 'pending_audit'
-                    ? 'Awaiting Audit Review'
-                    : (vob.vobStatus || vob.status)}
+                  {isPendingAudit ? 'Awaiting Audit Review' : (vob.vobStatus || vob.status)}
                 </span>
                 {submittingSpecialist && (
                   <span style={{ fontSize: '12px', color: '#4b5563' }}>
@@ -163,7 +165,7 @@ export function VerificationFormView() {
                 )}
               </div>
               <p style={{ margin: '3px 0 0', fontSize: '12.5px', color: '#4b5563', lineHeight: 1.4 }}>
-                Reviewing captured data against the call transcript. You can edit fields directly, re-extract the transcript, approve & complete the VOB, or return it to the specialist with error remarks.
+                Reviewing captured data against the call transcript. You can edit fields directly, extract and import transcript values, submit for audit, approve & complete, or return to specialist with remarks.
               </p>
             </div>
           </div>
@@ -260,39 +262,54 @@ export function VerificationFormView() {
 
           {isAuditSpecialist ? (
             <>
+              {isPendingAudit && (
+                <button
+                  type="button"
+                  className="btn"
+                  style={{
+                    backgroundColor: '#dc2626',
+                    borderColor: '#dc2626',
+                    color: '#ffffff',
+                    fontWeight: 600,
+                    padding: '10px 18px',
+                    borderRadius: 'var(--r-md, 6px)'
+                  }}
+                  onClick={() => setIsReassignModalOpen(true)}
+                  disabled={isSubmitting}
+                  title="Return this record back to the submitting specialist with error remarks"
+                >
+                  ↩ Reassign to Specialist (Error Tab)
+                </button>
+              )}
+              {isPendingAudit && (
+                <button
+                  type="button"
+                  className="btn"
+                  style={{
+                    backgroundColor: '#059669',
+                    borderColor: '#059669',
+                    color: '#ffffff',
+                    fontWeight: 600,
+                    padding: '10px 22px',
+                    borderRadius: 'var(--r-md, 6px)'
+                  }}
+                  onClick={handleAuditApprove}
+                  disabled={isSubmitting}
+                  title="Approve this VOB as verified. Moves to Auth Queue if auth required, or Saved Records if completed."
+                >
+                  {isSubmitting ? 'Verifying & Completing…' : '✓ Approve & Complete VOB (Verified)'}
+                </button>
+              )}
               <button
                 type="button"
-                className="btn"
-                style={{
-                  backgroundColor: '#dc2626',
-                  borderColor: '#dc2626',
-                  color: '#ffffff',
-                  fontWeight: 600,
-                  padding: '10px 18px',
-                  borderRadius: 'var(--r-md, 6px)'
-                }}
-                onClick={() => setIsReassignModalOpen(true)}
+                className="btn btn-submit-vob"
+                onClick={handleSubmit}
                 disabled={isSubmitting}
-                title="Return this record back to the submitting specialist with error remarks"
+                title="Submit this VOB for audit verification"
               >
-                ↩ Reassign to Specialist (Error Tab)
-              </button>
-              <button
-                type="button"
-                className="btn"
-                style={{
-                  backgroundColor: '#059669',
-                  borderColor: '#059669',
-                  color: '#ffffff',
-                  fontWeight: 600,
-                  padding: '10px 22px',
-                  borderRadius: 'var(--r-md, 6px)'
-                }}
-                onClick={handleAuditApprove}
-                disabled={isSubmitting}
-                title="Approve this VOB as verified. Moves to Auth Queue if auth required, or Saved Records if completed."
-              >
-                {isSubmitting ? 'Verifying & Completing…' : '✓ Approve & Complete VOB (Verified)'}
+                {isSubmitting
+                  ? (inAuthQueue ? 'Completing Authorization…' : 'Submitting for Audit Verification…')
+                  : (inAuthQueue ? '✓ Complete Authorization & Approve' : '✓ Submit VOB for Audit')}
               </button>
             </>
           ) : (
@@ -318,7 +335,7 @@ export function VerificationFormView() {
         initialTranscript={formData.transcript || formData.transcriptText || vob.transcript || ''}
         transcriptFileName={formData.transcriptFileName || vob.transcriptFileName || ''}
         onApplyFields={handleApplyAiFields}
-        canAutoFill={!isAuditSpecialist}
+        canAutoFill={true}
       />
 
       {/* Correction & Audit Logs Modal */}

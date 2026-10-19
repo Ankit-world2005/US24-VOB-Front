@@ -342,14 +342,14 @@ export function TranscriptExtractActions({ extraction, onApply, canAutoFill = tr
   const { transcript, isProcessing, result, error, tooLong, extract } = extraction;
 
   const handleApplyAll = () => {
-    if (!canAutoFill || isAuditSpecialist) return;
+    if (!canAutoFill) return;
     if (result?.proposed.length) {
       onApply(result.fields);
     }
   };
 
   const handleApplySafeOnly = () => {
-    if (!canAutoFill || isAuditSpecialist) return;
+    if (!canAutoFill) return;
     const safeItems = result?.proposed?.filter(p => p.isSafe) || [];
     if (safeItems.length) {
       onApply(Object.fromEntries(safeItems.map(p => [p.key, p.value])));
@@ -359,8 +359,7 @@ export function TranscriptExtractActions({ extraction, onApply, canAutoFill = tr
   const safeCount = result?.proposed?.filter(p => p.isSafe).length || 0;
   const totalProposed = result?.proposed?.length || 0;
 
-  // In Audit Mode: auto-fill is completely disabled, only Re-Extract is allowed
-  if (isAuditSpecialist || !canAutoFill) {
+  if (!canAutoFill) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         <button

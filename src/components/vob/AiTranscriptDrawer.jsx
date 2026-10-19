@@ -5,7 +5,7 @@ import { useTranscriptExtraction, TranscriptExtractBody, TranscriptExtractAction
 export function AiTranscriptDrawer({ isOpen, onClose, vobId, initialTranscript = '', transcriptFileName = '', onApplyFields, canAutoFill }) {
   const { currentUser } = useWorkspace();
   const isAuditSpecialist = currentUser?.role === 'auth' || currentUser?.role === 'auth_specialist' || currentUser?.role === 'audit' || currentUser?.email === 'jitender.s@us24solutions.com' || currentUser?.email === 'ankit.k@us24solutions.com';
-  const effectiveCanAutoFill = canAutoFill !== undefined ? canAutoFill : !isAuditSpecialist;
+  const effectiveCanAutoFill = canAutoFill !== undefined ? canAutoFill : true;
 
   // Held here, above the early return, so the text and result survive closing the drawer.
   const extraction = useTranscriptExtraction(vobId, {
@@ -17,7 +17,7 @@ export function AiTranscriptDrawer({ isOpen, onClose, vobId, initialTranscript =
   if (!isOpen) return null;
 
   const handleApply = (fields) => {
-    if (isAuditSpecialist || !effectiveCanAutoFill) {
+    if (!effectiveCanAutoFill) {
       return;
     }
     onApplyFields(fields, extraction.transcript);
@@ -33,7 +33,7 @@ export function AiTranscriptDrawer({ isOpen, onClose, vobId, initialTranscript =
               {isAuditSpecialist ? 'Audit QA Transcript Inspection' : 'Transcript Extraction With AI'}
             </div>
             <h2 className="drawer-title">
-              {isAuditSpecialist ? 'Audit Transcript Re-Extraction' : 'AI Transcript Auto-Fill'}
+              {isAuditSpecialist ? 'Audit Transcript Extraction & Auto-Fill' : 'AI Transcript Auto-Fill'}
             </h2>
           </div>
           <button type="button" className="drawer-close-btn" onClick={onClose}>✕</button>
@@ -41,7 +41,7 @@ export function AiTranscriptDrawer({ isOpen, onClose, vobId, initialTranscript =
 
         {isAuditSpecialist && (
           <div style={{ margin: '0 20px 12px', padding: '10px 14px', background: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.25)', borderRadius: '6px', fontSize: '12px', color: '#4338ca' }}>
-            ℹ️ <strong>Quality Audit Mode:</strong> You can view and re-extract transcript values to verify against the submitted VOB. Auto-fill is disabled for Audit Specialists to preserve the specialist's entries.
+            ℹ️ <strong>Quality Audit & Verification:</strong> You can view, re-extract, and auto-fill transcript values directly into the VOB form.
           </div>
         )}
 

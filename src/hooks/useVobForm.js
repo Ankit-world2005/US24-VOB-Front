@@ -166,11 +166,6 @@ export function useVobForm() {
   }, []);
 
   const handleApplyAiFields = useCallback((extracted, appliedTranscript) => {
-    if (isAuditSpecialist) {
-      showToast("Auto-fill is disabled for Audit Specialists to preserve submitted entries.", "info");
-      return;
-    }
-
     setFormData(prevForm => {
       const nextFormData = { ...prevForm };
       if (appliedTranscript) {
