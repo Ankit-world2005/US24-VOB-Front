@@ -308,12 +308,16 @@ export function QueueView() {
       });
     } else if (isAuditSpecialist) {
       // Auto-load latest in-progress VOB for audit specialist review if none explicitly passed
-      vobsApi.getVobs({ status: 'in_progress', limit: 1 }).then(({ data }) => {
-        if (!current || !data || data.length === 0) return;
-        vobsApi.getVobById(data[0].id).then(recordData => {
-          if (!current) return;
-          applyTargetRecord(recordData);
-        });
+      vobsApi.getVobs({ status: 'in_progress', limit: 10 }).then((res) => {
+        const list = Array.isArray(res) ? res : (res?.data || []);
+        if (!current || list.length === 0) return;
+        const target = list.find(v => v.audit_stage === 'pending_audit' || v.auditStage === 'pending_audit') || list[0];
+        if (target) {
+          vobsApi.getVobById(target.id).then(recordData => {
+            if (!current) return;
+            applyTargetRecord(recordData);
+          });
+        }
       }).catch(() => {});
     }
 

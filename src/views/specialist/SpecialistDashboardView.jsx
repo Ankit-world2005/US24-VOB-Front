@@ -21,11 +21,11 @@ export function SpecialistDashboardView() {
     setLoading(true);
     setLoadError('');
     Promise.all([
-      dashboardApi.getSummary({ userEmail: currentUser?.email }),
+      dashboardApi.getSummary(isAuditSpecialist ? {} : { userEmail: currentUser?.email }),
       vobsApi.getVobs({
-        assigneeId: currentUser?.email,
+        ...(isAuditSpecialist ? {} : { assigneeId: currentUser?.email }),
         status: isAuditSpecialist ? ['Assigned', 'In Progress'] : 'Assigned',
-        limit: 50
+        limit: 100
       })
     ]).then(([sumData, list]) => {
       setSummary(sumData);
@@ -38,9 +38,13 @@ export function SpecialistDashboardView() {
     });
   }, [currentUser?.email, currentUser?.role, isAuditSpecialist, reloadKey]);
 
-  // Only VOBs a specialist submitted for audit; one an admin reassigned to the
-  // audit specialist is ordinary work and stays under My Assigned Tasks.
-  const awaitingAudit = (v) => v.audit_stage === 'pending_audit';
+  // VOBs assigned or submitted for audit verification show to ALL audit specialists
+  const awaitingAudit = (v) =>
+    v.audit_stage === 'pending_audit' ||
+    v.auditStage === 'pending_audit' ||
+    v.extra?.auditStage === 'pending_audit' ||
+    v.reassignmentReason === 'Submitted for Audit Verification' ||
+    v.reassignment_reason === 'Submitted for Audit Verification';
   const auditTasks = isAuditSpecialist ? myVobs.filter(awaitingAudit) : [];
   const assignedTasks = isAuditSpecialist ? myVobs.filter(v => !awaitingAudit(v)) : myVobs;
 

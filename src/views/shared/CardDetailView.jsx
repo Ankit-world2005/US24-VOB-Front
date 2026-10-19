@@ -39,10 +39,10 @@ export function CardDetailView() {
   // The counts on the switcher, from the same endpoint as the dashboard cards.
   usePolling(async (isCurrent) => {
     const data = await dashboardApi.getSummary(
-      isAdmin ? { clientId: selectedClient } : { userEmail: currentUser.email }
+      isAdmin ? { clientId: selectedClient } : (isAuditSpecialist ? {} : { userEmail: currentUser.email })
     );
     if (isCurrent()) setSummary(data);
-  }, LIST_POLL_MS, [isAdmin, selectedClient, currentUser.email]);
+  }, LIST_POLL_MS, [isAdmin, selectedClient, currentUser.email, isAuditSpecialist]);
 
   return (
     <div className="card-detail-view">
