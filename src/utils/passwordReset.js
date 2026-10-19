@@ -5,11 +5,24 @@ const RESET_PATH = '/reset-password';
 
 function readTokenFromLink() {
   if (typeof window === 'undefined') return null;
-  const { pathname, hash } = window.location;
-  if (pathname.replace(/\/+$/, '') !== RESET_PATH) return null;
-  const token = new URLSearchParams(hash.slice(1)).get('token');
+  const { pathname, hash, search } = window.location;
+  const cleanPath = pathname.replace(/\/+$/, '');
+  if (cleanPath !== RESET_PATH && !cleanPath.endsWith('/reset-password')) return null;
+
+  // Check both hash fragment (#token=...) and search query (?token=...)
+  // Many email scanners and clients rewrite hash fragments to query parameters.
+  let token = null;
+  if (hash && hash.length > 1) {
+    token = new URLSearchParams(hash.slice(1)).get('token');
+  }
+  if (!token && search && search.length > 1) {
+    token = new URLSearchParams(search).get('token');
+  }
+
   // Take the token out of the address bar and the history right away.
-  window.history.replaceState(null, '', '/');
+  if (token) {
+    window.history.replaceState(null, '', '/');
+  }
   return token || null;
 }
 
