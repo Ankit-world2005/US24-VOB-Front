@@ -22,10 +22,12 @@ export function SpecialistLayout() {
   }, [activeTab, isAuditSpecialist, setActiveTab]);
 
   // Navigation tabs:
-  // Audit Specialists have all specialist tabs plus the Audit Queue tab.
+  // Audit Specialists have all specialist tabs except New Verification, plus the Audit Queue tab.
+  // (The form still opens from the buttons on their other tabs.)
   // Regular Specialists have all specialist tabs except the Audit Queue tab.
   const tabs = UI_CONTENT.navigation.specialistTabs
     .filter(tab => tab.id !== 'queue' || isAuditSpecialist)
+    .filter(tab => tab.id !== 'verification' || !isAuditSpecialist)
     .map(tab => {
       if (tab.id === 'queue') {
         return { ...tab, label: '📋 Audit Queue' };

@@ -89,23 +89,19 @@ export function useVobForm() {
     vobsApi.getVobs(fetchParams).then(list => {
       if (!isCurrent) return;
 
-      let sortedList = list;
-      if (isAuditSpecialist) {
-        const awaitingAudit = (v) =>
-          v.audit_stage === 'pending_audit' ||
-          v.auditStage === 'pending_audit' ||
-          v.extra?.auditStage === 'pending_audit' ||
-          v.reassignmentReason === 'Submitted for Audit Verification' ||
-          v.reassignment_reason === 'Submitted for Audit Verification';
+      // Records awaiting audit are worked in the Audit Queue. Here an audit
+      // specialist gets their own assigned VOBs, as a specialist does.
+      const awaitingAudit = (v) =>
+        v.audit_stage === 'pending_audit' ||
+        v.auditStage === 'pending_audit' ||
+        v.extra?.auditStage === 'pending_audit' ||
+        v.reassignmentReason === 'Submitted for Audit Verification' ||
+        v.reassignment_reason === 'Submitted for Audit Verification';
+      const workList = isAuditSpecialist ? list.filter(v => !awaitingAudit(v)) : list;
 
-        const auditList = list.filter(awaitingAudit);
-        const otherList = list.filter(v => !awaitingAudit(v));
-        sortedList = [...auditList, ...otherList];
-      }
-
-      setMyVobsList(sortedList);
-      if (!activeVobId && sortedList.length > 0) {
-        setActiveVobId(sortedList[0].id);
+      setMyVobsList(workList);
+      if (!activeVobId && workList.length > 0) {
+        setActiveVobId(workList[0].id);
       } else if (!activeVobId) {
         // Nothing to open: show the empty state, not an endless "Loading…".
         setLoading(false);
@@ -279,82 +275,6 @@ export function useVobForm() {
     }
   }, [vob, activeVobId, currentUser.email, saveForm, reloadAfterConflict, showInvalidFields, showToast, setActiveTab]);
 
-  const handleAuditApprove = useCallback(async () => {
-    if (!vob) return;
-    setIsSubmitting(true);
-    try {
-      const patchRes = await saveForm();
-      const currentVersion = patchRes?.version || (vob.version ? vob.version + 1 : 1);
-      setVob(prev => ({ ...prev, version: currentVersion }));
-
-      const res = await vobsApi.auditApprove(activeVobId, currentVersion);
-      if (res?.status === 'auth_queue') {
-        showToast(`VOB ${activeVobId} verified & approved. Authorization is required — moved to Auth Queue.`, "success");
-      } else {
-        showToast(`VOB ${activeVobId} verified & approved. No authorization required — marked Approved.`, "success");
-      }
-
-      const remaining = myVobsList.filter(v => v.id !== activeVobId);
-      setMyVobsList(remaining);
-      if (remaining.length > 0) {
-        setActiveVobId(remaining[0].id);
-      } else {
-        setActiveVobId(null);
-        setActiveTab('my_dashboard');
-      }
-    } catch (err) {
-      if (err.status === 409) {
-        reloadAfterConflict(err);
-      } else if (!showInvalidFields(err)) {
-        console.error(err);
-        showToast(err?.message || "Failed to approve VOB", "error");
-      }
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [vob, activeVobId, saveForm, myVobsList, showToast, setActiveVobId, setActiveTab, reloadAfterConflict, showInvalidFields]);
-
-  const handleAuditReassign = useCallback(async (remarks) => {
-    if (!vob) return;
-    const targetUser = vob.previous_assignee_id || vob.previous_assignee?.id || vob.previous_assignee?.email || vob.previousAssignee?.id || vob.previousAssignee || vob.assignee_id || vob.assignee?.id || vob.assignee?.email;
-    if (!targetUser) {
-      showToast("No original specialist found to return this VOB to.", "error");
-      return;
-    }
-    const remarksToSend = (remarks || '').trim() || 'Discrepancies found during audit verification. Please correct and resubmit.';
-    setIsSubmitting(true);
-    try {
-      const patchRes = await saveForm();
-      const currentVersion = patchRes?.version || (vob.version ? vob.version + 1 : 1);
-
-      await vobsApi.reassignVob(activeVobId, {
-        assignee_id: targetUser,
-        reason: remarksToSend,
-        status: 'error',
-        version: currentVersion
-      });
-      showToast(`VOB ${activeVobId} returned to specialist with remarks. Moved to Error Queue.`, "info");
-
-      const remaining = myVobsList.filter(v => v.id !== activeVobId);
-      setMyVobsList(remaining);
-      if (remaining.length > 0) {
-        setActiveVobId(remaining[0].id);
-      } else {
-        setActiveVobId(null);
-        setActiveTab('my_dashboard');
-      }
-    } catch (err) {
-      if (err.status === 409) {
-        reloadAfterConflict(err);
-      } else {
-        console.error(err);
-        showToast(err?.message || "Failed to reassign VOB", "error");
-      }
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [vob, activeVobId, saveForm, myVobsList, showToast, setActiveVobId, setActiveTab, reloadAfterConflict]);
-
   return {
     vob,
     formData,
@@ -371,8 +291,6 @@ export function useVobForm() {
     handleApplyAiFields,
     handleSaveDraft,
     handleSubmit,
-    handleAuditApprove,
-    handleAuditReassign,
     isAuditSpecialist
   };
 }

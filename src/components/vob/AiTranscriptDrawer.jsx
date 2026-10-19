@@ -1,25 +1,14 @@
 import React from 'react';
-import { useWorkspace } from '../../context/WorkspaceContext';
 import { useTranscriptExtraction, TranscriptExtractBody, TranscriptExtractActions } from './TranscriptExtractPanel';
 
-export function AiTranscriptDrawer({ isOpen, onClose, vobId, initialTranscript = '', transcriptFileName = '', onApplyFields, canAutoFill }) {
-  const { currentUser } = useWorkspace();
-  const isAuditSpecialist = currentUser?.role === 'auth' || currentUser?.role === 'auth_specialist' || currentUser?.role === 'audit' || currentUser?.email === 'jitender.s@us24solutions.com' || currentUser?.email === 'ankit.k@us24solutions.com';
-  const effectiveCanAutoFill = canAutoFill !== undefined ? canAutoFill : true;
-
+export function AiTranscriptDrawer({ isOpen, onClose, vobId, initialTranscript = '', transcriptFileName = '', onApplyFields, canAutoFill = true }) {
   // Held here, above the early return, so the text and result survive closing the drawer.
-  const extraction = useTranscriptExtraction(vobId, {
-    initialTranscript,
-    transcriptFileName,
-    allFields: isAuditSpecialist
-  });
+  const extraction = useTranscriptExtraction(vobId, { initialTranscript, transcriptFileName });
 
   if (!isOpen) return null;
 
   const handleApply = (fields) => {
-    if (!effectiveCanAutoFill) {
-      return;
-    }
+    if (!canAutoFill) return;
     onApplyFields(fields, extraction.transcript);
     onClose();
   };
@@ -29,41 +18,19 @@ export function AiTranscriptDrawer({ isOpen, onClose, vobId, initialTranscript =
       <div className="drawer-panel" onClick={(e) => e.stopPropagation()}>
         <div className="drawer-header">
           <div>
-            <div className="drawer-eyebrow">
-              {isAuditSpecialist ? 'Audit QA Transcript Inspection' : 'Transcript Extraction With AI'}
-            </div>
-            <h2 className="drawer-title">
-              {isAuditSpecialist ? 'Audit Transcript Extraction & Auto-Fill' : 'AI Transcript Auto-Fill'}
-            </h2>
+            <div className="drawer-eyebrow">Transcript Extraction With AI</div>
+            <h2 className="drawer-title">AI Transcript Auto-Fill</h2>
           </div>
           <button type="button" className="drawer-close-btn" onClick={onClose}>✕</button>
         </div>
 
-        {isAuditSpecialist && (
-          <div style={{ margin: '0 20px 12px', padding: '10px 14px', background: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.25)', borderRadius: '6px', fontSize: '12px', color: '#4338ca' }}>
-            ℹ️ <strong>Quality Audit & Verification:</strong> You can view, re-extract, and auto-fill transcript values directly into the VOB form.
-          </div>
-        )}
-
         <div className="drawer-body">
-          <TranscriptExtractBody
-            extraction={extraction}
-            description={isAuditSpecialist
-              ? "Associated transcript loaded from Azure Blob Storage. You can review or re-extract values using AI for verification comparison."
-              : undefined}
-          />
+          <TranscriptExtractBody extraction={extraction} />
         </div>
 
         <div className="drawer-footer" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '8px' }}>
-          <button type="button" className="btn ghost" onClick={onClose}>
-            {isAuditSpecialist ? 'Close' : 'Cancel'}
-          </button>
-          <TranscriptExtractActions
-            extraction={extraction}
-            onApply={handleApply}
-            canAutoFill={effectiveCanAutoFill}
-            isAuditSpecialist={isAuditSpecialist}
-          />
+          <button type="button" className="btn ghost" onClick={onClose}>Cancel</button>
+          <TranscriptExtractActions extraction={extraction} onApply={handleApply} canAutoFill={canAutoFill} />
         </div>
       </div>
     </div>
