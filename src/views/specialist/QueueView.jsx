@@ -9,6 +9,7 @@ import { fieldLabel } from '../../data/clients';
 import { readVobDocument, readPastedVob, documentKind, isVobFile } from '../../utils/vobDocumentParser';
 import { readTranscriptLocally } from '../../utils/transcriptReader';
 import { compareVobWithCall, namesMatch, samePatient, documentCheckFor } from '../../utils/vobCompare';
+import { isAwaitingAudit, auditTakenMessage, AUDIT_ACTION_LABELS } from '../../utils/audit';
 
 const RESULT_LABELS = {
   match: '✅ MATCH',
@@ -16,6 +17,15 @@ const RESULT_LABELS = {
   missing: '⚠️ MISSING',
   not_mentioned: 'Not mentioned'
 };
+
+/** Why a record has no audit actions: who audited it already, and how. */
+function auditDoneNote(record) {
+  const history = record.extra?.auditHistory;
+  const last = Array.isArray(history) ? history[history.length - 1] : null;
+  if (!last) return `${record.id} is not waiting on audit.`;
+  const by = last.auditedByName || 'another audit specialist';
+  return `${record.id} was already audited by ${by}: ${AUDIT_ACTION_LABELS[last.action] || last.action}.`;
+}
 
 /** Whether a VOB names its patient: a name with letters, not a placeholder. */
 const namesPatient = (fields) => /[a-z]/i.test(fields.patientName || '');
@@ -307,11 +317,12 @@ export function QueueView() {
         console.error('Failed to load target audit record:', err);
       });
     } else if (isAuditSpecialist) {
-      // Auto-load latest in-progress VOB for audit specialist review if none explicitly passed
+      // Auto-load the latest VOB waiting on audit if none was passed in. Only
+      // one waiting: anything else has no audit action left to take.
       vobsApi.getVobs({ status: 'in_progress', limit: 10 }).then((res) => {
         const list = Array.isArray(res) ? res : (res?.data || []);
         if (!current || list.length === 0) return;
-        const target = list.find(v => v.audit_stage === 'pending_audit' || v.auditStage === 'pending_audit') || list[0];
+        const target = list.find(isAwaitingAudit);
         if (target) {
           vobsApi.getVobById(target.id).then(recordData => {
             if (!current) return;
@@ -519,53 +530,53 @@ export function QueueView() {
     }
   };
 
-  const handleAuditReassign = async () => {
-    if (!record) return;
-    const targetUser = record.previous_assignee_id || record.previousAssignee?.id || record.previousAssignee;
-    if (!targetUser) {
-      showToast("No original specialist found to return this VOB to.", "error");
-      return;
-    }
-    const remarksToSend = remark.trim() || 'Discrepancies found during audit verification. Please correct and resubmit.';
-    setIsSubmitting(true);
-    try {
-      const { version } = await vobsApi.getVobById(record.id);
-      await vobsApi.reassignVob(record.id, {
-        assignee_id: targetUser,
-        reason: remarksToSend,
-        status: 'error',
-        version
-      });
-      showToast(`VOB ${record.id} returned to specialist with remarks. Moved to Error Queue.`, "info");
-      setQueueTargetVobId?.(null);
-      setActiveTab('my_dashboard');
-    } catch (err) {
-      showToast(err?.message || "Failed to reassign VOB", "error");
-    } finally {
-      setIsSubmitting(false);
-    }
+  // Out of this view once the audit is done (by this auditor or another), back
+  // to the dashboard's pending list.
+  const leaveAudit = () => {
+    setQueueTargetVobId?.(null);
+    setActiveTab('my_dashboard');
   };
 
-  const handleAuditApprove = async () => {
+  /**
+   * Runs an audit action. Another audit specialist may have acted on the VOB
+   * first: the API then refuses it, and the VOB has left the pending list.
+   */
+  const runAuditAction = async (action, failureText) => {
     if (!record) return;
     setIsSubmitting(true);
     try {
       // The record as it is now: its version may have moved on since it was loaded.
       const { version } = await vobsApi.getVobById(record.id);
-      const res = await vobsApi.auditApprove(record.id, version);
-      if (res?.status === 'auth_queue') {
-        showToast(`VOB ${record.id} verified. Authorization is required — moved to specialist's Auth Queue tab.`, "success");
-      } else {
-        showToast(`VOB ${record.id} verified. No authorization required — moved to specialist's Approved tab.`, "success");
-      }
-      setQueueTargetVobId?.(null);
-      setActiveTab('my_dashboard');
+      await action(version);
+      leaveAudit();
     } catch (err) {
-      showToast(err?.message || "Failed to approve VOB", "error");
+      const taken = auditTakenMessage(err, record.id);
+      if (taken) {
+        showToast(taken, "error");
+        leaveAudit();
+      } else {
+        showToast(err?.message || failureText, "error");
+      }
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const handleAuditReassign = () => runAuditAction(async (version) => {
+    const remarksToSend = remark.trim() || 'Discrepancies found during audit verification. Please correct and resubmit.';
+    await vobsApi.auditReturn(record.id, version, remarksToSend);
+    showToast(`VOB ${record.id} returned to the specialist's Error Queue with remarks. Saved to your Saved Records.`, "info");
+  }, "Failed to return VOB to specialist");
+
+  const handleAuditApprove = () => runAuditAction(async (version) => {
+    const res = await vobsApi.auditApprove(record.id, version);
+    showToast(
+      res?.status === 'auth_queue'
+        ? `VOB ${record.id} verified. Authorization is required — moved to the specialist's Auth Queue. Saved to your Saved Records.`
+        : `VOB ${record.id} verified. No authorization required — moved to the specialist's Approved Records. Saved to your Saved Records.`,
+      "success"
+    );
+  }, "Failed to approve VOB");
 
   const extractBlocked = extraction.isProcessing || !extraction.transcript.trim() || extraction.tooLong;
   // A browser reading can be read again by the AI once the VOB's record is found.
@@ -763,7 +774,11 @@ export function QueueView() {
                   : `✅ No wrong or missing fields: ${record.id} goes on as usual`}
             </span>
           )}
-          {record ? (() => {
+          {record && !isAwaitingAudit(record) ? (
+            <span className="queue-submit-hint" style={{ marginLeft: 'auto', color: 'var(--ink-soft)' }}>
+              {auditDoneNote(record)}
+            </span>
+          ) : record ? (() => {
             const isAuthYes = Boolean(
               record?.authorizationRequired === true ||
               record?.extra?.auth_initial_eval === 'YES' ||

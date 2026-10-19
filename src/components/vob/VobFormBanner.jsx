@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { StatusBadge } from './StatusBadge';
 import { ClientBadge } from './ClientBadge';
 import { getVerificationProgress } from '../../data/clients';
+import { isAwaitingAudit } from '../../utils/audit';
 
 /** The layout toggle's modes, as the verification-split-layout's mode-* classes name them. */
 const LAYOUT_MODES = [
@@ -63,18 +64,11 @@ export function VobFormBanner({ vob, formData, layoutMode, onLayoutChange, myVob
             onChange={(e) => onSwitchVob(e.target.value)}
             title="Switch to another assigned VOB"
           >
-            {myVobsList.map(v => {
-              const isPendingAudit = v.audit_stage === 'pending_audit' ||
-                v.auditStage === 'pending_audit' ||
-                v.extra?.auditStage === 'pending_audit' ||
-                v.reassignmentReason === 'Submitted for Audit Verification' ||
-                v.reassignment_reason === 'Submitted for Audit Verification';
-              return (
-                <option key={v.id} value={v.id}>
-                  {isPendingAudit ? '🛡️ [Audit] ' : ''}{v.patientName || 'Unnamed'} ({v.vobStatus || v.status}) - ID: {v.id}
-                </option>
-              );
-            })}
+            {myVobsList.map(v => (
+              <option key={v.id} value={v.id}>
+                {isAwaitingAudit(v) ? '🛡️ [Audit] ' : ''}{v.patientName || 'Unnamed'} ({v.vobStatus || v.status}) - ID: {v.id}
+              </option>
+            ))}
           </select>
         )}
 

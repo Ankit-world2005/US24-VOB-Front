@@ -111,6 +111,9 @@ export const vobsApi = {
       params.assignee_id = assigneeId;
     }
 
+    // `me`: the VOBs the caller reviewed as audit specialist
+    if (query.auditedBy) params.audited_by = query.auditedBy;
+
     // Map search query (q)
     const q = query.q || query.search;
     if (q) {
@@ -434,6 +437,19 @@ export const vobsApi = {
       path: `/api/v1/vobs/${id}/audit-approve`,
       method: 'POST',
       data: { version: version || 1 }
+    });
+  },
+
+  /**
+   * POST /api/v1/vobs/:id/audit-return - The audit specialist returns a VOB
+   * waiting on audit to the specialist who submitted it (their Error Queue).
+   * Body: { version, remarks }
+   */
+  async auditReturn(id, version, remarks) {
+    return apiClient.request({
+      path: `/api/v1/vobs/${id}/audit-return`,
+      method: 'POST',
+      data: { version, remarks }
     });
   },
 

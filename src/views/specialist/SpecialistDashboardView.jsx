@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { DataError } from '../../components/DataError';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { dashboardApi } from '../../api/dashboard';
@@ -6,6 +6,11 @@ import { vobsApi } from '../../api/vobs';
 import { StatusBadge } from '../../components/vob/StatusBadge';
 import { ClientBadge } from '../../components/vob/ClientBadge';
 import { KpiCardGrid } from '../../components/vob/KpiCardGrid';
+import { usePolling } from '../../hooks/usePolling';
+import { isAwaitingAudit } from '../../utils/audit';
+
+// Live, so a VOB one audit specialist acts on leaves every other's pending list.
+const DASHBOARD_POLL_MS = 15000;
 
 export function SpecialistDashboardView() {
   const { currentUser, openVerification, openCardPage, openQueueWithVob } = useWorkspace();
@@ -13,40 +18,34 @@ export function SpecialistDashboardView() {
   const [myVobs, setMyVobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
-  const [reloadKey, setReloadKey] = useState(0);
 
   const isAuditSpecialist = currentUser?.role === 'auth' || currentUser?.role === 'auth_specialist' || currentUser?.role === 'audit' || currentUser?.email === 'jitender.s@us24solutions.com' || currentUser?.email === 'ankit.k@us24solutions.com';
 
-  useEffect(() => {
-    setLoading(true);
-    setLoadError('');
-    Promise.all([
-      dashboardApi.getSummary(isAuditSpecialist ? {} : { userEmail: currentUser?.email }),
-      vobsApi.getVobs({
-        ...(isAuditSpecialist ? {} : { assigneeId: currentUser?.email }),
-        status: isAuditSpecialist ? ['Assigned', 'In Progress'] : 'Assigned',
-        limit: 100
-      })
-    ]).then(([sumData, list]) => {
+  const { refresh } = usePolling(async (isCurrent) => {
+    try {
+      const [sumData, list] = await Promise.all([
+        dashboardApi.getSummary(isAuditSpecialist ? {} : { userEmail: currentUser?.email }),
+        vobsApi.getVobs({
+          ...(isAuditSpecialist ? {} : { assigneeId: currentUser?.email }),
+          status: isAuditSpecialist ? ['Assigned', 'In Progress'] : 'Assigned',
+          limit: 100
+        })
+      ]);
+      if (!isCurrent()) return;
       setSummary(sumData);
       setMyVobs(list);
-      setLoading(false);
-    }).catch((err) => {
+      setLoadError('');
+    } catch (err) {
       console.error(err);
-      setLoadError(err?.message || 'Could not load this data.');
-      setLoading(false);
-    });
-  }, [currentUser?.email, currentUser?.role, isAuditSpecialist, reloadKey]);
+      if (isCurrent()) setLoadError(err?.message || 'Could not load this data.');
+    } finally {
+      if (isCurrent()) setLoading(false);
+    }
+  }, DASHBOARD_POLL_MS, [currentUser?.email, currentUser?.role, isAuditSpecialist]);
 
-  // VOBs assigned or submitted for audit verification show to ALL audit specialists
-  const awaitingAudit = (v) =>
-    v.audit_stage === 'pending_audit' ||
-    v.auditStage === 'pending_audit' ||
-    v.extra?.auditStage === 'pending_audit' ||
-    v.reassignmentReason === 'Submitted for Audit Verification' ||
-    v.reassignment_reason === 'Submitted for Audit Verification';
-  const auditTasks = isAuditSpecialist ? myVobs.filter(awaitingAudit) : [];
-  const assignedTasks = isAuditSpecialist ? myVobs.filter(v => !awaitingAudit(v)) : myVobs;
+  // VOBs submitted for audit verification show to ALL audit specialists, until one of them acts.
+  const auditTasks = isAuditSpecialist ? myVobs.filter(isAwaitingAudit) : [];
+  const assignedTasks = isAuditSpecialist ? myVobs.filter(v => !isAwaitingAudit(v)) : myVobs;
 
   const handleStartNext = () => {
     if (isAuditSpecialist) {
@@ -73,7 +72,7 @@ export function SpecialistDashboardView() {
 
   return (
     <div className="specialist-dashboard-view">
-      <DataError message={loadError} onRetry={() => setReloadKey(k => k + 1)} />
+      <DataError message={loadError} onRetry={refresh} />
 
       {/* Header Banner */}
       <section className="spec-banner">

@@ -79,7 +79,7 @@ export function VobFormSections({ formData, provenance, failingRules, inAuthQueu
             ) : (
               <>
                 <h4>Validation Error — {formFailingRules.length} Rule(s) Failed</h4>
-                <p>The Parker VOB format requires all mandatory fields to be verified before approval:</p>
+                <p>The VOB format requires all mandatory fields to be verified before approval:</p>
               </>
             )}
             <ul className="error-fields-list">

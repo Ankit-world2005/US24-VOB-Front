@@ -3,6 +3,7 @@ import { useWorkspace } from '../context/WorkspaceContext';
 import { vobsApi } from '../api/vobs';
 import { CANONICAL_FIELDS, CANONICAL_FIELDS_BY_KEY } from '../data/clients';
 import { formKeyFor } from '../utils/vobAdapter';
+import { isAwaitingAudit } from '../utils/audit';
 
 /** The form's Authorization & Referral section: all an Auth Queue VOB can still change. */
 const AUTH_FIELD_KEYS = CANONICAL_FIELDS.filter(f => f.group === 'auth').map(f => f.key);
@@ -91,13 +92,7 @@ export function useVobForm() {
 
       // Records awaiting audit are worked in the Audit Queue. Here an audit
       // specialist gets their own assigned VOBs, as a specialist does.
-      const awaitingAudit = (v) =>
-        v.audit_stage === 'pending_audit' ||
-        v.auditStage === 'pending_audit' ||
-        v.extra?.auditStage === 'pending_audit' ||
-        v.reassignmentReason === 'Submitted for Audit Verification' ||
-        v.reassignment_reason === 'Submitted for Audit Verification';
-      const workList = isAuditSpecialist ? list.filter(v => !awaitingAudit(v)) : list;
+      const workList = isAuditSpecialist ? list.filter(v => !isAwaitingAudit(v)) : list;
 
       setMyVobsList(workList);
       if (!activeVobId && workList.length > 0) {
