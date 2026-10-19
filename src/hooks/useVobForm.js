@@ -138,7 +138,14 @@ export function useVobForm() {
     }, 50);
   }, []);
 
+  const isAuditSpecialist = currentUser?.role === 'auth' || currentUser?.role === 'auth_specialist' || currentUser?.role === 'audit' || currentUser?.email === 'jitender.s@us24solutions.com' || currentUser?.email === 'ankit.k@us24solutions.com';
+
   const handleApplyAiFields = useCallback((extracted, appliedTranscript) => {
+    if (isAuditSpecialist) {
+      showToast("Auto-fill is disabled for Audit Specialists to preserve submitted entries.", "info");
+      return;
+    }
+
     setFormData(prevForm => {
       const nextFormData = { ...prevForm };
       if (appliedTranscript) {
@@ -267,6 +274,7 @@ export function useVobForm() {
     handleSelectField,
     handleApplyAiFields,
     handleSaveDraft,
-    handleSubmit
+    handleSubmit,
+    isAuditSpecialist
   };
 }

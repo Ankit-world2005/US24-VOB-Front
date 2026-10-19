@@ -580,6 +580,12 @@ export function QueueView() {
           open={transcriptOpen}
           onToggle={() => setTranscriptOpen(o => !o)}
         >
+          {isAuditSpecialist && (
+            <div style={{ margin: '8px 0 12px', padding: '10px 14px', background: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.25)', borderRadius: '6px', fontSize: '12px', color: '#4338ca', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '15px' }}>ℹ️</span>
+              <span><strong>Audit Verification Mode:</strong> You can re-extract transcript data to check against the submitted VOB. Auto-fill is disabled for Audit Specialists to preserve specialist entries.</span>
+            </div>
+          )}
           <TranscriptExtractBody
             extraction={extraction}
             showResult={false}
@@ -610,11 +616,12 @@ export function QueueView() {
             <button
               type="button"
               className="btn btn-sm"
+              style={isAuditSpecialist ? { background: '#6366f1', color: '#fff', fontWeight: 600 } : {}}
               onClick={extract}
               disabled={extractBlocked}
               title={record ? `The AI reads the transcript on ${record.id}, the VOB’s record` : 'The AI reads the transcript with Gemini'}
             >
-              {extraction.isProcessing ? 'Reading with AI…' : result ? 'Extract again' : extraction.error ? 'Try again' : 'Extract'}
+              {extraction.isProcessing ? 'Reading with AI…' : isAuditSpecialist ? '🔄 Re-Extract Data' : result ? 'Extract again' : extraction.error ? 'Try again' : 'Extract'}
             </button>
           </div>
         </QueuePane>

@@ -338,16 +338,18 @@ export function TranscriptExtractBody({ extraction, showResult = true, descripti
  * Extract before there is a result; the apply buttons after. `onApply` gets the
  * form keys and values to fill.
  */
-export function TranscriptExtractActions({ extraction, onApply }) {
+export function TranscriptExtractActions({ extraction, onApply, canAutoFill = true, isAuditSpecialist = false }) {
   const { transcript, isProcessing, result, error, tooLong, extract } = extraction;
 
   const handleApplyAll = () => {
+    if (!canAutoFill || isAuditSpecialist) return;
     if (result?.proposed.length) {
       onApply(result.fields);
     }
   };
 
   const handleApplySafeOnly = () => {
+    if (!canAutoFill || isAuditSpecialist) return;
     const safeItems = result?.proposed?.filter(p => p.isSafe) || [];
     if (safeItems.length) {
       onApply(Object.fromEntries(safeItems.map(p => [p.key, p.value])));
@@ -357,6 +359,24 @@ export function TranscriptExtractActions({ extraction, onApply }) {
   const safeCount = result?.proposed?.filter(p => p.isSafe).length || 0;
   const totalProposed = result?.proposed?.length || 0;
 
+  // In Audit Mode: auto-fill is completely disabled, only Re-Extract is allowed
+  if (isAuditSpecialist || !canAutoFill) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <button
+          type="button"
+          className="btn"
+          style={{ background: '#6366f1', borderColor: '#6366f1' }}
+          onClick={() => extract({ allFields: true })}
+          disabled={isProcessing || !transcript.trim() || tooLong}
+          title="Re-extract values from transcript with AI"
+        >
+          {isProcessing ? 'Re-extracting with AI…' : result ? '🔄 Re-Extract with AI' : error ? 'Try Again' : 'Extract & Preview'}
+        </button>
+      </div>
+    );
+  }
+
   if (!result) {
     return (
       <button
@@ -365,13 +385,22 @@ export function TranscriptExtractActions({ extraction, onApply }) {
         onClick={extract}
         disabled={isProcessing || !transcript.trim() || tooLong}
       >
-        {isProcessing ? 'Reading with AI ' : error ? 'Try Again' : 'Extract & Preview'}
+        {isProcessing ? 'Reading with AI…' : error ? 'Try Again' : 'Extract & Preview'}
       </button>
     );
   }
 
   return (
     <>
+      <button
+        type="button"
+        className="btn ghost btn-sm"
+        onClick={() => extract({ allFields: true })}
+        disabled={isProcessing}
+        title="Re-run AI extraction on the transcript"
+      >
+        {isProcessing ? 'Re-extracting…' : '🔄 Re-Extract'}
+      </button>
       {safeCount > 0 && safeCount < totalProposed && (
         <button
           type="button"

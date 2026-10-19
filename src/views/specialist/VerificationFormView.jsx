@@ -25,7 +25,8 @@ export function VerificationFormView() {
     handleSelectField,
     handleApplyAiFields,
     handleSaveDraft,
-    handleSubmit
+    handleSubmit,
+    isAuditSpecialist
   } = useVobForm();
   const [isAiDrawerOpen, setIsAiDrawerOpen] = useState(false);
   const [isLogsOpen, setIsLogsOpen] = useState(false);
@@ -76,9 +77,11 @@ export function VerificationFormView() {
           disabled={inAuthQueue}
           title={inAuthQueue
             ? "Locked while the VOB is in the Auth Queue"
-            : "Paste call transcript or payer portal text to auto-fill"}
+            : isAuditSpecialist
+              ? "Inspect and re-extract associated transcript"
+              : "Paste call transcript or payer portal text to auto-fill"}
         >
-          Paste Transcript
+          {isAuditSpecialist ? "🔍 View / Re-Extract Transcript" : "Paste Transcript"}
         </button>
       </VobFormBanner>
 
@@ -153,6 +156,7 @@ export function VerificationFormView() {
         initialTranscript={formData.transcript || formData.transcriptText || vob.transcript || ''}
         transcriptFileName={formData.transcriptFileName || vob.transcriptFileName || ''}
         onApplyFields={handleApplyAiFields}
+        canAutoFill={!isAuditSpecialist}
       />
 
       {/* Correction & Audit Logs Modal */}
