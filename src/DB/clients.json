@@ -3,22 +3,6 @@
   "description": "Client specifications, color palettes, and extended column definitions mapping onto canonical fields",
   "clients": [
     {
-      "id": "parker",
-      "name": "Parker Clinic",
-      "description": "Physical therapy & sports rehabilitation",
-      "color": "#0284c7",
-      "extendedColumns": [
-        "Request Type",
-        "Verification Type",
-        "PAT",
-        "Additional Info",
-        "HSA/HRA AMT",
-        "TFL Claims",
-        "Secondary Payer"
-      ],
-      "notes": "Uses Pre-Authorization & Benefits Determination format"
-    },
-    {
       "id": "arra",
       "name": "Arra",
       "description": "Multi-specialty clinic group",

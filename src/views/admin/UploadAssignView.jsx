@@ -669,7 +669,7 @@ export function UploadAssignView() {
                     <th style={{ padding: '10px 12px' }}>Row #</th>
                     <th style={{ padding: '10px 12px' }}>Patient Name</th>
                     <th style={{ padding: '10px 12px' }}>DOB</th>
-                    <th style={{ padding: '10px 12px' }}>Date of Service</th>
+                    <th style={{ padding: '10px 12px' }}>Service Type</th>
                     <th style={{ padding: '10px 12px' }}>Insurance / Payer</th>
                     <th style={{ padding: '10px 12px' }}>Member ID</th>
                     <th style={{ padding: '10px 12px' }}>Assigned Specialist</th>
@@ -698,7 +698,7 @@ export function UploadAssignView() {
                         <td style={{ padding: '10px 12px', fontFamily: 'var(--mono)', color: 'var(--ink-soft)' }}>#{r.row}</td>
                         <td style={{ padding: '10px 12px', fontWeight: 600 }}>{r.patientName}</td>
                         <td style={{ padding: '10px 12px' }}>{r.dob || <span style={{ color: 'var(--ink-soft)' }}>—</span>}</td>
-                        <td style={{ padding: '10px 12px' }}>{r.dos || <span style={{ color: 'var(--ink-soft)' }}>—</span>}</td>
+                        <td style={{ padding: '10px 12px' }}>{r.appointmentType || r.dos || 'Physical Therapy'}</td>
                         <td style={{ padding: '10px 12px' }}>{r.insurance || <span style={{ color: 'var(--ink-soft)' }}>—</span>}</td>
                         <td style={{ padding: '10px 12px', fontFamily: 'var(--mono)', fontSize: '12px' }}>{r.idCard || <span style={{ color: 'var(--ink-soft)' }}>—</span>}</td>
                         <td style={{ padding: '8px 12px' }}>

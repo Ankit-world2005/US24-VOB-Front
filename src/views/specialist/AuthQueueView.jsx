@@ -88,8 +88,8 @@ export function AuthQueueView() {
                 <th>Record ID</th>
                 <th>Client</th>
                 <th>Patient Name</th>
-                <th>Date of Service</th>
-                <th>Insurance Carrier</th>
+                <th>Service Type</th>
+                <th>Insurance / Payer</th>
                 <th>TAT Requirement</th>
                 <th>Auth Number / Status</th>
                 <th>Actions</th>
@@ -116,9 +116,12 @@ export function AuthQueueView() {
                     <td><ClientBadge clientId={v.clientName || v.client} /></td>
                     <td>
                       <div className="bold">{v.patientName}</div>
-                      <div className="patient-sub-cell">{v.appointmentType}</div>
+                      <div className="patient-sub-cell">DOB: {v.dob}</div>
                     </td>
-                    <td>{v.dos}</td>
+                    <td>
+                      <div>{v.appointmentType || 'Physical Therapy'}</div>
+                      {v.dos && <div className="patient-sub-cell">DOS: {v.dos}</div>}
+                    </td>
                     <td>{v.insurance}</td>
                     <td>
                       <span className="tat-chip">{v.authRequestTat || '3-5 business days'}</span>

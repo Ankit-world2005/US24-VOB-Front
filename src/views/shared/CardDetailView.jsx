@@ -143,7 +143,7 @@ function CardRecords({ card, isAdmin }) {
                   <th>Record ID</th>
                   <th>Client</th>
                   <th>Patient</th>
-                  <th>Date of Service</th>
+                  <th>Service Type</th>
                   {isAdmin && <th>Assigned To</th>}
                   <th>Status</th>
                   {card.id === 'error' && <th>Failing Rules</th>}
@@ -175,7 +175,7 @@ function CardRecords({ card, isAdmin }) {
                       <td className="mono" title={v.id}>{/^[A-Z]+-\d+$/.test(v.id) ? v.id : v.id.slice(0, 8)}</td>
                       <td><ClientBadge clientId={v.clientName || v.client} /></td>
                       <td className="bold">{v.patientName}</td>
-                      <td>{v.dos || '—'}</td>
+                      <td>{v.appointmentType || 'Physical Therapy'}</td>
                       {isAdmin && <td>{v.assignedTo || 'Unassigned'}</td>}
                       <td><StatusBadge status={v.vobStatus} /></td>
                       {card.id === 'error' && <td className="mono failure-count">{v.failureCount}</td>}

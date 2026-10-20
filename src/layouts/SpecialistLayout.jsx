@@ -1,6 +1,7 @@
-import React, { Suspense, lazy, useEffect } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { UI_CONTENT } from '../DB';
+import { isAssignedToUser, STORAGE_KEY, CLIENT_REQUESTS_SYNC_EVENT, INITIAL_REQUESTS } from '../data/clientRequests';
 
 const SpecialistDashboardView = lazy(() => import('../views/specialist/SpecialistDashboardView').then(m => ({ default: m.SpecialistDashboardView })));
 const VerificationFormView = lazy(() => import('../views/specialist/VerificationFormView').then(m => ({ default: m.VerificationFormView })));
@@ -8,11 +9,47 @@ const QueueView = lazy(() => import('../views/specialist/QueueView').then(m => (
 const AuthQueueView = lazy(() => import('../views/specialist/AuthQueueView').then(m => ({ default: m.AuthQueueView })));
 const ErrorQueueView = lazy(() => import('../views/specialist/ErrorQueueView').then(m => ({ default: m.ErrorQueueView })));
 const SavedRecordsView = lazy(() => import('../views/specialist/SavedRecordsView').then(m => ({ default: m.SavedRecordsView })));
+const ClientRequestView = lazy(() => import('../views/admin/ClientRequestView').then(m => ({ default: m.ClientRequestView })));
 const CardDetailView = lazy(() => import('../views/shared/CardDetailView').then(m => ({ default: m.CardDetailView })));
 
 export function SpecialistLayout() {
   const { activeTab, setActiveTab, currentUser } = useWorkspace();
   const isAuditSpecialist = currentUser?.role === 'auth' || currentUser?.role === 'auth_specialist' || currentUser?.role === 'audit' || currentUser?.email === 'jitender.s@us24solutions.com' || currentUser?.email === 'ankit.k@us24solutions.com';
+
+  // Live count of pending client requests assigned to this specialist
+  const [assignedClientRequestsCount, setAssignedClientRequestsCount] = useState(0);
+
+  useEffect(() => {
+    const updateCount = () => {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        const list = saved ? JSON.parse(saved) : INITIAL_REQUESTS;
+        if (Array.isArray(list)) {
+          const pendingForMe = list.filter(r => isAssignedToUser(r, currentUser) && r.status !== 'Completed');
+          setAssignedClientRequestsCount(pendingForMe.length);
+        }
+      } catch (err) {
+        // ignore parse error
+      }
+    };
+
+    updateCount();
+
+    const handleSync = () => updateCount();
+    const handleStorage = (e) => {
+      if (e.key === STORAGE_KEY) updateCount();
+    };
+
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener(CLIENT_REQUESTS_SYNC_EVENT, handleSync);
+    const interval = setInterval(updateCount, 3000);
+
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener(CLIENT_REQUESTS_SYNC_EVENT, handleSync);
+      clearInterval(interval);
+    };
+  }, [currentUser]);
 
   // Automatically redirect regular specialists if attempting restricted views
   useEffect(() => {
@@ -29,6 +66,14 @@ export function SpecialistLayout() {
     .map(tab => {
       if (tab.id === 'queue') {
         return { ...tab, label: '📋 Audit Queue' };
+      }
+      if (tab.id === 'client_requests') {
+        return {
+          ...tab,
+          label: assignedClientRequestsCount > 0
+            ? `📨 Client Requests (${assignedClientRequestsCount})`
+            : '📨 Client Requests'
+        };
       }
       return tab;
     });
@@ -70,6 +115,7 @@ export function SpecialistLayout() {
           {activeTab === 'auth_queue' && <AuthQueueView />}
           {activeTab === 'error_queue' && <ErrorQueueView />}
           {activeTab === 'saved_records' && <SavedRecordsView />}
+          {activeTab === 'client_requests' && <ClientRequestView />}
           {activeTab === 'card_detail' && <CardDetailView />}
         </Suspense>
       </div>

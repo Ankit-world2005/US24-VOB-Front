@@ -143,8 +143,8 @@ export function SpecialistDashboardView() {
                   <th>Client</th>
                   <th>Patient Name</th>
                   <th>Submitting Specialist</th>
-                  <th>Date of Service</th>
-                  <th>Insurance Carrier</th>
+                  <th>Service Type</th>
+                  <th>Insurance / Payer</th>
                   <th>Action</th>
                 </tr>
               </thead>
@@ -167,7 +167,10 @@ export function SpecialistDashboardView() {
                           👤 {v.previous_assignee?.name || v.previousAssignee || 'Specialist'}
                         </span>
                       </td>
-                      <td>{v.dos}</td>
+                      <td>
+                        <div>{v.appointmentType || 'Physical Therapy'}</div>
+                        {v.dos && <div className="patient-sub-cell">DOS: {v.dos}</div>}
+                      </td>
                       <td>
                         <div>{v.insurance}</div>
                         <div className="patient-sub-cell">{v.planTypeAndName}</div>
@@ -195,6 +198,8 @@ export function SpecialistDashboardView() {
         </section>
       )}
 
+
+
       {/* My Assigned Tasks Table (Both Specialists and Audit Specialists) */}
       <section className="panel-card">
         <div className="panel-header">
@@ -211,8 +216,8 @@ export function SpecialistDashboardView() {
                 <th>Record ID</th>
                 <th>Client</th>
                 <th>Patient Name</th>
-                <th>Date of Service</th>
-                <th>Insurance Carrier</th>
+                <th>Service Type</th>
+                <th>Insurance / Payer</th>
                 <th>Status</th>
                 <th>Action</th>
               </tr>
@@ -233,7 +238,10 @@ export function SpecialistDashboardView() {
                       <div className="bold">{v.patientName}</div>
                       <div className="patient-sub-cell">DOB: {v.dob}</div>
                     </td>
-                    <td>{v.dos}</td>
+                    <td>
+                      <div>{v.appointmentType || 'Physical Therapy'}</div>
+                      {v.dos && <div className="patient-sub-cell">DOS: {v.dos}</div>}
+                    </td>
                     <td>
                       <div>{v.insurance}</div>
                       <div className="patient-sub-cell">{v.planTypeAndName}</div>

@@ -182,7 +182,9 @@ export function normalizeVobListItem(item) {
     failingRules: failureList,
     updatedAt: item.updated_at || item.updatedAt,
     reassignedAt: item.reassigned_at || item.reassignedAt || null,
-    insurance: item.insurance || item.fields?.insurance || 'General Healthcare',
+    insurance: item.insurance || item.fields?.insurance || '—',
+    planTypeAndName: item.plan_type_and_name || item.planTypeAndName || item.fields?.plan_type_and_name || '',
+    idCard: item.id_card || item.idCard || item.idCardRef || item.fields?.id_card_ref || '',
     appointmentType: item.appointment_type || item.appointmentType || item.fields?.service_type || item.serviceType || 'Physical Therapy',
     authRequestTat: item.auth_request_tat || item.fields?.auth_request_tat || item.authRequestTat || '3-5 business days',
     authDetails: {

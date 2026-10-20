@@ -37,6 +37,10 @@
         "label": "📥 Upload & Assign"
       },
       {
+        "id": "client_requests",
+        "label": "📨 Client Requests"
+      },
+      {
         "id": "records",
         "label": "📋 All Client Records"
       },
@@ -49,6 +53,10 @@
       {
         "id": "my_dashboard",
         "label": "⚡ My Dashboard"
+      },
+      {
+        "id": "client_requests",
+        "label": "📨 Client Requests"
       },
       {
         "id": "verification",

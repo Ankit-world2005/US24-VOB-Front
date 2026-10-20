@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DataError } from '../../components/DataError';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { vobsApi } from '../../api/vobs';
@@ -160,8 +160,8 @@ export function SavedRecordsView() {
                 <th>Record ID</th>
                 <th>Client</th>
                 <th>Patient Name</th>
-                <th>Date of Service</th>
-                <th>Insurance Carrier</th>
+                <th>Service Type</th>
+                <th>Insurance / Payer</th>
                 <th>Cost Share / Copay</th>
                 <th>Completion Date</th>
                 <th>Documentation Actions</th>
@@ -190,7 +190,10 @@ export function SavedRecordsView() {
                       <div className="bold">{v.patientName}</div>
                       <div className="patient-sub-cell">ID: {v.idCard}</div>
                     </td>
-                    <td>{v.dos}</td>
+                    <td>
+                      <div>{v.appointmentType || 'Physical Therapy'}</div>
+                      {v.dos && <div className="patient-sub-cell">DOS: {v.dos}</div>}
+                    </td>
                     <td>{v.insurance}</td>
                     <td><span className="copay-highlight">{v.copayCoinsurance}</span></td>
                     <td className="mono">{v.vobCompletionDate || '2026-09-21'}</td>

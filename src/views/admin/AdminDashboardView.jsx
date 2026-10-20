@@ -94,6 +94,23 @@ export function AdminDashboardView() {
             <button type="button" className="btn btn-sm" onClick={() => setActiveTab('upload_assign')}>
               + Upload & Assign Intake
             </button>
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => setActiveTab('client_requests')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: '#0284c7',
+                color: '#fff',
+                borderColor: '#0284c7',
+                fontWeight: 600
+              }}
+              title="Open Client Requests Dashboard (Teams, Sheet, Email)"
+            >
+              📥 Client Request
+            </button>
           </div>
         </div>
 
@@ -307,8 +324,8 @@ export function AdminDashboardView() {
                 <tr>
                   <th>Client</th>
                   <th>Patient Name & DOB</th>
-                  <th>Date of Service</th>
-                  <th>Insurance & Plan</th>
+                  <th>Service Type</th>
+                  <th>Insurance / Payer</th>
                   <th>Status</th>
                   <th>Assigned Specialist</th>
                   <th>Action</th>
@@ -323,8 +340,8 @@ export function AdminDashboardView() {
                       <div className="patient-sub-cell">DOB: {v.dob}</div>
                     </td>
                     <td>
-                      <div>{v.dos}</div>
-                      <div className="patient-sub-cell">{v.appointmentType}</div>
+                      <div>{v.appointmentType || 'Physical Therapy'}</div>
+                      {v.dos && <div className="patient-sub-cell">DOS: {v.dos}</div>}
                     </td>
                     <td>
                       <div>{v.insurance}</div>
