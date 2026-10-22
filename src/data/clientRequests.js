@@ -14,6 +14,7 @@ export const DEFAULT_SPECIALISTS = [
 export const INITIAL_REQUESTS = [
   {
     id: 'CR-1001',
+    patientName: 'Eleanor Vance',
     mode: 'Teams',
     client: 'arra',
     insName: 'UnitedHealthcare (UHC)',
@@ -60,6 +61,7 @@ export const INITIAL_REQUESTS = [
   },
   {
     id: 'CR-1002',
+    patientName: 'Marcus Brody',
     mode: 'Email',
     client: 'west_az',
     insName: 'Blue Cross Blue Shield (BCBS)',
@@ -106,6 +108,7 @@ export const INITIAL_REQUESTS = [
   },
   {
     id: 'CR-1003',
+    patientName: 'Sophia Loren',
     mode: 'Sheet',
     client: 'sugarland',
     insName: 'Aetna Healthcare',

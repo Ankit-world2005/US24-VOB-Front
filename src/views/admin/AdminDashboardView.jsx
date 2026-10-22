@@ -109,7 +109,7 @@ export function AdminDashboardView() {
               }}
               title="Open Client Requests Dashboard (Teams, Sheet, Email)"
             >
-              📥 Client Request
+              📨 Client Requests
             </button>
           </div>
         </div>

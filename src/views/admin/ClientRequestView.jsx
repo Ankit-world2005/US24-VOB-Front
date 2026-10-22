@@ -23,20 +23,20 @@ const CARD_DEFINITIONS = [
     filter: () => true
   },
   {
-    id: 'completed',
-    label: '✅ Completed',
-    tone: 'tone-approved',
-    meta: 'Finished and verified client intake requests',
-    getCount: (list) => list.reduce((acc, r) => acc + (Number(r.completed) || 0), 0),
-    filter: (r) => r.status === 'Completed'
-  },
-  {
     id: 'pending',
     label: '⏳ Pending / In Progress',
     tone: 'tone-pending',
     meta: 'Requests awaiting specialist verification and completion',
-    getCount: (list) => list.reduce((acc, r) => acc + (Number(r.notCompleted) || 0), 0),
+    getCount: (list) => list.filter(r => r.status !== 'Completed').reduce((acc, r) => acc + (Number(r.notCompleted) || 1), 0),
     filter: (r) => r.status !== 'Completed'
+  },
+  {
+    id: 'completed',
+    label: '✅ Completed',
+    tone: 'tone-approved',
+    meta: 'Finished and verified client intake requests',
+    getCount: (list) => list.filter(r => r.status === 'Completed').reduce((acc, r) => acc + (Number(r.completed) || 0), 0),
+    filter: (r) => r.status === 'Completed'
   }
 ];
 
@@ -97,6 +97,7 @@ export function ClientRequestView() {
   const [showForm, setShowForm] = useState(false);
   const [mode, setMode] = useState('Teams');
   const [selectedClient, setSelectedClient] = useState('arra');
+  const [patientName, setPatientName] = useState('');
   const [insName, setInsName] = useState('');
   const [insPhone, setInsPhone] = useState('');
   const [planType, setPlanType] = useState('');
@@ -109,7 +110,8 @@ export function ClientRequestView() {
   const [editRemark, setEditRemark] = useState('');
   const [editAssignTo, setEditAssignTo] = useState('');
 
-  // Main Table Filters & Search
+  // Main Table Tab & Filters
+  const [activeMainTab, setActiveMainTab] = useState('all'); // 'all' | 'pending' | 'in_progress' | 'completed' | 'teams' | 'sheet' | 'email'
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMode, setFilterMode] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -212,6 +214,10 @@ export function ClientRequestView() {
       showToast('Please enter an Insurance Name (INS NAME).', 'warning');
       return;
     }
+    if (!patientName.trim()) {
+      showToast('Please enter Patient Name.', 'warning');
+      return;
+    }
 
     const nextId = `CR-${1000 + requests.length + 1}`;
     const creatorLabel = currentUser?.name
@@ -223,6 +229,7 @@ export function ClientRequestView() {
       id: nextId,
       mode,
       client: selectedClient,
+      patientName: patientName.trim(),
       insName: insName.trim(),
       insPhone: insPhone.trim(),
       planType: planType.trim(),
@@ -243,7 +250,7 @@ export function ClientRequestView() {
           action: 'Request Created & Assigned',
           from: null,
           to: `Assigned to ${assignTo}`,
-          note: remark.trim() || `Intake received via ${mode} for client ${selectedClient.toUpperCase()}. Insurance: ${insName.trim()}.`
+          note: remark.trim() || `Intake received via ${mode} for patient ${patientName.trim()} (${selectedClient.toUpperCase()}). Insurance: ${insName.trim()}.`
         }
       ]
     };
@@ -251,9 +258,10 @@ export function ClientRequestView() {
     const updated = [newEntry, ...requests];
     setRequests(updated);
     persistAndSyncClientRequests(updated);
-    showToast(`Client Request ${nextId} created and assigned to ${assignTo}!`, 'success');
+    showToast(`Client Request ${nextId} created for ${patientName.trim()} and assigned to ${assignTo}!`, 'success');
 
     // Reset Form
+    setPatientName('');
     setInsName('');
     setInsPhone('');
     setPlanType('');
@@ -417,6 +425,7 @@ export function ClientRequestView() {
         id: `CR-${1000 + requests.length + 1}`,
         mode: 'Teams',
         client: 'arra',
+        patientName: 'Jane Smith',
         insName: 'UnitedHealthcare (UHC)',
         insPhone: '1-800-842-8178',
         planType: 'Choice Plus PPO',
@@ -443,6 +452,7 @@ export function ClientRequestView() {
         id: `CR-${1000 + requests.length + 2}`,
         mode: 'Email',
         client: 'sugarland',
+        patientName: 'David Miller',
         insName: 'Aetna Healthcare',
         insPhone: '1-800-872-3862',
         planType: 'Managed Choice POS',
@@ -478,12 +488,13 @@ export function ClientRequestView() {
       showToast('No requests to export.', 'info');
       return;
     }
-    const headers = ['Request ID', 'Date', 'Mode', 'Client', 'Insurance Name', 'Insurance Phone', 'Plan Type', 'Assigned By', 'Assign To', 'Total', 'Completed', 'Not completed', 'Status', 'Remark', 'Log Count'];
+    const headers = ['Request ID', 'Date', 'Mode', 'Client', 'Patient Name', 'Insurance Name', 'Insurance Phone', 'Plan Type', 'Assigned By', 'Assign To', 'Total', 'Completed', 'Not completed', 'Status', 'Remark', 'Log Count'];
     const rows = customList.map(r => [
       r.id,
       new Date(r.createdAt).toLocaleDateString(),
       r.mode,
       CLIENTS.find(c => c.id === r.client)?.name || r.client,
+      `"${(r.patientName || '').replace(/"/g, '""')}"`,
       `"${(r.insName || '').replace(/"/g, '""')}"`,
       r.insPhone || '',
       `"${(r.planType || '').replace(/"/g, '""')}"`,
@@ -513,23 +524,36 @@ export function ClientRequestView() {
   const totalCompleted = scopedRequests.reduce((acc, r) => acc + (Number(r.completed) || 0), 0);
   const totalNotCompleted = scopedRequests.reduce((acc, r) => acc + (Number(r.notCompleted) || 0), 0);
   const completionPct = totalVolume > 0 ? Math.round((totalCompleted / totalVolume) * 100) : 0;
+  const inProgressCount = scopedRequests.filter(r => r.status === 'In Progress').length;
 
   // Breakdown by channel / mode
   const teamsCount = scopedRequests.filter(r => r.mode === 'Teams').reduce((acc, r) => acc + (Number(r.total) || 1), 0);
   const sheetCount = scopedRequests.filter(r => r.mode === 'Sheet').reduce((acc, r) => acc + (Number(r.total) || 1), 0);
   const emailCount = scopedRequests.filter(r => r.mode === 'Email').reduce((acc, r) => acc + (Number(r.total) || 1), 0);
 
-  // Filtered requests for the main table
+  // Filtered requests for the main table (combining category tab with client filter & search)
   const filteredRequests = scopedRequests.filter(r => {
+    // 1. Tab filter
+    if (activeMainTab === 'pending' && r.status === 'Completed') return false;
+    if (activeMainTab === 'in_progress' && r.status !== 'In Progress') return false;
+    if (activeMainTab === 'completed' && r.status !== 'Completed') return false;
+    if (activeMainTab === 'teams' && r.mode !== 'Teams') return false;
+    if (activeMainTab === 'sheet' && r.mode !== 'Sheet') return false;
+    if (activeMainTab === 'email' && r.mode !== 'Email') return false;
+
+    // 2. Dropdown filters (if applied)
     if (filterMode !== 'all' && r.mode !== filterMode) return false;
     if (filterStatus === 'completed' && r.status !== 'Completed') return false;
     if (filterStatus === 'not_completed' && r.status === 'Completed') return false;
     if (filterStatus === 'in_progress' && r.status !== 'In Progress') return false;
     if (filterClient !== 'all' && r.client !== filterClient) return false;
+
+    // 3. Search query
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return (
       r.id.toLowerCase().includes(q) ||
+      (r.patientName || '').toLowerCase().includes(q) ||
       (r.insName || '').toLowerCase().includes(q) ||
       (r.planType || '').toLowerCase().includes(q) ||
       (r.remark || '').toLowerCase().includes(q) ||
@@ -555,6 +579,7 @@ export function ClientRequestView() {
       const q = cardSearchQuery.toLowerCase();
       return (
         r.id.toLowerCase().includes(q) ||
+        (r.patientName || '').toLowerCase().includes(q) ||
         (r.insName || '').toLowerCase().includes(q) ||
         (r.planType || '').toLowerCase().includes(q) ||
         (r.remark || '').toLowerCase().includes(q) ||
@@ -569,7 +594,7 @@ export function ClientRequestView() {
     return (
       <div className="card-detail-view" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         {/* Navigation Bar */}
-        <nav className="card-detail-nav" aria-label="Client Request Cards" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+        <nav className="card-detail-nav" aria-label="Client Request Cards">
           <button
             type="button"
             className="btn-action-link"
@@ -578,23 +603,12 @@ export function ClientRequestView() {
               setSelectedRecordId(null);
               setCardModeFilter('all');
             }}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontSize: '13px',
-              fontWeight: 600,
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              color: '#0284c7'
-            }}
           >
             ← Back to Client Requests Dashboard
           </button>
 
           {/* Switcher Chips */}
-          <div className="card-switcher" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <div className="card-switcher">
             {CARD_DEFINITIONS.map(c => {
               const count = c.getCount(scopedRequests);
               const isActive = selectedCardView === c.id;
@@ -603,35 +617,14 @@ export function ClientRequestView() {
                   key={c.id}
                   type="button"
                   className={`card-chip ${c.tone} ${isActive ? 'active' : ''}`}
+                  aria-current={isActive ? 'page' : undefined}
                   onClick={() => {
                     setSelectedCardView(c.id);
                     setSelectedRecordId(null);
                   }}
-                  style={{
-                    padding: '6px 12px',
-                    borderRadius: '20px',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    border: isActive ? '2px solid #0284c7' : '1px solid var(--rule)',
-                    background: isActive ? '#0284c7' : 'var(--surface)',
-                    color: isActive ? '#fff' : 'var(--ink)'
-                  }}
                 >
-                  <span>{c.label}</span>
-                  <span style={{
-                    padding: '1px 6px',
-                    borderRadius: '10px',
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    background: isActive ? 'rgba(255,255,255,0.25)' : 'var(--surface-2)',
-                    color: isActive ? '#fff' : 'var(--ink)'
-                  }}>
-                    {count}
-                  </span>
+                  <span className="card-chip-label">{c.label}</span>
+                  <span className="card-chip-count">{count}</span>
                 </button>
               );
             })}
@@ -712,6 +705,7 @@ export function ClientRequestView() {
                     <th>Req ID</th>
                     <th>Mode</th>
                     <th>Client</th>
+                    <th>Patient</th>
                     <th>Insurance &amp; Plan</th>
                     {canAssign ? <th>Assignee</th> : <th>Assigned By</th>}
                     <th>Status</th>
@@ -721,7 +715,7 @@ export function ClientRequestView() {
                 <tbody>
                   {cardFilteredRecords.length === 0 ? (
                     <tr>
-                      <td colSpan="7" className="table-empty" style={{ textAlign: 'center', padding: '36px' }}>
+                      <td colSpan="8" className="table-empty" style={{ textAlign: 'center', padding: '36px' }}>
                         No client requests found in this card view.
                       </td>
                     </tr>
@@ -758,6 +752,9 @@ export function ClientRequestView() {
                           </td>
                           <td style={{ fontWeight: 600, fontSize: '12px' }}>
                             {CLIENTS.find(c => c.id === r.client)?.name || r.client}
+                          </td>
+                          <td style={{ fontWeight: 600, fontSize: '12px', color: 'var(--ink)' }}>
+                            {r.patientName || '—'}
                           </td>
                           <td>
                             <div style={{ fontWeight: 600, fontSize: '12px' }}>{r.insName}</div>
@@ -818,8 +815,11 @@ export function ClientRequestView() {
                     <h3 style={{ margin: '4px 0', fontSize: '18px', fontWeight: 700, color: 'var(--ink)' }}>
                       {currentSelected.insName}
                     </h3>
-                    <div style={{ fontSize: '13px', color: 'var(--ink-soft)' }}>
-                      Client: <strong>{CLIENTS.find(c => c.id === currentSelected.client)?.name || currentSelected.client}</strong>
+                    <div style={{ fontSize: '13px', color: 'var(--ink-soft)', display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '2px' }}>
+                      <span>Client: <strong>{CLIENTS.find(c => c.id === currentSelected.client)?.name || currentSelected.client}</strong></span>
+                      {currentSelected.patientName && (
+                        <span>· Patient: <strong style={{ color: 'var(--ink)' }}>{currentSelected.patientName}</strong></span>
+                      )}
                     </div>
                   </div>
 
@@ -847,6 +847,11 @@ export function ClientRequestView() {
 
                 {/* Facts Grid */}
                 <dl className="task-facts" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '10px', margin: 0 }}>
+                  <div>
+                    <dt style={{ fontSize: '10.5px', textTransform: 'uppercase', color: 'var(--ink-soft)', fontWeight: 600 }}>Patient Name</dt>
+                    <dd style={{ fontSize: '13px', fontWeight: 600, color: 'var(--ink)' }}>👤 {currentSelected.patientName || '—'}</dd>
+                  </div>
+
                   <div>
                     <dt style={{ fontSize: '10.5px', textTransform: 'uppercase', color: 'var(--ink-soft)', fontWeight: 600 }}>Carrier Phone</dt>
                     <dd style={{ fontSize: '13px', fontWeight: 600, fontFamily: 'monospace', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -881,7 +886,6 @@ export function ClientRequestView() {
                     <dt style={{ fontSize: '10.5px', textTransform: 'uppercase', color: 'var(--ink-soft)', fontWeight: 600 }}>Assigned By</dt>
                     <dd style={{ fontSize: '13px', fontWeight: 600, color: '#6366f1' }}>{currentSelected.assignedBy || 'Admin'}</dd>
                   </div>
-
 
                   <div>
                     <dt style={{ fontSize: '10.5px', textTransform: 'uppercase', color: 'var(--ink-soft)', fontWeight: 600 }}>Date Received</dt>
@@ -1097,35 +1101,29 @@ export function ClientRequestView() {
 
             {/* Scope Filter Switcher - Only Admin & Audit Specialists can switch scopes */}
             {canAssign ? (
-              <div style={{ display: 'flex', gap: '8px', marginTop: '10px', alignItems: 'center' }}>
-                <button
-                  type="button"
-                  className={`btn btn-sm ${assigneeScope === 'all' ? 'btn-primary' : 'ghost'}`}
-                  onClick={() => setAssigneeScope('all')}
-                  style={{
-                    fontWeight: 600,
-                    fontSize: '12px',
-                    background: assigneeScope === 'all' ? '#0284c7' : 'transparent',
-                    borderColor: assigneeScope === 'all' ? '#0284c7' : 'var(--rule)',
-                    color: assigneeScope === 'all' ? '#fff' : 'var(--ink)'
-                  }}
-                >
-                  🌐 All Department Requests ({requests.length})
-                </button>
-                <button
-                  type="button"
-                  className={`btn btn-sm ${assigneeScope === 'mine' ? 'btn-primary' : 'ghost'}`}
-                  onClick={() => setAssigneeScope('mine')}
-                  style={{
-                    fontWeight: 600,
-                    fontSize: '12px',
-                    background: assigneeScope === 'mine' ? '#0284c7' : 'transparent',
-                    borderColor: assigneeScope === 'mine' ? '#0284c7' : 'var(--rule)',
-                    color: assigneeScope === 'mine' ? '#fff' : 'var(--ink)'
-                  }}
-                >
-                  👤 Assigned to Me ({myAssignedCount})
-                </button>
+              <div style={{ marginTop: '12px' }}>
+                <div className="segmented-scope-control" role="tablist" aria-label="Request Scope">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={assigneeScope === 'all'}
+                    className={`segmented-tab-btn ${assigneeScope === 'all' ? 'active' : ''}`}
+                    onClick={() => setAssigneeScope('all')}
+                  >
+                    <span>🌐 All Department Requests</span>
+                    <span className="tab-badge">{requests.length}</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={assigneeScope === 'mine'}
+                    className={`segmented-tab-btn ${assigneeScope === 'mine' ? 'active' : ''}`}
+                    onClick={() => setAssigneeScope('mine')}
+                  >
+                    <span>👤 Assigned to Me</span>
+                    <span className="tab-badge">{myAssignedCount}</span>
+                  </button>
+                </div>
               </div>
             ) : (
               <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1299,10 +1297,7 @@ export function ClientRequestView() {
           </div>
           <div style={{ display: 'flex', gap: '12px', marginTop: '10px', fontSize: '13px' }}>
             <div
-              onClick={() => {
-                setSelectedCardView('all');
-                setCardModeFilter('Teams');
-              }}
+              onClick={() => { setSelectedCardView('all'); setCardModeFilter('Teams'); }}
               style={{ cursor: 'pointer', padding: '4px 6px', borderRadius: '4px', background: 'var(--surface-2)', transition: 'background .2s' }}
               title="Click to view Teams records & logs"
             >
@@ -1311,10 +1306,7 @@ export function ClientRequestView() {
             </div>
 
             <div
-              onClick={() => {
-                setSelectedCardView('all');
-                setCardModeFilter('Sheet');
-              }}
+              onClick={() => { setSelectedCardView('all'); setCardModeFilter('Sheet'); }}
               style={{ cursor: 'pointer', padding: '4px 6px', borderRadius: '4px', background: 'var(--surface-2)', transition: 'background .2s' }}
               title="Click to view Sheets records & logs"
             >
@@ -1323,10 +1315,7 @@ export function ClientRequestView() {
             </div>
 
             <div
-              onClick={() => {
-                setSelectedCardView('all');
-                setCardModeFilter('Email');
-              }}
+              onClick={() => { setSelectedCardView('all'); setCardModeFilter('Email'); }}
               style={{ cursor: 'pointer', padding: '4px 6px', borderRadius: '4px', background: 'var(--surface-2)', transition: 'background .2s' }}
               title="Click to view Email records & logs"
             >
@@ -1335,7 +1324,7 @@ export function ClientRequestView() {
             </div>
           </div>
           <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--ink-soft)' }}>
-            Channel distribution breakdown
+            Channel distribution breakdown · Click channel to open
           </div>
         </div>
       </div>
@@ -1354,14 +1343,10 @@ export function ClientRequestView() {
           </div>
 
           <form onSubmit={handleSubmit} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-              gap: '16px'
-            }}>
-              {/* 1. Mode Dropdown */}
+            <div className="client-request-form-grid">
+              {/* Row 1, Col 1: Mode Dropdown */}
               <div className="field">
-                <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600 }}>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', color: 'var(--ink)' }}>
                   Mode (Channel) *
                 </label>
                 <select
@@ -1376,9 +1361,9 @@ export function ClientRequestView() {
                 </select>
               </div>
 
-              {/* Client Organization */}
+              {/* Row 1, Col 2: Client Organization */}
               <div className="field">
-                <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600 }}>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', color: 'var(--ink)' }}>
                   Client Organization *
                 </label>
                 <select
@@ -1393,56 +1378,26 @@ export function ClientRequestView() {
                 </select>
               </div>
 
-              {/* 2. INS NAME */}
+              {/* Row 1, Col 3: Patient Name */}
               <div className="field">
-                <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600 }}>
-                  INS NAME (Insurance Carrier / Payer) *
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', color: 'var(--ink)' }}>
+                  Patient Name *
                 </label>
                 <input
                   type="text"
                   className="input"
-                  placeholder="e.g. UHC, BCBS, Aetna, Humana, Medicare..."
-                  value={insName}
-                  onChange={(e) => setInsName(e.target.value)}
+                  placeholder="e.g. John Doe or Sarah Connor"
+                  value={patientName}
+                  onChange={(e) => setPatientName(e.target.value)}
                   style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid var(--rule)', background: 'var(--surface)', color: 'var(--ink)' }}
                   required
                 />
               </div>
 
-              {/* 3. INS PHONE NO */}
+              {/* Row 1, Col 4: Assign To */}
               <div className="field">
-                <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600 }}>
-                  INS PHONE NO
-                </label>
-                <input
-                  type="text"
-                  className="input"
-                  placeholder="e.g. 1-800-842-8178 or 800-344-4567"
-                  value={insPhone}
-                  onChange={(e) => setInsPhone(e.target.value)}
-                  style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid var(--rule)', background: 'var(--surface)', color: 'var(--ink)' }}
-                />
-              </div>
-
-              {/* 4. PLAN TYPE */}
-              <div className="field">
-                <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600 }}>
-                  PLAN TYPE
-                </label>
-                <input
-                  type="text"
-                  className="input"
-                  placeholder="e.g. Choice Plus PPO, HMO, Commercial, Medicare Advantage..."
-                  value={planType}
-                  onChange={(e) => setPlanType(e.target.value)}
-                  style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid var(--rule)', background: 'var(--surface)', color: 'var(--ink)' }}
-                />
-              </div>
-
-              {/* 5. Assign Too */}
-              <div className="field">
-                <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600 }}>
-                  Assign Too (Specialist) *
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', color: 'var(--ink)' }}>
+                  Assign To (Specialist) *
                 </label>
                 <select
                   className="select-input"
@@ -1457,21 +1412,67 @@ export function ClientRequestView() {
                   ))}
                 </select>
               </div>
-            </div>
 
-            {/* Remarkn */}
-            <div className="field">
-              <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600 }}>
-                Remarkn (Special Notes, Client Instructions, Escalation Info)
-              </label>
-              <textarea
-                className="input"
-                rows={3}
-                placeholder="Enter client remarks, instructions from Teams message, expected turnaround time..."
-                value={remark}
-                onChange={(e) => setRemark(e.target.value)}
-                style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--rule)', background: 'var(--surface)', color: 'var(--ink)', resize: 'vertical' }}
-              />
+              {/* Row 2, Col 1-2: INS NAME (Spans 2 columns) */}
+              <div className="field col-span-2">
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', color: 'var(--ink)' }}>
+                  INS NAME (Insurance Carrier / Payer) *
+                </label>
+                <input
+                  type="text"
+                  className="input"
+                  placeholder="e.g. UHC, BCBS, Aetna, Humana, Medicare..."
+                  value={insName}
+                  onChange={(e) => setInsName(e.target.value)}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid var(--rule)', background: 'var(--surface)', color: 'var(--ink)' }}
+                  required
+                />
+              </div>
+
+              {/* Row 2, Col 3: INS PHONE NO */}
+              <div className="field">
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', color: 'var(--ink)' }}>
+                  INS PHONE NO
+                </label>
+                <input
+                  type="text"
+                  className="input"
+                  placeholder="e.g. 1-800-842-8178 or 800-344-4567"
+                  value={insPhone}
+                  onChange={(e) => setInsPhone(e.target.value)}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid var(--rule)', background: 'var(--surface)', color: 'var(--ink)' }}
+                />
+              </div>
+
+              {/* Row 2, Col 4: PLAN TYPE */}
+              <div className="field">
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', color: 'var(--ink)' }}>
+                  PLAN TYPE
+                </label>
+                <input
+                  type="text"
+                  className="input"
+                  placeholder="e.g. Choice Plus PPO, HMO, Commercial, Medicare Advantage..."
+                  value={planType}
+                  onChange={(e) => setPlanType(e.target.value)}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid var(--rule)', background: 'var(--surface)', color: 'var(--ink)' }}
+                />
+              </div>
+
+              {/* Row 3, Col 1-4: Remarks (Spans all 4 columns) */}
+              <div className="field col-span-4">
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', color: 'var(--ink)' }}>
+                  Remarks (Special Notes, Client Instructions, Escalation Info)
+                </label>
+                <textarea
+                  className="input"
+                  rows={3}
+                  placeholder="Enter client remarks, instructions from Teams message, expected turnaround time..."
+                  value={remark}
+                  onChange={(e) => setRemark(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--rule)', background: 'var(--surface)', color: 'var(--ink)', resize: 'vertical' }}
+                />
+              </div>
             </div>
 
             {/* Form Buttons */}
@@ -1619,6 +1620,41 @@ export function ClientRequestView() {
           </div>
         </div>
 
+        {/* Client Request Category Tabs */}
+        <div className="client-request-tabs-wrapper">
+          <div className="client-request-tabs" role="tablist" aria-label="Client Request Category Filters">
+            {[
+              { id: 'all', label: '📋 All Requests', count: totalVolume },
+              { id: 'pending', label: '⏳ Pending', count: totalNotCompleted },
+              { id: 'in_progress', label: '🔄 In Progress', count: inProgressCount },
+              { id: 'completed', label: '✅ Completed', count: totalCompleted }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={activeMainTab === tab.id}
+                className={`client-request-tab ${activeMainTab === tab.id ? 'active' : ''}`}
+                onClick={() => setActiveMainTab(tab.id)}
+              >
+                <span>{tab.label}</span>
+                <span className="tab-count">{tab.count}</span>
+              </button>
+            ))}
+          </div>
+
+          {activeMainTab !== 'all' && (
+            <button
+              type="button"
+              className="btn btn-sm ghost"
+              onClick={() => setActiveMainTab('all')}
+              style={{ fontSize: '12px', padding: '4px 8px', whiteSpace: 'nowrap' }}
+            >
+              Reset Tab Filter
+            </button>
+          )}
+        </div>
+
         {/* Filter and Search Bar */}
         <div style={{
           display: 'flex',
@@ -1627,9 +1663,10 @@ export function ClientRequestView() {
           padding: '12px 20px',
           background: 'var(--surface-2)',
           borderBottom: '1px solid var(--rule)',
-          alignItems: 'center'
+          alignItems: 'center',
+          justifyContent: 'space-between'
         }}>
-          <div style={{ flex: '1 1 240px' }}>
+          <div style={{ flex: '1 1 260px' }}>
             <input
               type="text"
               className="input"
@@ -1640,42 +1677,33 @@ export function ClientRequestView() {
             />
           </div>
 
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            <select
-              className="select-input"
-              value={filterMode}
-              onChange={(e) => setFilterMode(e.target.value)}
-              style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--rule)', fontSize: '13px' }}
-            >
-              <option value="all">All Modes</option>
-              <option value="Teams">💬 Teams</option>
-              <option value="Sheet">📊 Sheet</option>
-              <option value="Email">✉️ Email</option>
-            </select>
-
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
             <select
               className="select-input"
               value={filterClient}
               onChange={(e) => setFilterClient(e.target.value)}
               style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--rule)', fontSize: '13px' }}
             >
-              <option value="all">All Clients</option>
+              <option value="all">All Clients ({CLIENTS.length})</option>
               {CLIENTS.map(c => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
 
-            <select
-              className="select-input"
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--rule)', fontSize: '13px' }}
-            >
-              <option value="all">All Statuses</option>
-              <option value="not_completed">⏳ Not Completed</option>
-              <option value="in_progress">🔄 In Progress</option>
-              <option value="completed">✅ Completed</option>
-            </select>
+            {(searchQuery || filterClient !== 'all' || activeMainTab !== 'all') && (
+              <button
+                type="button"
+                className="btn btn-sm ghost"
+                onClick={() => {
+                  setSearchQuery('');
+                  setFilterClient('all');
+                  setActiveMainTab('all');
+                }}
+                style={{ fontSize: '12px' }}
+              >
+                ✕ Clear All
+              </button>
+            )}
           </div>
         </div>
 
@@ -1687,18 +1715,19 @@ export function ClientRequestView() {
                 <th>Req ID</th>
                 <th>Mode</th>
                 <th>Client</th>
+                <th>Patient Name</th>
                 <th>Insurance Carrier &amp; Plan</th>
                 <th>INS Phone</th>
-                {canAssign ? <th>Assign Too</th> : <th>Assigned By</th>}
+                {canAssign ? <th>Assign To</th> : <th>Assigned By</th>}
                 <th>Status</th>
-                <th>Remarkn</th>
+                <th>Remarks</th>
                 <th style={{ textAlign: 'right' }}>Action</th>
               </tr>
             </thead>
             <tbody>
               {filteredRequests.length === 0 ? (
                 <tr>
-                  <td colSpan="9" className="table-empty" style={{ textAlign: 'center', padding: '48px 20px' }}>
+                  <td colSpan="10" className="table-empty" style={{ textAlign: 'center', padding: '48px 20px' }}>
                     <div style={{ fontSize: '32px', marginBottom: '8px' }}>📭</div>
                     <div style={{ fontWeight: 600, fontSize: '15px', color: 'var(--ink)' }}>
                       {isSpecialistOnly
@@ -1748,6 +1777,9 @@ export function ClientRequestView() {
                         </span>
                       </td>
                       <td><span style={{ fontWeight: 600 }}>{clientName}</span></td>
+                      <td>
+                        <div style={{ fontWeight: 600, color: 'var(--ink)' }}>{r.patientName || '—'}</div>
+                      </td>
                       <td>
                         <div className="bold">{r.insName}</div>
                         {r.planType && <div className="patient-sub-cell">{r.planType}</div>}
@@ -1916,6 +1948,13 @@ export function ClientRequestView() {
                 </div>
 
                 <div>
+                  <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--ink-soft)', fontWeight: 600 }}>Patient Name</span>
+                  <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--ink)', marginTop: '2px' }}>
+                    👤 {editingRequest.patientName || '—'}
+                  </div>
+                </div>
+
+                <div>
                   <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--ink-soft)', fontWeight: 600 }}>Insurance Carrier (INS NAME)</span>
                   <div style={{ fontSize: '13px', fontWeight: 700, color: '#0284c7', marginTop: '2px' }}>
                     {editingRequest.insName}
@@ -2019,11 +2058,11 @@ export function ClientRequestView() {
               </div>
 
 
-              {/* Specialist Remarkn Field */}
+              {/* Specialist Remarks Field */}
               <div className="field">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                   <label style={{ fontSize: '13px', fontWeight: 700 }}>
-                    Remarkn (Verification Details &amp; Notes) *
+                    Remarks (Verification Details &amp; Notes) *
                   </label>
                   <button
                     type="button"
@@ -2051,7 +2090,7 @@ export function ClientRequestView() {
               {canAssign && (
                 <div className="field">
                   <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600 }}>
-                    Reassign Too (Specialist)
+                    Reassign To (Specialist)
                   </label>
                   <select
                     className="select-input"

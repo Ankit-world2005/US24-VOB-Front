@@ -10,6 +10,7 @@ const INITIAL_REQUESTS = [
     id: 'CR-1001',
     mode: 'Teams',
     client: 'arra',
+    patientName: 'Jane Smith',
     insName: 'UnitedHealthcare (UHC)',
     insPhone: '1-800-842-8178',
     planType: 'Choice Plus PPO',
@@ -25,6 +26,7 @@ const INITIAL_REQUESTS = [
     id: 'CR-1002',
     mode: 'Email',
     client: 'west_az',
+    patientName: 'Michael Brown',
     insName: 'Blue Cross Blue Shield (BCBS)',
     insPhone: '1-800-241-0803',
     planType: 'BlueCare HMO',
@@ -40,6 +42,7 @@ const INITIAL_REQUESTS = [
     id: 'CR-1003',
     mode: 'Sheet',
     client: 'sugarland',
+    patientName: 'David Miller',
     insName: 'Aetna Healthcare',
     insPhone: '1-800-872-3862',
     planType: 'Managed Choice POS',
@@ -75,6 +78,7 @@ export function ClientRequestModal({ isOpen, onClose, onUpdated }) {
   // Form Fields State
   const [mode, setMode] = useState('Teams');
   const [selectedClient, setSelectedClient] = useState('arra');
+  const [patientName, setPatientName] = useState('');
   const [insName, setInsName] = useState('');
   const [insPhone, setInsPhone] = useState('');
   const [planType, setPlanType] = useState('');
@@ -123,12 +127,17 @@ export function ClientRequestModal({ isOpen, onClose, onUpdated }) {
       showToast('Please enter an Insurance Name (INS NAME).', 'warning');
       return;
     }
+    if (!patientName.trim()) {
+      showToast('Please enter Patient Name.', 'warning');
+      return;
+    }
 
     const nextId = `CR-${1000 + requests.length + 1}`;
     const newEntry = {
       id: nextId,
       mode,
       client: selectedClient,
+      patientName: patientName.trim(),
       insName: insName.trim(),
       insPhone: insPhone.trim(),
       planType: planType.trim(),
@@ -142,9 +151,10 @@ export function ClientRequestModal({ isOpen, onClose, onUpdated }) {
     };
 
     setRequests(prev => [newEntry, ...prev]);
-    showToast(`Client request ${nextId} saved successfully!`, 'success');
+    showToast(`Client request ${nextId} saved successfully for ${patientName.trim()}!`, 'success');
 
     // Reset form for next entry
+    setPatientName('');
     setInsName('');
     setInsPhone('');
     setPlanType('');
@@ -188,6 +198,7 @@ export function ClientRequestModal({ isOpen, onClose, onUpdated }) {
     const q = searchQuery.toLowerCase();
     return (
       r.id.toLowerCase().includes(q) ||
+      (r.patientName || '').toLowerCase().includes(q) ||
       (r.insName || '').toLowerCase().includes(q) ||
       (r.planType || '').toLowerCase().includes(q) ||
       (r.remark || '').toLowerCase().includes(q) ||
@@ -327,14 +338,10 @@ export function ClientRequestModal({ isOpen, onClose, onUpdated }) {
         <div style={{ padding: '20px 24px', overflowY: 'auto', flex: 1 }}>
           {activeTab === 'new' ? (
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-                gap: '16px'
-              }}>
-                {/* 1. Mode Dropdown */}
+              <div className="client-request-form-grid">
+                {/* Row 1, Col 1: Mode Dropdown */}
                 <div className="field">
-                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600 }}>
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', color: 'var(--ink)' }}>
                     Mode (Intake Channel) *
                   </label>
                   <select
@@ -349,9 +356,9 @@ export function ClientRequestModal({ isOpen, onClose, onUpdated }) {
                   </select>
                 </div>
 
-                {/* Client Organization */}
+                {/* Row 1, Col 2: Client Organization */}
                 <div className="field">
-                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600 }}>
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', color: 'var(--ink)' }}>
                     Client Organization *
                   </label>
                   <select
@@ -366,56 +373,26 @@ export function ClientRequestModal({ isOpen, onClose, onUpdated }) {
                   </select>
                 </div>
 
-                {/* 2. INS NAME */}
+                {/* Row 1, Col 3: Patient Name */}
                 <div className="field">
-                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600 }}>
-                    INS NAME (Insurance / Payer) *
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', color: 'var(--ink)' }}>
+                    Patient Name *
                   </label>
                   <input
                     type="text"
                     className="input"
-                    placeholder="e.g. UHC, BCBS, Aetna, Humana, Medicare..."
-                    value={insName}
-                    onChange={(e) => setInsName(e.target.value)}
+                    placeholder="e.g. John Doe or Sarah Connor"
+                    value={patientName}
+                    onChange={(e) => setPatientName(e.target.value)}
                     style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid var(--rule)', background: 'var(--surface)', color: 'var(--ink)' }}
                     required
                   />
                 </div>
 
-                {/* 3. INS PHONE NO */}
+                {/* Row 1, Col 4: Assign To */}
                 <div className="field">
-                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600 }}>
-                    INS PHONE NO
-                  </label>
-                  <input
-                    type="text"
-                    className="input"
-                    placeholder="e.g. 1-800-842-8178 or 800-344-4567"
-                    value={insPhone}
-                    onChange={(e) => setInsPhone(e.target.value)}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid var(--rule)', background: 'var(--surface)', color: 'var(--ink)' }}
-                  />
-                </div>
-
-                {/* 4. PLAN TYPE */}
-                <div className="field">
-                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600 }}>
-                    PLAN TYPE
-                  </label>
-                  <input
-                    type="text"
-                    className="input"
-                    placeholder="e.g. PPO, HMO, Medicare Advantage, POS, Commercial..."
-                    value={planType}
-                    onChange={(e) => setPlanType(e.target.value)}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid var(--rule)', background: 'var(--surface)', color: 'var(--ink)' }}
-                  />
-                </div>
-
-                {/* 5. Assign Too */}
-                <div className="field">
-                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600 }}>
-                    Assign Too (Specialist)
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', color: 'var(--ink)' }}>
+                    Assign To (Specialist)
                   </label>
                   <select
                     className="select-input"
@@ -430,21 +407,67 @@ export function ClientRequestModal({ isOpen, onClose, onUpdated }) {
                     ))}
                   </select>
                 </div>
-              </div>
 
-              {/* 9. Remarkn */}
-              <div className="field">
-                <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600 }}>
-                  Remarkn (Notes, Calling Instructions, or Special Requests)
-                </label>
-                <textarea
-                  className="input"
-                  rows={3}
-                  placeholder="Enter remarks, specific questions from client, turnaround time expectation..."
-                  value={remark}
-                  onChange={(e) => setRemark(e.target.value)}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--rule)', background: 'var(--surface)', color: 'var(--ink)', resize: 'vertical' }}
-                />
+                {/* Row 2, Col 1-2: INS NAME (Spans 2 columns) */}
+                <div className="field col-span-2">
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', color: 'var(--ink)' }}>
+                    INS NAME (Insurance / Payer) *
+                  </label>
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="e.g. UHC, BCBS, Aetna, Humana, Medicare..."
+                    value={insName}
+                    onChange={(e) => setInsName(e.target.value)}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid var(--rule)', background: 'var(--surface)', color: 'var(--ink)' }}
+                    required
+                  />
+                </div>
+
+                {/* Row 2, Col 3: INS PHONE NO */}
+                <div className="field">
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', color: 'var(--ink)' }}>
+                    INS PHONE NO
+                  </label>
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="e.g. 1-800-842-8178 or 800-344-4567"
+                    value={insPhone}
+                    onChange={(e) => setInsPhone(e.target.value)}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid var(--rule)', background: 'var(--surface)', color: 'var(--ink)' }}
+                  />
+                </div>
+
+                {/* Row 2, Col 4: PLAN TYPE */}
+                <div className="field">
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', color: 'var(--ink)' }}>
+                    PLAN TYPE
+                  </label>
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="e.g. PPO, HMO, Medicare Advantage, POS, Commercial..."
+                    value={planType}
+                    onChange={(e) => setPlanType(e.target.value)}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid var(--rule)', background: 'var(--surface)', color: 'var(--ink)' }}
+                  />
+                </div>
+
+                {/* Row 3, Col 1-4: Remarks (Spans all 4 columns) */}
+                <div className="field col-span-4">
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', color: 'var(--ink)' }}>
+                    Remarks (Notes, Calling Instructions, or Special Requests)
+                  </label>
+                  <textarea
+                    className="input"
+                    rows={3}
+                    placeholder="Enter remarks, specific questions from client, turnaround time expectation..."
+                    value={remark}
+                    onChange={(e) => setRemark(e.target.value)}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--rule)', background: 'var(--surface)', color: 'var(--ink)', resize: 'vertical' }}
+                  />
+                </div>
               </div>
 
               {/* Form Actions */}
@@ -515,21 +538,22 @@ export function ClientRequestModal({ isOpen, onClose, onUpdated }) {
                       <th>Req ID</th>
                       <th>Mode</th>
                       <th>Client</th>
+                      <th>Patient Name</th>
                       <th>INS Name &amp; Plan</th>
                       <th>INS Phone</th>
-                      <th>Assign Too</th>
+                      <th>Assign To</th>
                       <th>Total</th>
                       <th>Completed</th>
                       <th>Not completed</th>
                       <th>Status</th>
-                      <th>Remarkn</th>
+                      <th>Remarks</th>
                       <th>Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredRequests.length === 0 ? (
                       <tr>
-                        <td colSpan="12" className="table-empty" style={{ textAlign: 'center', padding: '30px' }}>
+                        <td colSpan="13" className="table-empty" style={{ textAlign: 'center', padding: '30px' }}>
                           No client requests match your filter.
                         </td>
                       </tr>
@@ -557,6 +581,9 @@ export function ClientRequestModal({ isOpen, onClose, onUpdated }) {
                               </span>
                             </td>
                             <td><span style={{ fontWeight: 600 }}>{clientName}</span></td>
+                            <td>
+                              <div style={{ fontWeight: 600, color: 'var(--ink)' }}>{r.patientName || '—'}</div>
+                            </td>
                             <td>
                               <div className="bold">{r.insName}</div>
                               {r.planType && <div className="patient-sub-cell">{r.planType}</div>}

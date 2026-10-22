@@ -1,6 +1,7 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useState, useEffect } from 'react';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { UI_CONTENT } from '../DB';
+import { STORAGE_KEY, CLIENT_REQUESTS_SYNC_EVENT, INITIAL_REQUESTS } from '../data/clientRequests';
 
 const AdminDashboardView = lazy(() => import('../views/admin/AdminDashboardView').then(m => ({ default: m.AdminDashboardView })));
 const UploadAssignView = lazy(() => import('../views/admin/UploadAssignView').then(m => ({ default: m.UploadAssignView })));
@@ -11,7 +12,52 @@ const CardDetailView = lazy(() => import('../views/shared/CardDetailView').then(
 
 export function AdminLayout() {
   const { activeTab, setActiveTab } = useWorkspace();
-  const tabs = UI_CONTENT.navigation.adminTabs;
+  const [pendingClientRequestsCount, setPendingClientRequestsCount] = useState(0);
+
+  useEffect(() => {
+    const updateCount = () => {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        const list = saved ? JSON.parse(saved) : INITIAL_REQUESTS;
+        if (Array.isArray(list)) {
+          const pending = list.filter(r => r.status !== 'Completed');
+          setPendingClientRequestsCount(pending.length);
+        }
+      } catch (err) {
+        // ignore parse error
+      }
+    };
+
+    updateCount();
+
+    const handleSync = () => updateCount();
+    const handleStorage = (e) => {
+      if (e.key === STORAGE_KEY) updateCount();
+    };
+
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener(CLIENT_REQUESTS_SYNC_EVENT, handleSync);
+    const interval = setInterval(updateCount, 3000);
+
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener(CLIENT_REQUESTS_SYNC_EVENT, handleSync);
+      clearInterval(interval);
+    };
+  }, []);
+
+  const tabs = UI_CONTENT.navigation.adminTabs.map(tab => {
+    if (tab.id === 'client_requests') {
+      return {
+        ...tab,
+        label: pendingClientRequestsCount > 0
+          ? `📨 Client Requests (${pendingClientRequestsCount})`
+          : '📨 Client Requests'
+      };
+    }
+    return tab;
+  });
+
   // A card's page belongs to the dashboard, so its tab stays highlighted there.
   const highlightedTab = activeTab === 'card_detail' ? 'dashboard' : activeTab;
 
