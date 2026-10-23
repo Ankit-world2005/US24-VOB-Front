@@ -1278,55 +1278,6 @@ export function ClientRequestView() {
             View pending records &amp; logs →
           </div>
         </div>
-
-        {/* Card 4: Channels Breakdown -> Clickable channels */}
-        <div
-          className="kpi-card"
-          style={{
-            background: 'var(--surface)',
-            border: '1px solid var(--rule)',
-            borderRadius: '10px',
-            padding: '16px'
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--ink-soft)', fontWeight: 600, letterSpacing: '0.04em' }}>
-              Intake by Channel
-            </span>
-            <span style={{ fontSize: '20px' }}>📡</span>
-          </div>
-          <div style={{ display: 'flex', gap: '12px', marginTop: '10px', fontSize: '13px' }}>
-            <div
-              onClick={() => { setSelectedCardView('all'); setCardModeFilter('Teams'); }}
-              style={{ cursor: 'pointer', padding: '4px 6px', borderRadius: '4px', background: 'var(--surface-2)', transition: 'background .2s' }}
-              title="Click to view Teams records & logs"
-            >
-              <span style={{ color: '#0284c7', fontWeight: 700 }}>💬 {teamsCount}</span>
-              <div style={{ fontSize: '11px', color: 'var(--ink-soft)' }}>Teams →</div>
-            </div>
-
-            <div
-              onClick={() => { setSelectedCardView('all'); setCardModeFilter('Sheet'); }}
-              style={{ cursor: 'pointer', padding: '4px 6px', borderRadius: '4px', background: 'var(--surface-2)', transition: 'background .2s' }}
-              title="Click to view Sheets records & logs"
-            >
-              <span style={{ color: '#059669', fontWeight: 700 }}>📊 {sheetCount}</span>
-              <div style={{ fontSize: '11px', color: 'var(--ink-soft)' }}>Sheets →</div>
-            </div>
-
-            <div
-              onClick={() => { setSelectedCardView('all'); setCardModeFilter('Email'); }}
-              style={{ cursor: 'pointer', padding: '4px 6px', borderRadius: '4px', background: 'var(--surface-2)', transition: 'background .2s' }}
-              title="Click to view Email records & logs"
-            >
-              <span style={{ color: '#d97706', fontWeight: 700 }}>✉️ {emailCount}</span>
-              <div style={{ fontSize: '11px', color: 'var(--ink-soft)' }}>Email →</div>
-            </div>
-          </div>
-          <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--ink-soft)' }}>
-            Channel distribution breakdown · Click channel to open
-          </div>
-        </div>
       </div>
 
       {/* Collapsible New Request Form Panel (Admin & Audit Specialist Only) */}
