@@ -286,9 +286,13 @@ export const apiClient = {
     }
 
     let timeoutId = null;
+    let didTimeout = false;
     if (timeout > 0) {
       const controller = new AbortController();
-      timeoutId = setTimeout(() => controller.abort(), timeout);
+      timeoutId = setTimeout(() => {
+        didTimeout = true;
+        controller.abort();
+      }, timeout);
       options.signal = controller.signal;
     }
 
@@ -353,6 +357,13 @@ export const apiClient = {
 
       return res.json();
     } catch (err) {
+      if (didTimeout || err.name === 'AbortError' || err.message?.includes('aborted')) {
+        const timeoutErr = new Error(`Request timed out after ${Math.round(timeout / 1000)}s. The backend server or database took too long to respond.`);
+        timeoutErr.name = 'TimeoutError';
+        timeoutErr.status = 504;
+        console.warn(`[API Client] ${method} ${url} failed:`, timeoutErr.message);
+        throw timeoutErr;
+      }
       console.warn(`[API Client] ${method} ${url} failed:`, err.message);
       throw err;
     } finally {

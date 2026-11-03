@@ -4164,7 +4164,8 @@ body::before {
   margin: 0;
 }
 
-.btn-print-preview {
+.btn-print-preview,
+.btn-save-doc {
   background: var(--surface-2);
   border: 1px solid var(--rule);
   color: var(--ink);
@@ -4176,10 +4177,16 @@ body::before {
   transition: all .15s ease;
 }
 
-.btn-print-preview:hover {
+.btn-print-preview:hover,
+.btn-save-doc:hover:not(:disabled) {
   background: var(--cobalt);
   color: #ffffff;
   border-color: var(--cobalt);
+}
+
+.btn-save-doc:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 /* Paper Sheet Layout */

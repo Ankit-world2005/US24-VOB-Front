@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authApi } from '../api/auth';
 
-const WorkspaceContext = createContext(null);
+export const WorkspaceContext = createContext(null);
 
 export function WorkspaceProvider({ session, onLogout, children }) {
   // App only renders this provider once a session exists, so the session is the

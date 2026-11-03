@@ -3,7 +3,7 @@ import templateUrl from '../../../docs/VOB_PARKER - Copy.docx?url';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { vobsApi } from '../../api/vobs';
 import { DOCX_TYPE, fillVobTemplate, vobDocxFilename } from '../../utils/vobDocx';
-import { ParkerLivePreview, printVobSheet } from './ParkerLivePreview';
+import { ParkerLivePreview } from './ParkerLivePreview';
 
 /**
  * The per-patient VOB form (FR-15) for a saved record: a preview, a Word
@@ -32,7 +32,7 @@ export function DocumentGeneratorModal({ vob, isOpen, onClose }) {
 
   if (!isOpen || !vob) return null;
 
-  const handlePrint = () => printVobSheet(bodyRef.current);
+
 
   const handleDownloadDocx = async () => {
     setIsDownloading(true);
@@ -74,9 +74,9 @@ export function DocumentGeneratorModal({ vob, isOpen, onClose }) {
           </div>
           <div className="modal-actions">
             <button type="button" className="btn btn-sm" onClick={handleDownloadDocx} disabled={!record || isDownloading}>
-              {isDownloading ? 'Generating…' : '⬇ Download .docx'}
+              {isDownloading ? 'Saving…' : '💾 Save Docs (.docx)'}
             </button>
-            <button type="button" className="btn-doc-action" onClick={handlePrint} disabled={!record}>🖨️ Print / Save PDF</button>
+
             <button type="button" className="drawer-close-btn" onClick={onClose}>✕</button>
           </div>
         </div>

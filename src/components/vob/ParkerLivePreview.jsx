@@ -1,6 +1,9 @@
-import React, { useRef, useMemo, useCallback, memo } from 'react';
+import React, { useRef, useMemo, useCallback, useState, useContext, memo } from 'react';
 import { vobFormRows, shownValue } from '../../utils/vobFormRows';
 import { printElement } from '../../utils/printElement';
+import templateUrl from '../../../docs/VOB_PARKER - Copy.docx?url';
+import { DOCX_TYPE, fillVobTemplate, vobDocxFilename } from '../../utils/vobDocx';
+import { WorkspaceContext } from '../../context/WorkspaceContext';
 
 /**
  * The VOB output document: the letterhead, PAT box and title of
@@ -29,7 +32,44 @@ export function printVobSheet(root) {
 
 export const ParkerLivePreview = memo(function ParkerLivePreview({ formData = {} }) {
   const cardRef = useRef(null);
-  const handlePrint = useCallback(() => printVobSheet(cardRef.current), []);
+  const workspace = useContext(WorkspaceContext);
+  const showToast = workspace?.showToast;
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSaveDoc = useCallback(async () => {
+    setIsSaving(true);
+    try {
+      const res = await fetch(templateUrl);
+      if (!res.ok) throw new Error('Could not load the VOB form template.');
+      const templateBytes = new Uint8Array(await res.arrayBuffer());
+      const bytes = await fillVobTemplate(templateBytes, formData);
+      const filename = vobDocxFilename({
+        client: formData.clientName || formData.client_name || formData.client?.name || formData.client,
+        insurance: formData.insurance,
+        patientName: formData.patientName || formData.patient_name || formData.patient?.name,
+        dos: formData.dos
+      });
+
+      const url = URL.createObjectURL(new Blob([bytes], { type: DOCX_TYPE }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      if (showToast) {
+        showToast(`Saved ${filename}.`, "success");
+      }
+    } catch (err) {
+      console.error(err);
+      if (showToast) {
+        showToast(err?.message || "Could not generate the Word document.", "error");
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  }, [formData, showToast]);
   const rows = useMemo(() => vobFormRows(formData), [formData]);
 
   return (
@@ -37,15 +77,16 @@ export const ParkerLivePreview = memo(function ParkerLivePreview({ formData = {}
       <div className="parker-preview-header">
         <div>
           <h3 className="preview-title">Live preview</h3>
-          <p className="preview-subtitle">Matches the generated PDF.</p>
+          <p className="preview-subtitle">Matches the generated document.</p>
         </div>
         <button
           type="button"
-          className="btn-print-preview"
-          onClick={handlePrint}
-          title="Print or export document as PDF"
+          className="btn-save-doc"
+          onClick={handleSaveDoc}
+          disabled={isSaving}
+          title="Save filled VOB document (.docx)"
         >
-          🖨️ Print / Save PDF
+          {isSaving ? 'Saving…' : '💾 Save Docs'}
         </button>
       </div>
 
